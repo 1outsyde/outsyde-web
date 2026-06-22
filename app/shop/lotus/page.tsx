@@ -19,19 +19,24 @@
 
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { addToCart, getCart, setQty, removeFromCart, subscribe, type CartItem } from "@/lib/cart";
 
 type Filter = "all" | "morning" | "midday" | "night" | "tea" | "herbs" | "prerolls";
 
 export default function LotusHouseBlends() {
   const [active, setActive] = useState<Filter>("all");
-  const [toast, setToast] = useState({ show: false, text: "" });
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const showToast = (name: string, price: string) => {
-    setToast({ show: true, text: `${name} — ${price} added` });
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setToast((t) => ({ ...t, show: false })), 3000);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  useEffect(() => {
+    setCart(getCart());
+    return subscribe(() => setCart(getCart()));
+  }, []);
+  const count = cart.reduce((n, i) => n + i.qty, 0);
+  const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const addItem = (p: { id: string; name: string; price: number; image: string }) => {
+    addToCart({ ...p, vendor: "Lotus House Blends", vendorId: "lotus" });
+    setDrawerOpen(true);
   };
 
   const groupHidden = (blend: string) =>
@@ -179,6 +184,37 @@ html{scroll-behavior:smooth;}
 .toast.show{transform:translateY(0);opacity:1;}
 .toast-dot{width:5px;height:5px;border-radius:50%;background:var(--lhb-lavender-light);flex-shrink:0;}
 
+.nav-right{display:flex;align-items:center;gap:1.5rem;}
+.cart-btn{position:relative;display:flex;align-items:center;gap:.45rem;background:transparent;border:none;color:#fff;cursor:pointer;font-family:'Jost',sans-serif;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;}
+.cart-btn:hover{color:var(--outsyde-gold);}
+.cart-count{background:var(--outsyde-gold);color:#000;border-radius:999px;min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:600;padding:0 5px;}
+.cart-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;opacity:0;pointer-events:none;transition:opacity .25s;}
+.cart-overlay.open{opacity:1;pointer-events:auto;}
+.cart-drawer{position:fixed;top:0;right:0;height:100%;width:380px;max-width:90vw;background:var(--lhb-parchment);z-index:201;transform:translateX(100%);transition:transform .3s ease;display:flex;flex-direction:column;box-shadow:-8px 0 40px rgba(0,0,0,.2);}
+.cart-drawer.open{transform:translateX(0);}
+.cart-drawer-hdr{display:flex;align-items:center;justify-content:space-between;padding:1.4rem 1.5rem;border-bottom:1px solid rgba(90,62,30,.15);}
+.cart-drawer-hdr h3{font-family:'Cormorant Garamond',serif;font-size:1.5rem;color:var(--lhb-brown-dark);font-weight:500;}
+.cart-close{background:none;border:none;font-size:1.6rem;cursor:pointer;color:var(--lhb-text-mid);line-height:1;}
+.cart-items{flex:1;overflow-y:auto;padding:.5rem 1.5rem 1rem;}
+.cart-vendor-label{font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--lhb-sage);margin:1rem 0 .5rem;font-weight:600;}
+.cart-line{display:flex;gap:.85rem;padding:.85rem 0;border-bottom:1px solid rgba(90,62,30,.1);}
+.cart-line-img{width:56px;height:56px;background:#fff;object-fit:contain;flex-shrink:0;border:1px solid rgba(90,62,30,.1);}
+.cart-line-info{flex:1;min-width:0;}
+.cart-line-name{font-family:'Cormorant Garamond',serif;font-size:1.02rem;color:var(--lhb-brown-dark);line-height:1.2;}
+.cart-line-price{font-size:.78rem;color:var(--lhb-text-muted);margin-top:.2rem;}
+.cart-qty{display:flex;align-items:center;gap:.5rem;margin-top:.55rem;}
+.cart-qty button{width:24px;height:24px;border:1px solid rgba(90,62,30,.3);background:#fff;cursor:pointer;font-size:.95rem;color:var(--lhb-brown-dark);line-height:1;display:flex;align-items:center;justify-content:center;}
+.cart-qty span{font-size:.85rem;min-width:20px;text-align:center;}
+.cart-remove{background:none;border:none;color:var(--lhb-text-muted);font-size:.66rem;text-decoration:underline;cursor:pointer;margin-left:auto;align-self:flex-start;letter-spacing:.05em;}
+.cart-empty{text-align:center;color:var(--lhb-text-muted);padding:3rem 1rem;font-size:.9rem;}
+.cart-foot{padding:1.4rem 1.5rem;border-top:1px solid rgba(90,62,30,.15);}
+.cart-subtotal{display:flex;justify-content:space-between;align-items:baseline;color:var(--lhb-brown-dark);margin-bottom:1rem;}
+.cart-subtotal span{font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;color:var(--lhb-text-mid);}
+.cart-subtotal strong{font-family:'Cormorant Garamond',serif;font-size:1.35rem;font-weight:600;}
+.cart-checkout{display:block;width:100%;background:var(--lhb-moss);color:var(--lhb-parchment);text-align:center;padding:.95rem;font-size:.75rem;letter-spacing:.16em;text-transform:uppercase;text-decoration:none;border:none;cursor:pointer;transition:background .2s;}
+.cart-checkout:hover{background:var(--lhb-brown-dark);}
+.cart-viewcart{display:block;text-align:center;margin-top:.8rem;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--lhb-text-mid);text-decoration:underline;text-underline-offset:3px;}
+@media(max-width:420px){.cart-drawer{width:100%;}}
 @media(max-width:900px){
   .hero{grid-template-columns:1fr;} .hero-left{min-height:46vh;} .hero-secondary-img{display:none;}
   .about-section{grid-template-columns:1fr;} .about-imagery{min-height:340px;}
@@ -198,12 +234,17 @@ html{scroll-behavior:smooth;}
             <div className="nav-y">Y</div>
             <div className="nav-wordmark">OUTSYDE</div>
           </a>
-          <a href="/" className="nav-back">
-            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M9 11L5 7l4-4" />
-            </svg>
-            Back to Platform
-          </a>
+          <div className="nav-right">
+            <a href="/" className="nav-back">
+              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M9 11L5 7l4-4" />
+              </svg>
+              Back to Platform
+            </a>
+            <button className="cart-btn" onClick={() => setDrawerOpen(true)} aria-label="Open cart">
+              Cart{count > 0 && <span className="cart-count">{count}</span>}
+            </button>
+          </div>
         </nav>
 
         <div className="page">
@@ -332,7 +373,7 @@ html{scroll-behavior:smooth;}
                         <span className="pcard-price">$10.00</span>
                         <span className="pcard-bundle">Bundle: 3 for $20</span>
                       </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); showToast("Dream Temple Herbal Cones", "$10.00"); }}>+</button>
+                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "dt-cones", name: "Dream Temple Herbal Cones", price: 10.00, image: "/dream-temple-prerolls.jpg" }); }}>+</button>
                     </div>
                   </div>
                 </a>
@@ -350,7 +391,7 @@ html{scroll-behavior:smooth;}
                         <span className="pcard-price">$18.75</span>
                         <span className="pcard-bundle">Bundle: 3 for $35</span>
                       </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); showToast("Dream Temple Loose-Herbs", "$18.75"); }}>+</button>
+                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "dt-herbs", name: "Dream Temple Loose-Herbs", price: 18.75, image: "/dream-temple-loose-herbs.jpg" }); }}>+</button>
                     </div>
                   </div>
                 </a>
@@ -368,7 +409,7 @@ html{scroll-behavior:smooth;}
                         <span className="pcard-price">$12.50</span>
                         <span className="pcard-bundle">Bundle: 3 for $25</span>
                       </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); showToast("Dream Temple Tea Box", "$12.50"); }}>+</button>
+                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "dt-tea", name: "Dream Temple Tea Box", price: 12.50, image: "/dream-temple-tea-box.jpg" }); }}>+</button>
                     </div>
                   </div>
                 </a>
@@ -396,7 +437,7 @@ html{scroll-behavior:smooth;}
                         <span className="pcard-price">$18.75</span>
                         <span className="pcard-bundle">Bundle: 3 for $35</span>
                       </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); showToast("Heart Flow Loose-Herbs", "$18.75"); }}>+</button>
+                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "hf-herbs", name: "Heart Flow Loose-Herbs", price: 18.75, image: "/heart-flow-loose-herbs.jpg" }); }}>+</button>
                     </div>
                   </div>
                 </a>
@@ -414,7 +455,7 @@ html{scroll-behavior:smooth;}
                         <span className="pcard-price">$12.50</span>
                         <span className="pcard-bundle">Bundle: 3 for $25</span>
                       </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); showToast("Heart Flow Tea Box", "$12.50"); }}>+</button>
+                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "hf-tea", name: "Heart Flow Tea Box", price: 12.50, image: "/heart-flow-tea-box.jpg" }); }}>+</button>
                     </div>
                   </div>
                 </a>
@@ -432,7 +473,7 @@ html{scroll-behavior:smooth;}
                         <span className="pcard-price">$10.00</span>
                         <span className="pcard-bundle">Bundle: 3 for $20</span>
                       </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); showToast("Heart Flow Herbal Cones", "$10.00"); }}>+</button>
+                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "hf-cones", name: "Heart Flow Herbal Cones", price: 10.00, image: "/heart-flow-prerolls.jpg" }); }}>+</button>
                     </div>
                   </div>
                 </a>
@@ -460,7 +501,7 @@ html{scroll-behavior:smooth;}
                         <span className="pcard-price">$18.75</span>
                         <span className="pcard-bundle">Bundle: 3 for $35</span>
                       </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); showToast("Rise & Bloom Loose-Herbs", "$18.75"); }}>+</button>
+                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "rb-herbs", name: "Rise & Bloom Loose-Herbs", price: 18.75, image: "/rise-bloom-loose-herbs.jpg" }); }}>+</button>
                     </div>
                   </div>
                 </a>
@@ -478,7 +519,7 @@ html{scroll-behavior:smooth;}
                         <span className="pcard-price">$12.50</span>
                         <span className="pcard-bundle">Bundle: 3 for $25</span>
                       </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); showToast("Rise & Bloom Tea Box", "$12.50"); }}>+</button>
+                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "rb-tea", name: "Rise & Bloom Tea Box", price: 12.50, image: "/rise-bloom-tea-box.jpg" }); }}>+</button>
                     </div>
                   </div>
                 </a>
@@ -497,7 +538,7 @@ html{scroll-behavior:smooth;}
                         <span className="pcard-price">$10.00</span>
                         <span className="pcard-bundle">Bundle: 3 for $20</span>
                       </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); showToast("Rise & Bloom Herbal Cones", "$10.00"); }}>+</button>
+                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "rb-cones", name: "Rise & Bloom Herbal Cones", price: 10.00, image: "/rise-bloom-prerolls.png" }); }}>+</button>
                     </div>
                   </div>
                 </a>
@@ -568,11 +609,49 @@ html{scroll-behavior:smooth;}
           </div>
         </div>
 
-        {/* TOAST */}
-        <div className={`toast${toast.show ? " show" : ""}`}>
-          <div className="toast-dot" />
-          <span>{toast.text}</span>
-        </div>
+        {/* CART DRAWER */}
+        <div className={`cart-overlay${drawerOpen ? " open" : ""}`} onClick={() => setDrawerOpen(false)} />
+        <aside className={`cart-drawer${drawerOpen ? " open" : ""}`} aria-hidden={!drawerOpen}>
+          <div className="cart-drawer-hdr">
+            <h3>Your Cart</h3>
+            <button className="cart-close" onClick={() => setDrawerOpen(false)} aria-label="Close cart">×</button>
+          </div>
+          <div className="cart-items">
+            {cart.length === 0 ? (
+              <p className="cart-empty">Your cart is empty.</p>
+            ) : (
+              <>
+                <div className="cart-vendor-label">Lotus House Blends</div>
+                {cart.map((i) => (
+                  <div className="cart-line" key={i.id}>
+                    {i.image && <img className="cart-line-img" src={i.image} alt={i.name} />}
+                    <div className="cart-line-info">
+                      <div className="cart-line-name">{i.name}</div>
+                      <div className="cart-line-price">${i.price.toFixed(2)}</div>
+                      <div className="cart-qty">
+                        <button onClick={() => setQty(i.id, i.qty - 1)} aria-label="Decrease">−</button>
+                        <span>{i.qty}</span>
+                        <button onClick={() => setQty(i.id, i.qty + 1)} aria-label="Increase">+</button>
+                        <button className="cart-remove" onClick={() => removeFromCart(i.id)}>Remove</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+          {cart.length > 0 && (
+            <div className="cart-foot">
+              <div className="cart-subtotal">
+                <span>Subtotal</span>
+                <strong>${subtotal.toFixed(2)}</strong>
+              </div>
+              <a href="/shop/lotus/checkout" className="cart-checkout">Checkout</a>
+              <a href="/cart" className="cart-viewcart">View full cart</a>
+            </div>
+          )}
+        </aside>
+
       </div>
     </>
   );
