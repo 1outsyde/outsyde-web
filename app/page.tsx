@@ -57,7 +57,7 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
 #nav{position:fixed;top:0;left:0;right:0;z-index:200;padding:22px 52px;display:flex;align-items:center;gap:24px;transition:background .45s ease,padding .35s ease,border-color .45s ease;border-bottom:0.5px solid transparent;}
 #nav.scrolled{background:rgba(0,0,0,.93);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 52px;border-bottom-color:rgba(232,185,48,.18);}
 .nav-logo{display:flex;align-items:center;gap:11px;text-decoration:none;}
-.nav-y-mark{width:36px;height:36px;background:var(--gold);border-radius:7px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:21px;color:var(--black);font-weight:600;letter-spacing:-0.02em;}
+.nav-y-mark{width:40px;height:40px;object-fit:contain;flex-shrink:0;}
 .nav-wordmark{line-height:1;}
 .nav-wordmark strong{display:block;font-family:var(--serif);font-weight:300;font-size:19px;letter-spacing:.14em;color:var(--cream);text-transform:uppercase;}
 .nav-wordmark span{display:block;font-size:8.5px;letter-spacing:.22em;color:var(--gold);text-transform:uppercase;margin-top:1px;}
@@ -233,7 +233,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
       {/* ══ NAV ══ */}
       <nav id="nav" className={scrolled ? "scrolled" : ""} aria-label="Main navigation">
         <a href="/" className="nav-logo" aria-label="Go OutsYde home">
-          <div className="nav-y-mark" aria-hidden="true">Y</div>
+          <img src="/outsyde-y-transparent.png" className="nav-y-mark" alt="OutsYde" />
           <div className="nav-wordmark">
             <strong>Go OutsYde</strong>
             <span>Like a Lavished Local</span>
