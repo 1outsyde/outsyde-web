@@ -18,14 +18,18 @@ import {
   STRIPE_TAX_ENABLED,
 } from "@/lib/stripe-config";
 
-const SECRET = process.env.STRIPE_SECRET_KEY as string;
-const stripe = new Stripe(SECRET);
-const IS_TEST = SECRET.startsWith("sk_test");
+function getStripe() {
+  const SECRET = process.env.STRIPE_SECRET_KEY;
+  if (!SECRET) throw new Error("STRIPE_SECRET_KEY is not set");
+  return { stripe: new Stripe(SECRET), isTest: SECRET.startsWith("sk_test") };
+}
 
 type IncomingItem = { id: string; name?: string; qty?: number };
 
 export async function POST(req: NextRequest) {
   try {
+    const { stripe, isTest: IS_TEST } = getStripe();
+
     const { items, shipping, email, phone } = (await req.json()) as {
       items: IncomingItem[];
       shipping?: {
@@ -86,7 +90,7 @@ export async function POST(req: NextRequest) {
         },
       });
       taxCents = calc.tax_amount_exclusive ?? 0;
-     taxCalculationId = calc.id ?? "";
+      taxCalculationId = calc.id ?? "";
     }
 
     // 4) Total the customer pays = base + service fee + tax
