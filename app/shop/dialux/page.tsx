@@ -94,7 +94,7 @@ export default function DiaLuxStore() {
 
   useEffect(() => {
     setCart(getCart());
-    const unsub = subscribe(setCart);
+    const unsub = subscribe(() => setCart(getCart()));
     return () => { unsub(); };
   }, []);
 
