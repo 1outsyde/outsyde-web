@@ -4,7 +4,7 @@
 // Pure front-end. Built to look full with 2 vendors and scale to many.
 //
 // Vendor card images expected in /public:
-//   lifestyle-ritual.jpg (Lotus), dialux-hero-clean.jpg (Dia Lux)
+//   lifestyle-ritual.jpg (Lotus), dialux-hero-clean.jpg (Dia Lux), royal-elite-card.jpg (Royal Elite)
 
 "use client";
 
@@ -36,6 +36,14 @@ const VENDORS: Vendor[] = [
     category: "Luxury Hair",
     href: "/shop/dialux",
     image: "/dialux-hero-clean.jpg",
+  },
+  {
+    id: "royalelite",
+    name: "Royal Elite Moving",
+    tagline: "Professional residential & commercial moving across Hampton Roads.",
+    category: "Moving & Services",
+    href: "/shop/royalelite",
+    image: "/royal-elite-card.jpg",
   },
 ];
 
@@ -73,8 +81,7 @@ export default function Marketplace() {
 .mkt-logo img{width:38px;height:38px;object-fit:contain;}
 .mkt-logo-word{font-family:var(--mk-display);font-size:19px;letter-spacing:.14em;color:var(--mk-cream);text-transform:uppercase;}
 .mkt-nav-right{display:flex;align-items:center;gap:24px;}
-.mkt-nav-link{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--mk-muted);transition:color .2s;}
-.mkt-nav-link:hover{color:var(--mk-gold);}
+.mkt-nav-link{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--mk-muted);transition:color .2s;}.mkt-nav-link:hover{color:var(--mk-gold);}
 .mkt-cart{position:relative;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--mk-cream);}
 .mkt-cart-count{position:absolute;top:-9px;right:-13px;background:var(--mk-gold);color:#000;font-size:10px;font-weight:700;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
 
