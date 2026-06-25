@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
         },
       });
       taxCents = calc.tax_amount_exclusive ?? 0;
-      taxCalculationId = calc.id;
+     taxCalculationId = calc.id ?? "";
     }
 
     // 4) Total the customer pays = base + service fee + tax
