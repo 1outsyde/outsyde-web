@@ -1,0 +1,5 @@
+api key google maps platform AIzaSyC_p0k8IdbAjL0GWeIbTVhRx4zXIfikXTs
+
+stripe npx skills add -y https://docs.stripe.com
+
+Powerhsell updated: stripe webhook secret  whsec_b0afcedd625f0aa72e6080bfc5e3cf7c2a542d93db90408e824df3e558db9c73

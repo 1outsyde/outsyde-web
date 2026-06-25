@@ -16,6 +16,7 @@
 //
 // COMPLIANCE: smokable products are named "Herbal Cones" (not "pre-rolls")
 // in all shopper-facing copy. Product link slugs are unchanged (live pages).
+// PRODUCT CARDS now link to internal detail pages: /shop/lotus/<slug>
 
 "use client";
 
@@ -360,7 +361,7 @@ html{scroll-behavior:smooth;}
                 <span className="blend-group-sub">Ease into rest · Calm the nervous system</span>
               </div>
               <div className="product-grid">
-                <a href="https://www.goutsyde.com/lotus-items/dream-temple-pre-rolls" className="pcard" style={{ display: cardDisplay("prerolls") }} data-stripe-price="STRIPE_PRICE_ID_DT_PREROLLS">
+                <a href="/shop/lotus/dream-temple-pre-rolls" className="pcard" style={{ display: cardDisplay("prerolls") }}>
                   <div className="pcard-img">
                     <img src="/dream-temple-prerolls.jpg" alt="Dream Temple Herbal Cones" />
                     <span className="ptype-tag">Herbal Blend</span>
@@ -378,7 +379,7 @@ html{scroll-behavior:smooth;}
                   </div>
                 </a>
 
-                <a href="https://www.goutsyde.com/lotus-items/dream-temple-loose-herbs" className="pcard" style={{ display: cardDisplay("herbs") }} data-stripe-price="STRIPE_PRICE_ID_DT_HERBS">
+                <a href="/shop/lotus/dream-temple-loose-herbs" className="pcard" style={{ display: cardDisplay("herbs") }}>
                   <div className="pcard-img">
                     <img src="/dream-temple-loose-herbs.jpg" alt="Dream Temple Loose Herbs" />
                     <span className="ptype-tag">Loose Herbs</span>
@@ -396,7 +397,7 @@ html{scroll-behavior:smooth;}
                   </div>
                 </a>
 
-                <a href="https://www.goutsyde.com/lotus-items/dream-temple-tea-box" className="pcard" style={{ display: cardDisplay("tea") }} data-stripe-price="STRIPE_PRICE_ID_DT_TEA">
+                <a href="/shop/lotus/dream-temple-tea-box" className="pcard" style={{ display: cardDisplay("tea") }}>
                   <div className="pcard-img">
                     <img src="/dream-temple-tea-box.jpg" alt="Dream Temple Tea Box" />
                     <span className="ptype-tag">Tea Box</span>
@@ -424,7 +425,7 @@ html{scroll-behavior:smooth;}
                 <span className="blend-group-sub">Stay balanced &amp; grounded · Supports digestion</span>
               </div>
               <div className="product-grid">
-                <a href="https://www.goutsyde.com/lotus-items/heart-flow-loose-herbs" className="pcard" style={{ display: cardDisplay("herbs") }} data-stripe-price="STRIPE_PRICE_ID_HF_HERBS">
+                <a href="/shop/lotus/heart-flow-loose-herbs" className="pcard" style={{ display: cardDisplay("herbs") }}>
                   <div className="pcard-img">
                     <img src="/heart-flow-loose-herbs.jpg" alt="Heart Flow Loose Herbs" />
                     <span className="ptype-tag">Loose Herbs</span>
@@ -442,7 +443,7 @@ html{scroll-behavior:smooth;}
                   </div>
                 </a>
 
-                <a href="https://www.goutsyde.com/lotus-items/heart-flow-tea-box" className="pcard" style={{ display: cardDisplay("tea") }} data-stripe-price="STRIPE_PRICE_ID_HF_TEA">
+                <a href="/shop/lotus/heart-flow-tea-box" className="pcard" style={{ display: cardDisplay("tea") }}>
                   <div className="pcard-img">
                     <img src="/heart-flow-tea-box.jpg" alt="Heart Flow Tea Box" />
                     <span className="ptype-tag">Tea Box</span>
@@ -460,7 +461,7 @@ html{scroll-behavior:smooth;}
                   </div>
                 </a>
 
-                <a href="https://www.goutsyde.com/lotus-items/heart-flow-pre-rolls" className="pcard" style={{ display: cardDisplay("prerolls") }} data-stripe-price="STRIPE_PRICE_ID_HF_PREROLLS">
+                <a href="/shop/lotus/heart-flow-pre-rolls" className="pcard" style={{ display: cardDisplay("prerolls") }}>
                   <div className="pcard-img">
                     <img src="/heart-flow-prerolls.jpg" alt="Heart Flow Herbal Cones" />
                     <span className="ptype-tag">Herbal Blend</span>
@@ -488,7 +489,7 @@ html{scroll-behavior:smooth;}
                 <span className="blend-group-sub">Clear the mind · Get the day moving</span>
               </div>
               <div className="product-grid">
-                <a href="https://www.goutsyde.com/lotus-items/rise-bloom-loose-herbs" className="pcard" style={{ display: cardDisplay("herbs") }} data-stripe-price="STRIPE_PRICE_ID_RB_HERBS">
+                <a href="/shop/lotus/rise-bloom-loose-herbs" className="pcard" style={{ display: cardDisplay("herbs") }}>
                   <div className="pcard-img">
                     <img src="/rise-bloom-loose-herbs.jpg" alt="Rise & Bloom Loose Herbs" />
                     <span className="ptype-tag">Loose Herbs</span>
@@ -506,7 +507,7 @@ html{scroll-behavior:smooth;}
                   </div>
                 </a>
 
-                <a href="https://www.goutsyde.com/lotus-items/rise-bloom-tea-box" className="pcard" style={{ display: cardDisplay("tea") }} data-stripe-price="STRIPE_PRICE_ID_RB_TEA">
+                <a href="/shop/lotus/rise-bloom-tea-box" className="pcard" style={{ display: cardDisplay("tea") }}>
                   <div className="pcard-img">
                     <img src="/rise-bloom-tea-box.jpg" alt="Rise & Bloom Tea Box" />
                     <span className="ptype-tag">Tea Box</span>
@@ -524,9 +525,8 @@ html{scroll-behavior:smooth;}
                   </div>
                 </a>
 
-                <a href="https://www.goutsyde.com/lotus-items/rise-bloom-pre-rolls" className="pcard" style={{ display: cardDisplay("prerolls") }} data-stripe-price="STRIPE_PRICE_ID_RB_PREROLLS">
+                <a href="/shop/lotus/rise-bloom-pre-rolls" className="pcard" style={{ display: cardDisplay("prerolls") }}>
                   <div className="pcard-img">
-                    {/* Rise & Bloom cones — drop rise-bloom-prerolls.jpg into /public (JPG) */}
                     <img src="/rise-bloom-prerolls.png" alt="Rise & Bloom Herbal Cones" />
                     <span className="ptype-tag">Herbal Blend</span>
                   </div>
