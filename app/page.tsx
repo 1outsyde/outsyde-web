@@ -240,7 +240,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
           </div>
         </a>
         <div className="nav-links">
-          <a href="#collection">Shop</a>
+          <a href="/shop">Shop</a>
           <a href="#photographers">Photographers</a>
           <a href="#business-band">For Businesses</a>
           <a href="#photographers">For Creators</a>
@@ -281,7 +281,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
             local brands, artists, and photographers — all in one place.
           </p>
           <div className="hero-ctas">
-            <a href="#collection" className="btn btn-gold">
+            <a href="/shop" className="btn btn-gold">
               Shop Now →
             </a>
             <a href="#photographers" className="btn btn-outline">
