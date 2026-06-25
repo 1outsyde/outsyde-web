@@ -17,10 +17,17 @@ import {
   sendCustomerOrderConfirmation,
 } from "@/lib/emails";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
-const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET as string;
+function getStripe() {
+  const SECRET = process.env.STRIPE_SECRET_KEY;
+  const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!SECRET) throw new Error("STRIPE_SECRET_KEY is not set");
+  if (!WEBHOOK_SECRET) throw new Error("STRIPE_WEBHOOK_SECRET is not set");
+  return { stripe: new Stripe(SECRET), WEBHOOK_SECRET };
+}
 
 export async function POST(req: NextRequest) {
+  const { stripe, WEBHOOK_SECRET } = getStripe();
+
   const body = await req.text(); // RAW body required for signature verification
   const sig = req.headers.get("stripe-signature") || "";
 
