@@ -1,22 +1,5 @@
 // app/shop/lotus/page.tsx
-// Lotus House Blends — vendor page (converted from your HTML to Next.js)
-//
-// WHERE THIS GOES:
-//   Create folders so the path is:  outsyde-web/app/shop/lotus/page.tsx
-//   (matches the "Discover Lotus →" link on your home page → /shop/lotus)
-//
-// IMAGES: drop these files into outsyde-web/public/ (exact names):
-//   logo-dark.png (PNG)
-//   PRODUCTS (all PNG): dream-temple-loose-herbs.png, dream-temple-tea-box.png,
-//     dream-temple-prerolls.png, heart-flow-loose-herbs.png, heart-flow-tea-box.png,
-//     heart-flow-prerolls.png, rise-bloom-loose-herbs.png, rise-bloom-tea-box.png
-//   EXCEPTION (JPG): rise-bloom-prerolls.jpg
-//   LIFESTYLE (format flexible): lifestyle-ritual.jpg, lifestyle-tea.jpg, lifestyle-model.jpg
-//   (until they're added, image slots show blank — layout still holds)
-//
-// COMPLIANCE: smokable products are named "Herbal Cones" (not "pre-rolls")
-// in all shopper-facing copy. Product link slugs are unchanged (live pages).
-// PRODUCT CARDS now link to internal detail pages: /shop/lotus/<slug>
+// Lotus House Blends — vendor storefront page.
 
 "use client";
 
