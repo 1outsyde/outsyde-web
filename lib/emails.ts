@@ -1,11 +1,16 @@
 // lib/emails.ts
 // Ported from your Wix emailManager.jsw — same Resend setup, same branded HTML.
-// Wix's getSecret("RESEND_API_KEY") -> process.env.RESEND_API_KEY
 //
 // WHERE THIS GOES:  outsyde-web/lib/emails.ts
-// Needs (in .env.local):  RESEND_API_KEY
+// Needs (in .env.local / Vercel):  RESEND_API_KEY
+//
+// FROM ADDRESS: must use the Resend-VERIFIED domain (info.goutsyde.com).
+// Replies route to the info@goutsyde.com Google Workspace inbox via reply_to.
 
 const RESEND_API = "https://api.resend.com/emails";
+
+const FROM_ADDRESS = "Go Outsyde <orders@info.goutsyde.com>";
+const REPLY_TO = "info@goutsyde.com";
 
 type Addr = { line1?: string; city?: string; state?: string; postal_code?: string; country?: string };
 type Item = { description?: string; title?: string; quantity?: number; amount_total?: number };
@@ -22,7 +27,8 @@ async function sendEmail({
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: "Go Outsyde <info@info.goutsyde.com>",
+        from: FROM_ADDRESS,
+        reply_to: REPLY_TO,
         to: recipients,
         subject,
         ...(html ? { html } : { text: body }),
@@ -56,7 +62,7 @@ function rows(items: Item[], light = false) {
 
 // ===== EMAIL 3 — GO OUTSYDE SALE NOTIFICATION =====
 export async function sendOutsydeSaleNotification(p: {
-  customerName: string; customerEmail: string; orderId: string; items: Item[];
+  customerName: string; customerEmail: string; customerPhone: string; orderId: string; items: Item[];
   baseTotalCents: number; customerTotalCents: number; platformFeeCents: number;
   vendorPayoutCents: number; shippingAddress: Addr;
 }) {
@@ -77,6 +83,7 @@ export async function sendOutsydeSaleNotification(p: {
       <h3 style="color:#E8B930;margin:0 0 12px 0;font-size:13px;letter-spacing:2px;text-transform:uppercase;">Customer</h3>
       <p style="color:#ffffff;margin:0 0 4px 0;font-size:15px;">${p.customerName}</p>
       <p style="color:#999;margin:0 0 4px 0;font-size:13px;">${p.customerEmail}</p>
+      <p style="color:#999;margin:0 0 4px 0;font-size:13px;">📞 ${p.customerPhone || "No phone provided"}</p>
       <p style="color:#666;margin:0 0 24px 0;font-size:12px;">Order ID: ${p.orderId}</p>
       <h3 style="color:#E8B930;margin:0 0 12px 0;font-size:13px;letter-spacing:2px;text-transform:uppercase;">Items Sold</h3>
       <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;border:1px solid #2a2a2a;border-radius:4px;">
@@ -102,7 +109,7 @@ export async function sendOutsydeSaleNotification(p: {
 
 // ===== EMAIL 2 — LOTUS VENDOR NOTIFICATION =====
 export async function sendLotusOrderNotification(p: {
-  customerName: string; customerEmail: string; orderId: string; items: Item[];
+  customerName: string; customerEmail: string; customerPhone: string; orderId: string; items: Item[];
   vendorPayoutCents: number; shippingAddress: Addr;
 }) {
   const vendorPayout = (p.vendorPayoutCents / 100).toFixed(2);
@@ -119,6 +126,7 @@ export async function sendLotusOrderNotification(p: {
       <h3 style="color:#5b3d8f;margin:0 0 12px 0;font-size:13px;letter-spacing:2px;text-transform:uppercase;">Customer Info</h3>
       <p style="color:#333;margin:0 0 4px 0;font-size:15px;">${p.customerName}</p>
       <p style="color:#666;margin:0 0 4px 0;font-size:13px;">${p.customerEmail}</p>
+      <p style="color:#666;margin:0 0 4px 0;font-size:13px;">📞 ${p.customerPhone || "No phone provided"}</p>
       <p style="color:#999;margin:0 0 24px 0;font-size:12px;">Order ID: ${p.orderId}</p>
       <h3 style="color:#5b3d8f;margin:0 0 12px 0;font-size:13px;letter-spacing:2px;text-transform:uppercase;">Items To Fulfill</h3>
       <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;border:1px solid #e8e0d0;border-radius:4px;">

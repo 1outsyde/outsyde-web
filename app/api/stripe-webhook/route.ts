@@ -4,7 +4,7 @@
 //
 // WHERE THIS GOES:  outsyde-web/app/api/stripe-webhook/route.ts
 //
-// Needs (in .env.local):  STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+// Needs (in .env.local / Vercel):  STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
 //
 // NOTE: signature verification (incl. the replay/timestamp check you had disabled on Wix)
 // is handled correctly + automatically by stripe.webhooks.constructEvent below.
@@ -69,6 +69,7 @@ export async function POST(req: NextRequest) {
         sendOutsydeSaleNotification({
           customerName: m.customer_name || "Customer",
           customerEmail: m.customer_email || "",
+          customerPhone: m.customer_phone || "",
           orderId: pi.id,
           items,
           baseTotalCents: Number(m.base_total_cents || 0),
@@ -80,6 +81,7 @@ export async function POST(req: NextRequest) {
         sendLotusOrderNotification({
           customerName: m.customer_name || "Customer",
           customerEmail: m.customer_email || "",
+          customerPhone: m.customer_phone || "",
           orderId: pi.id,
           items,
           vendorPayoutCents: Number(m.vendor_payout_cents || 0),
