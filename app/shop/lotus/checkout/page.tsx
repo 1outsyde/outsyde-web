@@ -279,7 +279,7 @@ function CheckoutForm() {
                 <span>Subtotal</span><span>${subtotal.toFixed(2)}</span>
               </div>
               <div className="feerow">
-                <span>Service fee (5%)</span><span>${fee.toFixed(2)}</span>
+                <span>Service fee</span><span>${fee.toFixed(2)}</span>
               </div>
               <div className="feerow free">
                 <span>Shipping</span><span>Free</span>
