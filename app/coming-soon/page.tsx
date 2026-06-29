@@ -12,7 +12,7 @@
 import { useState } from "react";
 
 // ── Replace this with your real Web3Forms access key for info@goutsyde.com ──
-const WEB3FORMS_KEY = "REPLACE_ME_WITH_INFO_GOUTSYDE_KEY";
+const WEB3FORMS_KEY = "2859fc5d-eee8-48e3-9135-ce8ab878fd8c";
 
 export default function ComingSoon() {
   const [email, setEmail] = useState("");
