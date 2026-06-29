@@ -246,7 +246,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
           <a href="#photographers">For Creators</a>
         </div>
         <div className="nav-actions">
-          <a href="/login">Log In</a>
+          <a href="/coming-soon">Log In</a>
           <a href="/shop" className="nav-cta">Shop Now</a>
         </div>
       </nav>
@@ -309,10 +309,10 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
             <h2 className="tri-heading">List Your Business on OutsYde</h2>
             <p className="tri-desc">Get your products, services, and bookings in front of OutsYde&apos;s audience of local culture-seekers and active buyers.</p>
             <div className="tri-btns">
-              <a href="/business-inquiry" className="tri-btn btn-tri-gold">
+              <a href="/coming-soon" className="tri-btn btn-tri-gold">
                 Inquire to Join <span className="tri-btn-arrow">→</span>
               </a>
-              <a href="/how-it-works" className="tri-btn btn-tri-outline-cream">How It Works</a>
+              <a href="/coming-soon" className="tri-btn btn-tri-outline-cream">How It Works</a>
             </div>
           </div>
         </div>
@@ -343,10 +343,10 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
             <h2 className="tri-heading">Turn Your Lens Into Bookings</h2>
             <p className="tri-desc">Join OutsYde&apos;s collective of neighborhood photographers. Get discovered, get booked, and grow your client base — no middleman.</p>
             <div className="tri-btns">
-              <a href="/photographer-signup" className="tri-btn btn-tri-gold">
+              <a href="/coming-soon" className="tri-btn btn-tri-gold">
                 Join as a Photographer <span className="tri-btn-arrow">→</span>
               </a>
-              <a href="/photographer-faq" className="tri-btn btn-tri-outline-cream">Learn More</a>
+              <a href="/coming-soon" className="tri-btn btn-tri-outline-cream">Learn More</a>
             </div>
           </div>
         </div>
@@ -428,8 +428,8 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
                 <p className="slide-brand-label">Partner With OutsYde</p>
                 <h3 className="slide-title" style={{ color: "var(--gold)" }}>Your Brand<br /><em>Belongs</em><br />Here</h3>
                 <div className="slide-btns">
-                  <a href="/business-inquiry" className="slide-cta">Inquire About Listing →</a>
-                  <a href="/how-it-works" className="slide-cta-secondary">See How It Works</a>
+                  <a href="/coming-soon" className="slide-cta">Inquire About Listing →</a>
+                  <a href="/coming-soon" className="slide-cta-secondary">See How It Works</a>
                 </div>
               </div>
             </div>
@@ -460,8 +460,8 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
             <p>Emerging visionaries shaping the lens of New York. Bold, authentic, deeply connected to the pulse of the city.</p>
           </div>
           <div className="photo-hd-right">
-            <a href="/book-photographer" className="btn-book-now">Book a Session →</a>
-            <a href="/photographer-signup" className="btn-join-collective">Join Our Collective →</a>
+            <a href="/coming-soon" className="btn-book-now">Book a Session →</a>
+            <a href="/coming-soon" className="btn-join-collective">Join Our Collective →</a>
           </div>
         </div>
 
@@ -469,7 +469,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
           <div className="photo-card">
             <div className="photo-card-bg" style={{ backgroundImage: "url('/photographer-gio.jpg')", backgroundPosition: "center top" }} />
             <div className="photo-card-veil" />
-            <a href="/photographers/gio" className="photo-card-book">Book Gio</a>
+            <a href="/coming-soon" className="photo-card-book">Book Gio</a>
             <div className="photo-card-info">
               <p className="photo-card-name">Gio</p>
               <p className="photo-card-role">Event Photographer</p>
@@ -479,7 +479,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
           <div className="photo-card">
             <div className="photo-card-bg" style={{ backgroundImage: "url('/photographer-tre4k.jpg')", backgroundPosition: "center top" }} />
             <div className="photo-card-veil" />
-            <a href="/photographers/tre4k" className="photo-card-book">Book Tre4k</a>
+            <a href="/coming-soon" className="photo-card-book">Book Tre4k</a>
             <div className="photo-card-info">
               <p className="photo-card-name">Tre4k</p>
               <p className="photo-card-role">Focus Finder</p>
@@ -489,7 +489,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
           <div className="photo-card">
             <div className="photo-card-bg" style={{ backgroundImage: "url('/photographer-gicasso.jpg')", backgroundPosition: "center top" }} />
             <div className="photo-card-veil" />
-            <a href="/photographers/gicasso" className="photo-card-book">Book Gicasso</a>
+            <a href="/coming-soon" className="photo-card-book">Book Gicasso</a>
             <div className="photo-card-info">
               <p className="photo-card-name">Gicasso</p>
               <p className="photo-card-role">Attention Grabber</p>
@@ -499,7 +499,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
 
         <div className="photo-cta-row">
           <p><strong>Are you a photographer?</strong> Join OutsYde&apos;s collective and start receiving bookings directly through the platform. No upfront cost to list.</p>
-          <a href="/photographer-signup" className="btn-join-collective">Get Listed — It&apos;s Free →</a>
+          <a href="/coming-soon" className="btn-join-collective">Get Listed — It&apos;s Free →</a>
         </div>
       </section>
 
@@ -510,8 +510,8 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
           <p>Whether you&apos;re a local business looking to reach new customers or a creator wanting your products in front of the right audience — OutsYde is your platform.</p>
         </div>
         <div className="biz-band-ctas">
-          <a href="/business-inquiry" className="btn-biz-cta btn-biz-gold">Inquire About Listing →</a>
-          <a href="/how-it-works" className="btn-biz-cta btn-biz-ghost">See How It Works</a>
+          <a href="/coming-soon" className="btn-biz-cta btn-biz-gold">Inquire About Listing →</a>
+          <a href="/coming-soon" className="btn-biz-cta btn-biz-ghost">See How It Works</a>
         </div>
       </div>
 
@@ -525,18 +525,18 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
             </div>
             <p>Culture meets commerce. Linking local businesses with artists and consumers — one place to shop, book, and experience it all.</p>
             <div className="ft-social" aria-label="Social media links">
-              <a href="#">Instagram</a>
-              <a href="#">TikTok</a>
-              <a href="#">Twitter</a>
+              <a href="https://instagram.com/go.outsyde" target="_blank" rel="noopener noreferrer">Instagram</a>
+              <a href="https://tiktok.com/@go.outsyde" target="_blank" rel="noopener noreferrer">TikTok</a>
+              <a href="https://x.com/go.outsyde" target="_blank" rel="noopener noreferrer">Twitter</a>
             </div>
           </div>
 
           <div className="footer-col">
             <h4>For Businesses</h4>
             <ul>
-              <li><a href="/business-inquiry">Join the Marketplace</a></li>
-              <li><a href="/list-services">List Your Services</a></li>
-              <li><a href="/manage-bookings">Manage Bookings</a></li>
+              <li><a href="/coming-soon">Join the Marketplace</a></li>
+              <li><a href="/coming-soon">List Your Services</a></li>
+              <li><a href="/coming-soon">Manage Bookings</a></li>
               <li><a href="/partner">Partner With Us</a></li>
             </ul>
           </div>
@@ -545,19 +545,19 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
             <h4>For Shoppers</h4>
             <ul>
               <li><a href="/shop">Browse the Collection</a></li>
-              <li><a href="/book-photographer">Book a Photographer</a></li>
-              <li><a href="/brands">Discover Local Brands</a></li>
-              <li><a href="/account">My Account</a></li>
+              <li><a href="/coming-soon">Book a Photographer</a></li>
+              <li><a href="/coming-soon">Discover Local Brands</a></li>
+              <li><a href="/coming-soon">My Account</a></li>
             </ul>
           </div>
 
           <div className="footer-col">
             <h4>For Photographers</h4>
             <ul>
-              <li><a href="/photographer-signup">Join Our Collective</a></li>
-              <li><a href="/photographer-signup">Start Taking Bookings</a></li>
-              <li><a href="/photographers">Meet the Team</a></li>
-              <li><a href="/contact">Contact Us</a></li>
+              <li><a href="/coming-soon">Join Our Collective</a></li>
+              <li><a href="/coming-soon">Start Taking Bookings</a></li>
+              <li><a href="/coming-soon">Meet the Team</a></li>
+              <li><a href="/coming-soon">Contact Us</a></li>
             </ul>
           </div>
         </div>
