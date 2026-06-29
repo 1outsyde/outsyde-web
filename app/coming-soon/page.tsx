@@ -3,16 +3,14 @@
 // Branded to match the homepage (emerald/gold/cream, Bebas + Hanken, Y mark).
 // All not-yet-built nav links point here so there are zero 404 dead ends.
 //
-// ⚠️ BEFORE THIS WORKS: replace WEB3FORMS_KEY below with a key tied to
-//    info@goutsyde.com (web3forms.com → enter info@goutsyde.com → copy key).
-//    Until then the form will return an error on submit.
+// Submissions POST to /api/notify-signup, which sends via Resend:
+//   - an internal alert to info@goutsyde.com
+//   - a branded confirmation to the signer.
+// No third-party form key needed — uses your own Resend pipeline.
 
 "use client";
 
 import { useState } from "react";
-
-// ── Replace this with your real Web3Forms access key for info@goutsyde.com ──
-const WEB3FORMS_KEY = "2859fc5d-eee8-48e3-9135-ce8ab878fd8c";
 
 export default function ComingSoon() {
   const [email, setEmail] = useState("");
@@ -28,22 +26,17 @@ export default function ComingSoon() {
     }
     setStatus("sending");
     try {
-      const res = await fetch("https://api.web3forms.com/submit", {
+      const res = await fetch("/api/notify-signup", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          access_key: WEB3FORMS_KEY,
-          subject: "New Outsyde notify-list signup",
-          from_name: "Outsyde Notify List",
-          email,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         setStatus("done");
       } else {
         setStatus("error");
-        setMsg("Something went wrong. Please try again in a moment.");
+        setMsg(data.error || "Something went wrong. Please try again in a moment.");
       }
     } catch {
       setStatus("error");

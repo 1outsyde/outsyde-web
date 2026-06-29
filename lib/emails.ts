@@ -184,3 +184,58 @@ export async function sendCustomerOrderConfirmation(p: {
 
   return sendEmail({ to: p.customerEmail, subject: `🎉 Order Confirmed — Go Outsyde`, html });
 }
+
+// ===== NOTIFY LIST — INTERNAL ALERT TO OUTSYDE =====
+export async function sendNotifySignupAlert(p: { email: string }) {
+  const html = `<!DOCTYPE html><html><body style="margin:0;padding:0;background-color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0a0a;padding:40px 20px;"><tr><td align="center">
+  <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+    <tr><td align="center" style="padding:0 0 32px 0;">
+      <h1 style="color:#E8B930;font-size:28px;letter-spacing:4px;margin:0;text-transform:uppercase;">GO OUTSYDE</h1>
+      <p style="color:#666;font-size:11px;letter-spacing:2px;margin:4px 0 0 0;text-transform:uppercase;">Like A Lavished Local</p></td></tr>
+    <tr><td style="background-color:#E8B930;padding:16px 24px;border-radius:4px 4px 0 0;"><h2 style="color:#0a0a0a;margin:0;font-size:18px;">🔔 New Notify-List Signup</h2></td></tr>
+    <tr><td style="background-color:#141414;padding:24px;border-radius:0 0 4px 4px;">
+      <p style="color:#999;margin:0 0 8px 0;font-size:13px;letter-spacing:1px;text-transform:uppercase;">Email</p>
+      <p style="color:#ffffff;margin:0 0 4px 0;font-size:18px;font-weight:600;">${p.email}</p>
+      <p style="color:#666;margin:16px 0 0 0;font-size:12px;">Captured from the Coming Soon page.</p>
+    </td></tr>
+    <tr><td align="center" style="padding:24px 0 0 0;"><p style="color:#444;font-size:11px;margin:0;">© ${new Date().getFullYear()} Go Outsyde. All rights reserved.</p></td></tr>
+  </table></td></tr></table></body></html>`;
+
+  return sendEmail({
+    to: "info@goutsyde.com",
+    subject: `🔔 New notify-list signup: ${p.email}`,
+    html,
+  });
+}
+
+// ===== NOTIFY LIST — BRANDED CONFIRMATION TO THE SIGNER =====
+export async function sendNotifySignupConfirmation(p: { email: string }) {
+  const html = `<!DOCTYPE html><html><body style="margin:0;padding:0;background-color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0a0a;padding:40px 20px;"><tr><td align="center">
+  <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+    <tr><td align="center" style="padding:0 0 32px 0;">
+      <h1 style="color:#E8B930;font-size:28px;letter-spacing:4px;margin:0;text-transform:uppercase;">GO OUTSYDE</h1>
+      <p style="color:#666;font-size:11px;letter-spacing:2px;margin:4px 0 0 0;text-transform:uppercase;">Like A Lavished Local</p></td></tr>
+    <tr><td style="background-color:#E8B930;padding:16px 24px;border-radius:4px 4px 0 0;"><h2 style="color:#0a0a0a;margin:0;font-size:18px;">🎉 You're on the list</h2></td></tr>
+    <tr><td style="background-color:#141414;padding:24px;border-radius:0 0 4px 4px;">
+      <p style="color:#ffffff;font-size:15px;line-height:1.7;margin:0 0 16px 0;">Thanks for signing up. You'll be among the first to know the moment this part of Outsyde goes live.</p>
+      <p style="color:#999;font-size:14px;line-height:1.7;margin:0 0 24px 0;">We're building a place where culture meets commerce — shop local brands, book photographers, and discover the people shaping your city. More soon.</p>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr><td align="center" style="padding:8px 0;">
+          <a href="https://goutsyde.com" style="display:inline-block;background-color:#E8B930;color:#0a0a0a;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:12px 28px;border-radius:4px;">Visit Outsyde</a>
+        </td></tr>
+      </table>
+    </td></tr>
+    <tr><td align="center" style="padding:24px 0 0 0;">
+      <p style="color:#666;font-size:12px;margin:0 0 4px 0;">Follow along: <a href="https://instagram.com/go.outsyde" style="color:#E8B930;text-decoration:none;">Instagram</a> · <a href="https://tiktok.com/@go.outsyde" style="color:#E8B930;text-decoration:none;">TikTok</a></p>
+      <p style="color:#444;font-size:11px;margin:8px 0 0 0;">© ${new Date().getFullYear()} Go Outsyde. All rights reserved.</p>
+    </td></tr>
+  </table></td></tr></table></body></html>`;
+
+  return sendEmail({
+    to: p.email,
+    subject: `🎉 You're on the list — Go Outsyde`,
+    html,
+  });
+}
