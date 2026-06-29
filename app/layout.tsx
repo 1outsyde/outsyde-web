@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-
 export const metadata: Metadata = {
   metadataBase: new URL("https://goutsyde.com"),
   title: {
@@ -9,6 +8,9 @@ export const metadata: Metadata = {
   },
   description:
     "Discover, shop, and book from local vendors and creators — all in one place.",
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     title: "Outsyde",
     description:
@@ -27,7 +29,6 @@ export const metadata: Metadata = {
     images: ["/og-image.png"],
   },
 };
-
 export default function RootLayout({
   children,
 }: {
