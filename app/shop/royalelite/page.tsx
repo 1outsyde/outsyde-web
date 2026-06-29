@@ -4,20 +4,18 @@
 //
 // IMPORTANT: This vendor does NOT use cart/checkout. The current payment route
 // (app/api/create-payment-intent/route.ts) is single-vendor (Lotus only), so a
-// move is captured via a Web3Forms booking request instead. The $100 deposit is
-// collected off-platform by the vendor after they confirm date availability.
+// move is captured via a booking request instead. The $100 deposit is collected
+// off-platform by the vendor after they confirm date availability.
 // The nav cart badge is READ-ONLY (shows existing Lotus/Dia Lux items only).
 //
-// ONE FILL-IN: set WEB3FORMS_ACCESS_KEY below to a key tied to
-// Bprovisionproperties@yahoo.com (free at https://web3forms.com).
+// EMAIL: submissions POST to /api/royal-elite-estimate, which sends the lead via
+// Resend to BOTH info@goutsyde.com AND Bprovisionproperties@yahoo.com in one call.
+// (Migrated off Web3Forms — no access key needed anymore.)
 
 "use client";
 
 import { useEffect, useState } from "react";
 import { getCart, subscribe, type CartItem } from "@/lib/cart";
-
-// ── PASTE YOUR WEB3FORMS ACCESS KEY HERE (tied to Bprovisionproperties@yahoo.com) ──
-const WEB3FORMS_ACCESS_KEY = "f0ca22f6-bee4-42ce-94f9-fd9fcc6be95b";
 
 type FormState = {
   name: string;
@@ -65,30 +63,25 @@ export default function RoyalEliteStore() {
     e.preventDefault();
     setStatus("sending");
     try {
-      const res = await fetch("https://api.web3forms.com/submit", {
+      const res = await fetch("/api/royal-elite-estimate", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
-          access_key: WEB3FORMS_ACCESS_KEY,
-          subject: `New Move Request — ${form.name || "Royal Elite"}`,
-          from_name: "Royal Elite Moving (via Outsyde)",
-          replyto: form.email,
-          vendor: "Royal Elite Moving",
-          "Customer Name": form.name,
-          "Email": form.email,
-          "Phone": form.phone,
-          "Preferred Move Date": form.moveDate,
-          "Move Type": form.moveType,
-          "Home Size": form.homeSize,
-          "Pickup Address": form.fromAddress,
-          "Drop-off Address": form.toAddress,
-          "Floor (pickup or drop-off)": form.floor,
-          "Additional Stops": form.stops || "None",
-          "Notes / Special Items": form.notes || "None",
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          moveDate: form.moveDate,
+          moveType: form.moveType,
+          homeSize: form.homeSize,
+          fromAddress: form.fromAddress,
+          toAddress: form.toAddress,
+          floor: form.floor,
+          stops: form.stops,
+          notes: form.notes,
         }),
       });
       const data = (await res.json()) as { success?: boolean };
-      if (data.success) {
+      if (res.ok && data.success) {
         setStatus("ok");
         setForm(EMPTY_FORM);
       } else {
