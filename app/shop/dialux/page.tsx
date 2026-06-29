@@ -1,123 +1,26 @@
 // app/shop/dialux/page.tsx
 // Dia Lux Kollection — luxury raw hair bundles storefront
-// Mirrors the Lotus House Blends store structure, re-skinned in black/silver.
+// Reads products from lib/dialux-products.ts (shared with the [slug] detail pages).
+// Each card links to its own product page; quick add-to-cart stays on the card.
 // Wired into the shared multi-vendor cart (lib/cart.ts) with vendorId: "dialux".
 //
 // Images expected in /public:
 //   dialux-hero-clean.jpg, dialux-straight.jpg, dialux-wavy.jpg, dialux-curly.jpg
-//
-// Single bundles: per-inch pricing 12"–32".
-// Bundle deals: fixed 3-bundle sets, fixed price (no inch selector).
-//   Same texture reuses the same image regardless of length set.
 
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  DIALUX_PRODUCTS, LENGTH_PRICES, LENGTHS, type DialuxProduct,
+} from "@/lib/dialux-products";
 import { addToCart, getCart, setQty, removeFromCart, subscribe, type CartItem } from "@/lib/cart";
 
-// ── Per-inch price table for single bundles (12"–32") ──
-const LENGTH_PRICES: Record<number, number> = {
-  12: 125, 14: 135, 16: 145, 18: 155, 20: 165, 22: 175,
-  24: 185, 26: 195, 28: 205, 30: 225, 32: 235,
-};
-const LENGTHS = Object.keys(LENGTH_PRICES).map(Number);
-
-type SingleProduct = {
-  id: string;
-  name: string;
-  texture: string;
-  blurb: string;
-  image: string;
-};
-
-const SINGLES: SingleProduct[] = [
-  {
-    id: "dlx-straight",
-    name: "Filipino Raw Straight",
-    texture: "Straight",
-    blurb: "Sleek, bone-straight density with natural shine. Colors, styles, and heat-treats beautifully.",
-    image: "/dialux-straight.jpg",
-  },
-  {
-    id: "dlx-wavy",
-    name: "Vietnamese Raw Wavy",
-    texture: "Wavy",
-    blurb: "Soft, full-bodied waves with effortless movement and a luxurious drape.",
-    image: "/dialux-wavy.jpg",
-  },
-  {
-    id: "dlx-curly",
-    name: "Raw Burmese Curly",
-    texture: "Curly",
-    blurb: "Defined, springy curls with rich texture and fullness from root to tip.",
-    image: "/dialux-curly.jpg",
-  },
-];
-
-type DealProduct = {
-  id: string;
-  name: string;
-  texture: string;
-  lengths: string;
-  price: number;
-  blurb: string;
-  image: string;
-};
-
-// All 5 bundle deals (full Dia Lux catalog parity).
-// Same texture reuses the same image regardless of the length set.
-const DEALS: DealProduct[] = [
-  {
-    id: "dlx-deal-wavy-375",
-    name: "Vietnamese Raw Wavy · 18\u2033 / 20\u2033 / 22\u2033",
-    texture: "Wavy 3-Bundle Set",
-    lengths: "18\u2033 · 20\u2033 · 22\u2033",
-    price: 375,
-    blurb: "Three raw wavy bundles, ready to install. Our most popular starter length — natural movement that holds wash after wash.",
-    image: "/dialux-wavy.jpg",
-  },
-  {
-    id: "dlx-deal-wavy-415",
-    name: "Vietnamese Raw Wavy · 20\u2033 / 22\u2033 / 24\u2033",
-    texture: "Wavy 3-Bundle Set",
-    lengths: "20\u2033 · 22\u2033 · 24\u2033",
-    price: 415,
-    blurb: "Three raw wavy bundles in longer lengths for full, dramatic volume with an effortless drape.",
-    image: "/dialux-wavy.jpg",
-  },
-  {
-    id: "dlx-deal-straight-395",
-    name: "Filipino Raw Straight · 18\u2033 / 20\u2033 / 22\u2033",
-    texture: "Straight 3-Bundle Set",
-    lengths: "18\u2033 · 20\u2033 · 22\u2033",
-    price: 395,
-    blurb: "Three raw straight bundles, single-donor and sleek. The perfect foundation length for a flawless, polished install.",
-    image: "/dialux-straight.jpg",
-  },
-  {
-    id: "dlx-deal-straight-450",
-    name: "Filipino Raw Straight · 20\u2033 / 22\u2033 / 24\u2033",
-    texture: "Straight 3-Bundle Set",
-    lengths: "20\u2033 · 22\u2033 · 24\u2033",
-    price: 450,
-    blurb: "Three raw straight bundles in longer lengths — bone-straight density and natural shine from root to tip.",
-    image: "/dialux-straight.jpg",
-  },
-  {
-    id: "dlx-deal-curly-415",
-    name: "Raw Burmese Curly · 20\u2033 / 22\u2033 / 24\u2033",
-    texture: "Curly 3-Bundle Set",
-    lengths: "20\u2033 · 22\u2033 · 24\u2033",
-    price: 415,
-    blurb: "Three raw curly bundles with defined, springy texture and rich fullness for a bold, voluminous install.",
-    image: "/dialux-curly.jpg",
-  },
-];
+const SINGLES = DIALUX_PRODUCTS.filter((p) => p.kind === "single");
+const DEALS = DIALUX_PRODUCTS.filter((p) => p.kind === "deal");
 
 export default function DiaLuxStore() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  // selected length per single product id
   const [selLen, setSelLen] = useState<Record<string, number>>({
     "dlx-straight": 12,
     "dlx-wavy": 12,
@@ -133,7 +36,9 @@ export default function DiaLuxStore() {
   const count = cart.reduce((n, i) => n + i.qty, 0);
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
 
-  const addSingle = (p: SingleProduct) => {
+  const addSingle = (e: React.MouseEvent, p: DialuxProduct) => {
+    e.preventDefault();
+    e.stopPropagation();
     const len = selLen[p.id];
     const price = LENGTH_PRICES[len];
     addToCart({
@@ -147,11 +52,13 @@ export default function DiaLuxStore() {
     setDrawerOpen(true);
   };
 
-  const addDeal = (d: DealProduct) => {
+  const addDeal = (e: React.MouseEvent, d: DialuxProduct) => {
+    e.preventDefault();
+    e.stopPropagation();
     addToCart({
       id: d.id,
       name: d.name,
-      price: d.price,
+      price: d.price ?? 0,
       image: d.image,
       vendor: "Dia Lux Kollection",
       vendorId: "dialux",
@@ -176,7 +83,6 @@ export default function DiaLuxStore() {
 }
 .dlx-root a{text-decoration:none;color:inherit;}
 
-/* top bar */
 .dlx-top{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:18px 40px;background:rgba(10,10,10,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--dlx-line);}
 .dlx-back{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dlx-silver-soft);transition:color .2s;}
 .dlx-back:hover{color:var(--dlx-cream);}
@@ -185,7 +91,6 @@ export default function DiaLuxStore() {
 .dlx-cart-btn:hover{border-color:var(--dlx-silver);}
 .dlx-cart-count{position:absolute;top:-8px;right:-8px;background:var(--dlx-gold);color:#000;font-size:10px;font-weight:700;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
 
-/* hero */
 .dlx-hero{position:relative;height:62vh;min-height:420px;display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden;}
 .dlx-hero-bg{position:absolute;inset:0;background-size:cover;background-position:center;}
 .dlx-hero-veil{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.55),rgba(0,0,0,.72));}
@@ -194,13 +99,11 @@ export default function DiaLuxStore() {
 .dlx-hero-title{font-family:var(--dlx-serif);font-size:clamp(50px,8.5vw,92px);font-weight:600;line-height:1;letter-spacing:.02em;color:#fff;margin-bottom:16px;text-shadow:0 2px 30px rgba(0,0,0,.6);}
 .dlx-hero-sub{font-size:13.5px;font-weight:300;letter-spacing:.04em;color:rgba(244,242,238,.85);max-width:520px;margin:0 auto;line-height:1.7;text-shadow:0 1px 14px rgba(0,0,0,.6);}
 
-/* section */
 .dlx-wrap{max-width:1180px;margin:0 auto;padding:72px 40px;}
 .dlx-sec-head{text-align:center;margin-bottom:48px;}
 .dlx-sec-head h2{font-family:var(--dlx-display);font-size:clamp(30px,4.5vw,46px);letter-spacing:.06em;color:var(--dlx-cream);font-weight:400;}
 .dlx-sec-head p{font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dlx-silver-soft);margin-top:8px;}
 
-/* product grid */
 .dlx-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;}
 .dlx-card{background:#0F0F0F;border:1px solid var(--dlx-line);border-radius:4px;overflow:hidden;display:flex;flex-direction:column;transition:border-color .25s,transform .25s;}
 .dlx-card:hover{border-color:rgba(201,202,204,.35);transform:translateY(-3px);}
@@ -217,21 +120,19 @@ export default function DiaLuxStore() {
 .dlx-deal-lengths{font-size:11px;letter-spacing:.12em;color:var(--dlx-silver);margin-bottom:14px;}
 .dlx-add{width:100%;background:var(--dlx-cream);color:#000;border:none;border-radius:3px;padding:13px;font-family:var(--dlx-sans);font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:background .2s;}
 .dlx-add:hover{background:#fff;}
+.dlx-viewlink{display:block;text-align:center;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dlx-silver-soft);margin-top:10px;transition:color .2s;}
+.dlx-viewlink:hover{color:var(--dlx-gold);}
 
-/* deals tint */
 .dlx-card.deal{background:linear-gradient(160deg,#121212,#0A0A0A);}
 
-/* info strip */
 .dlx-info{border-top:1px solid var(--dlx-line);border-bottom:1px solid var(--dlx-line);background:#070707;}
 .dlx-info-grid{max-width:1180px;margin:0 auto;padding:54px 40px;display:grid;grid-template-columns:repeat(3,1fr);gap:36px;}
 .dlx-info-col h4{font-family:var(--dlx-display);font-size:20px;letter-spacing:.06em;color:var(--dlx-cream);margin-bottom:12px;font-weight:400;}
 .dlx-info-col p{font-size:12.5px;font-weight:300;line-height:1.7;color:rgba(244,242,238,.58);}
 
-/* footer */
 .dlx-foot{padding:40px;text-align:center;font-size:11px;letter-spacing:.1em;color:var(--dlx-silver-soft);border-top:1px solid var(--dlx-line);}
 .dlx-foot a{color:var(--dlx-silver);}
 
-/* cart drawer */
 .dlx-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;opacity:0;pointer-events:none;transition:opacity .3s;}
 .dlx-drawer-overlay.open{opacity:1;pointer-events:auto;}
 .dlx-drawer{position:fixed;top:0;right:0;height:100%;width:380px;max-width:90vw;background:#0C0C0C;border-left:1px solid var(--dlx-line);z-index:101;transform:translateX(100%);transition:transform .32s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;}
@@ -271,7 +172,6 @@ export default function DiaLuxStore() {
       />
 
       <div className="dlx-root">
-        {/* top bar */}
         <div className="dlx-top">
           <a href="/shop" className="dlx-back">← Marketplace</a>
           <span className="dlx-brand">Dia Lux Kollection</span>
@@ -281,7 +181,6 @@ export default function DiaLuxStore() {
           </button>
         </div>
 
-        {/* hero */}
         <section className="dlx-hero">
           <div className="dlx-hero-bg" style={{ backgroundImage: "url('/dialux-hero-clean.jpg')" }} />
           <div className="dlx-hero-veil" />
@@ -306,7 +205,7 @@ export default function DiaLuxStore() {
               const len = selLen[p.id];
               const price = LENGTH_PRICES[len];
               return (
-                <div className="dlx-card" key={p.id}>
+                <a className="dlx-card" href={`/shop/dialux/${p.slug}`} key={p.id}>
                   <div className="dlx-card-img" style={{ backgroundImage: `url('${p.image}')` }} />
                   <div className="dlx-card-body">
                     <span className="dlx-tex">{p.texture}</span>
@@ -317,9 +216,11 @@ export default function DiaLuxStore() {
                       <select
                         className="dlx-select"
                         value={len}
-                        onChange={(e) =>
-                          setSelLen((s) => ({ ...s, [p.id]: Number(e.target.value) }))
-                        }
+                        onClick={(e) => e.preventDefault()}
+                        onChange={(e) => {
+                          e.preventDefault();
+                          setSelLen((s) => ({ ...s, [p.id]: Number(e.target.value) }));
+                        }}
                       >
                         {LENGTHS.map((L) => (
                           <option key={L} value={L}>{L}&Prime;</option>
@@ -329,11 +230,12 @@ export default function DiaLuxStore() {
                     <div className="dlx-row">
                       <span className="dlx-price">${price.toFixed(2)}</span>
                     </div>
-                    <button className="dlx-add" onClick={() => addSingle(p)}>
+                    <button className="dlx-add" onClick={(e) => addSingle(e, p)}>
                       Add to Cart
                     </button>
+                    <span className="dlx-viewlink">View Details →</span>
                   </div>
-                </div>
+                </a>
               );
             })}
           </div>
@@ -347,26 +249,27 @@ export default function DiaLuxStore() {
           </div>
           <div className="dlx-grid">
             {DEALS.map((d) => (
-              <div className="dlx-card deal" key={d.id}>
+              <a className="dlx-card deal" href={`/shop/dialux/${d.slug}`} key={d.id}>
                 <div className="dlx-card-img" style={{ backgroundImage: `url('${d.image}')` }} />
                 <div className="dlx-card-body">
-                  <span className="dlx-tex">{d.texture}</span>
+                  <span className="dlx-tex">{d.texture} · 3-Bundle Set</span>
                   <h3 className="dlx-name">{d.name}</h3>
                   <p className="dlx-blurb">{d.blurb}</p>
                   <p className="dlx-deal-lengths">Includes: {d.lengths}</p>
                   <div className="dlx-row">
-                    <span className="dlx-price">${d.price.toFixed(2)}</span>
+                    <span className="dlx-price">${(d.price ?? 0).toFixed(2)}</span>
                   </div>
-                  <button className="dlx-add" onClick={() => addDeal(d)}>
+                  <button className="dlx-add" onClick={(e) => addDeal(e, d)}>
                     Add to Cart
                   </button>
+                  <span className="dlx-viewlink">View Details →</span>
                 </div>
-              </div>
+              </a>
             ))}
           </div>
         </section>
 
-        {/* info strip: product / shipping / returns */}
+        {/* info strip */}
         <div className="dlx-info">
           <div className="dlx-info-grid">
             <div className="dlx-info-col">

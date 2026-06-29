@@ -9,6 +9,18 @@ import type { MetadataRoute } from "next";
 
 const BASE = "https://www.goutsyde.com";
 
+// Dia Lux product detail slugs (keep in sync with lib/dialux-products.ts)
+const DIALUX_SLUGS = [
+  "filipino-raw-straight",
+  "vietnamese-raw-wavy",
+  "raw-burmese-curly",
+  "wavy-bundle-deal-18-20-22",
+  "wavy-bundle-deal-20-22-24",
+  "straight-bundle-deal-18-20-22",
+  "straight-bundle-deal-20-22-24",
+  "curly-bundle-deal-20-22-24",
+];
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
 
@@ -24,6 +36,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/shop/dialux",           // Dia Lux storefront
     "/shop/royalelite",       // Royal Elite
     "/coming-soon",
+    ...DIALUX_SLUGS.map((s) => `/shop/dialux/${s}`),
   ];
 
   return routes.map((path) => ({
