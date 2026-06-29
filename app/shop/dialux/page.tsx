@@ -4,11 +4,11 @@
 // Wired into the shared multi-vendor cart (lib/cart.ts) with vendorId: "dialux".
 //
 // Images expected in /public:
-//   dialux-hero-clean.jpg, dialux-straight.jpg, dialux-wavy.jpg,
-//   dialux-curly.jpg, dialux-curly-single.jpg
+//   dialux-hero-clean.jpg, dialux-straight.jpg, dialux-wavy.jpg, dialux-curly.jpg
 //
 // Single bundles: per-inch pricing 12"–32".
-// Bundle deals: fixed lengths, fixed price (no inch selector).
+// Bundle deals: fixed 3-bundle sets, fixed price (no inch selector).
+//   Same texture reuses the same image regardless of length set.
 
 "use client";
 
@@ -57,28 +57,60 @@ const SINGLES: SingleProduct[] = [
 type DealProduct = {
   id: string;
   name: string;
+  texture: string;
   lengths: string;
   price: number;
   blurb: string;
   image: string;
 };
 
+// All 5 bundle deals (full Dia Lux catalog parity).
+// Same texture reuses the same image regardless of the length set.
 const DEALS: DealProduct[] = [
   {
-    id: "dlx-deal-375",
-    name: "3-Bundle Deal · 18\u2033 / 20\u2033 / 22\u2033",
+    id: "dlx-deal-wavy-375",
+    name: "Vietnamese Raw Wavy · 18\u2033 / 20\u2033 / 22\u2033",
+    texture: "Wavy 3-Bundle Set",
     lengths: "18\u2033 · 20\u2033 · 22\u2033",
     price: 375,
-    blurb: "Three raw bundles, ready to install. Fixed-length set — our most popular starter length.",
+    blurb: "Three raw wavy bundles, ready to install. Our most popular starter length — natural movement that holds wash after wash.",
+    image: "/dialux-wavy.jpg",
+  },
+  {
+    id: "dlx-deal-wavy-415",
+    name: "Vietnamese Raw Wavy · 20\u2033 / 22\u2033 / 24\u2033",
+    texture: "Wavy 3-Bundle Set",
+    lengths: "20\u2033 · 22\u2033 · 24\u2033",
+    price: 415,
+    blurb: "Three raw wavy bundles in longer lengths for full, dramatic volume with an effortless drape.",
+    image: "/dialux-wavy.jpg",
+  },
+  {
+    id: "dlx-deal-straight-395",
+    name: "Filipino Raw Straight · 18\u2033 / 20\u2033 / 22\u2033",
+    texture: "Straight 3-Bundle Set",
+    lengths: "18\u2033 · 20\u2033 · 22\u2033",
+    price: 395,
+    blurb: "Three raw straight bundles, single-donor and sleek. The perfect foundation length for a flawless, polished install.",
     image: "/dialux-straight.jpg",
   },
   {
-    id: "dlx-deal-415",
-    name: "3-Bundle Deal · 20\u2033 / 22\u2033 / 24\u2033",
+    id: "dlx-deal-straight-450",
+    name: "Filipino Raw Straight · 20\u2033 / 22\u2033 / 24\u2033",
+    texture: "Straight 3-Bundle Set",
+    lengths: "20\u2033 · 22\u2033 · 24\u2033",
+    price: 450,
+    blurb: "Three raw straight bundles in longer lengths — bone-straight density and natural shine from root to tip.",
+    image: "/dialux-straight.jpg",
+  },
+  {
+    id: "dlx-deal-curly-415",
+    name: "Raw Burmese Curly · 20\u2033 / 22\u2033 / 24\u2033",
+    texture: "Curly 3-Bundle Set",
     lengths: "20\u2033 · 22\u2033 · 24\u2033",
     price: 415,
-    blurb: "Three raw bundles in longer lengths for full, dramatic volume and length.",
-    image: "/dialux-wavy.jpg",
+    blurb: "Three raw curly bundles with defined, springy texture and rich fullness for a bold, voluminous install.",
+    image: "/dialux-curly.jpg",
   },
 ];
 
@@ -313,12 +345,12 @@ export default function DiaLuxStore() {
             <h2>Bundle Deals</h2>
             <p>Fixed-length 3-bundle sets</p>
           </div>
-          <div className="dlx-grid" style={{ gridTemplateColumns: "repeat(2,1fr)", maxWidth: 760, margin: "0 auto" }}>
+          <div className="dlx-grid">
             {DEALS.map((d) => (
               <div className="dlx-card deal" key={d.id}>
                 <div className="dlx-card-img" style={{ backgroundImage: `url('${d.image}')` }} />
                 <div className="dlx-card-body">
-                  <span className="dlx-tex">3-Bundle Set</span>
+                  <span className="dlx-tex">{d.texture}</span>
                   <h3 className="dlx-name">{d.name}</h3>
                   <p className="dlx-blurb">{d.blurb}</p>
                   <p className="dlx-deal-lengths">Includes: {d.lengths}</p>
