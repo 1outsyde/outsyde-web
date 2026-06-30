@@ -4,7 +4,8 @@
 // Pure front-end. Built to look full with 2 vendors and scale to many.
 //
 // Vendor card images expected in /public:
-//   lifestyle-ritual.jpg (Lotus), dialux-hero-clean.jpg (Dia Lux), royal-elite-card.jpg (Royal Elite)
+//   lifestyle-ritual.jpg (Lotus), dialux-hero-clean.jpg (Dia Lux), royal-elite-card.jpg (Royal Elite),
+//   omega-card.jpg (Omega Lifestyle)
 
 "use client";
 
@@ -44,6 +45,14 @@ const VENDORS: Vendor[] = [
     category: "Moving & Services",
     href: "/shop/royalelite",
     image: "/royal-elite-card.jpg",
+  },
+  {
+    id: "omega",
+    name: "Omega Lifestyle",
+    tagline: "Strength training gear and apparel for the everyday lifter.",
+    category: "Fitness & Lifestyle",
+    href: "/shop/omega",
+    image: "/omega-card.jpg",
   },
 ];
 
