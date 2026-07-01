@@ -5,9 +5,43 @@
 
 export const VENDOR_ACCOUNT_ID = "acct_1SQl9ZRvtSpkHygW"; // Lotus House Blends connected account
 
-// Fee model (LOCKED):
-export const SERVICE_FEE_RATE = 0.05; // customer-facing service fee (5%)
-export const VENDOR_FEE_RATE = 0.07;  // platform commission taken from vendor base (7%)
+// ============================================================
+// FEE MODEL (LOCKED) — single source of truth.
+// Both the checkout page and the payment-intent route import
+// calculateFee() from here. Never recompute a fee inline anywhere
+// else — that's how web and mobile silently drift apart.
+//
+// 5% vendor-side + 5% client upcharge, everywhere. $1.50 floor on
+// the vendor fee applies to products only.
+// ============================================================
+export const FEE_RATES = {
+  product: { vendor: 0.05, client: 0.05 },
+  booking: { vendor: 0.05, client: 0.05 },
+  staff:   { vendor: 0.035, client: 0 },
+} as const;
+
+export const PRODUCT_FLOOR_CENTS = 150; // $1.50 minimum vendor fee — products only
+
+export type TransactionType = keyof typeof FEE_RATES;
+
+export function calculateFee(amountCents: number, transactionType: TransactionType = "product") {
+  const { vendor, client } = FEE_RATES[transactionType];
+
+  let vendorFeeCents = Math.round(amountCents * vendor);
+  if (transactionType === "product") {
+    vendorFeeCents = Math.max(vendorFeeCents, PRODUCT_FLOOR_CENTS);
+  }
+
+  const clientUpchargeCents = Math.round(amountCents * client);
+  const applicationFeeCents = vendorFeeCents + clientUpchargeCents;
+
+  return { vendorFeeCents, clientUpchargeCents, applicationFeeCents };
+}
+
+// Kept for any code that still references the old flat constants directly.
+// Prefer calculateFee() for anything actually computing a charge.
+export const SERVICE_FEE_RATE = FEE_RATES.product.client; // 0.05
+export const VENDOR_FEE_RATE = FEE_RATES.product.vendor;  // 0.05 — corrected from 0.07
 
 // Cart product id -> Stripe price ID (LIVE prices, on the connected account)
 export const PRICE_IDS: Record<string, string> = {

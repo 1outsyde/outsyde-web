@@ -15,7 +15,7 @@ import {
 import { getCart, clearCart, subscribe, type CartItem } from "@/lib/cart";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "");
-const SERVICE_FEE_RATE = 0.05;
+import { calculateFee } from "@/lib/stripe-config";
 
 const appearance = {
   theme: "night" as const,
@@ -76,7 +76,7 @@ function CheckoutForm() {
   }, []);
 
   const subtotalCents = cart.reduce((c, i) => c + Math.round(i.price * 100) * i.qty, 0);
-  const feeCents = Math.round(subtotalCents * SERVICE_FEE_RATE);
+  const feeCents = calculateFee(subtotalCents, "product").clientUpchargeCents;
   const totalCents = subtotalCents + feeCents;
   const subtotal = subtotalCents / 100;
   const fee = feeCents / 100;

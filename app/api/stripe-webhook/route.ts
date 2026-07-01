@@ -8,6 +8,12 @@
 //
 // NOTE: signature verification (incl. the replay/timestamp check you had disabled on Wix)
 // is handled correctly + automatically by stripe.webhooks.constructEvent below.
+//
+// NOTE 2: payment_intent.succeeded fires for EVERY successful PaymentIntent on the
+// account — not just storefront orders. Vendor platform subscription charges (Stripe
+// Billing invoices), manual charges, etc. also land here. Only PaymentIntents created
+// by our own /api/create-payment-intent route carry vendor_account_id + items_json
+// metadata, so we gate on that before doing any order processing or sending emails.
 
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
@@ -43,6 +49,16 @@ export async function POST(req: NextRequest) {
   if (event.type === "payment_intent.succeeded") {
     const pi = event.data.object as Stripe.PaymentIntent;
     const m = pi.metadata || {};
+
+    // Only process PaymentIntents created by our own storefront checkout flow.
+    // Vendor subscription/platform-billing PaymentIntents (and anything else not
+    // created via /api/create-payment-intent) won't have this metadata — skip them
+    // so we don't send "New Sale" emails with zeroed-out, fabricated order data.
+    if (!m.vendor_account_id || !m.items_json) {
+      console.log(`⏭️  Skipping ${pi.id} — not a storefront order (no checkout metadata).`);
+      return NextResponse.json({ received: true });
+    }
+
     const items = parseItems(m.items_json);
     const shippingAddress = {
       line1: m.address_line1 || "",
