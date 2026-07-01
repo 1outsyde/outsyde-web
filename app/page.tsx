@@ -399,10 +399,9 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
             </div>
 
             <div className={`carousel-slide${cur === 1 ? " active" : ""}`}>
-              <div className="slide-bg" style={{ backgroundColor: "var(--emerald)" }} />
+              <div className="slide-bg" style={{ backgroundImage: "url('/dialux-og.png')", backgroundSize: "cover", backgroundPosition: "center" }} />
               <div className="slide-grad" />
               <div className="slide-content">
-                <img src="/dialux-hero-clean.jpg" alt="Dia Lux Kollection" style={{ maxWidth: "220px", maxHeight: "140px", objectFit: "cover", borderRadius: "4px", marginBottom: "22px" }} />
                 <p className="slide-brand-label">Dia Lux Kollection</p>
                 <h3 className="slide-title">Raw<br /><em>&amp;</em><br />Refined</h3>
                 <div className="slide-btns">
@@ -412,10 +411,9 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
             </div>
 
             <div className={`carousel-slide${cur === 2 ? " active" : ""}`}>
-              <div className="slide-bg" style={{ backgroundColor: "var(--off-black)" }} />
+              <div className="slide-bg" style={{ backgroundImage: "url('/royalelite-hero.jpg')", backgroundSize: "cover", backgroundPosition: "center" }} />
               <div className="slide-grad" />
               <div className="slide-content">
-                <img src="/royal-elite-card.jpg" alt="Royal Elite Moving" style={{ maxWidth: "220px", maxHeight: "140px", objectFit: "cover", borderRadius: "4px", marginBottom: "22px" }} />
                 <p className="slide-brand-label">Royal Elite Moving</p>
                 <h3 className="slide-title">Trusted<br /><em>&amp;</em><br />Transitions</h3>
                 <div className="slide-btns">
@@ -425,10 +423,9 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
             </div>
 
             <div className={`carousel-slide${cur === 3 ? " active" : ""}`}>
-              <div className="slide-bg" style={{ backgroundColor: "var(--emerald-mid)" }} />
+              <div className="slide-bg" style={{ backgroundImage: "url('/omega-hero.jpg')", backgroundSize: "cover", backgroundPosition: "center" }} />
               <div className="slide-grad" />
               <div className="slide-content">
-                <img src="/omega-card.jpg" alt="Omega Lifestyle" style={{ maxWidth: "220px", maxHeight: "140px", objectFit: "cover", borderRadius: "4px", marginBottom: "22px" }} />
                 <p className="slide-brand-label">Omega Lifestyle</p>
                 <h3 className="slide-title">Strength<br /><em>&amp;</em><br />Style</h3>
                 <div className="slide-btns">
