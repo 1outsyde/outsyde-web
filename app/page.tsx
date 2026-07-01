@@ -244,6 +244,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
           <a href="#photographers">Photographers</a>
           <a href="#business-band">For Businesses</a>
           <a href="#photographers">For Creators</a>
+          <a href="/about">About</a>
         </div>
         <div className="nav-actions">
           <a href="/coming-soon">Log In</a>
@@ -575,7 +576,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
         </div>
 
         <div className="footer-bottom">
-          <span>© {new Date().getFullYear()} Go OutsYde. All rights reserved.</span>
+          <span>© {new Date().getFullYear()} Go OutsYde. All rights reserved. · <a href="/about" style={{ color: "inherit", textDecoration: "none" }} onMouseOver={(e) => (e.currentTarget.style.color = "var(--gold)")} onMouseOut={(e) => (e.currentTarget.style.color = "inherit")}>About</a></span>
           <span>Like a Lavished Local</span>
         </div>
       </footer>
