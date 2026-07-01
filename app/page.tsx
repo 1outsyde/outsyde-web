@@ -13,7 +13,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const SLIDES = 4;
+const SLIDES = 5;
 
 export default function Home() {
   const [scrolled, setScrolled] = useState(false);
@@ -399,30 +399,45 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
             </div>
 
             <div className={`carousel-slide${cur === 1 ? " active" : ""}`}>
-              <div className="slide-bg" style={{ backgroundColor: "#161616", backgroundImage: "url('/lifestyle-model.jpg')" }} />
+              <div className="slide-bg" style={{ backgroundColor: "var(--emerald)" }} />
               <div className="slide-grad" />
               <div className="slide-content">
-                <p className="slide-brand-label">Lotus House Blends</p>
-                <h3 className="slide-title">Pure<br /><em>&amp;</em><br />Peaceful</h3>
+                <img src="/dialux-hero-clean.jpg" alt="Dia Lux Kollection" style={{ maxWidth: "220px", maxHeight: "140px", objectFit: "cover", borderRadius: "4px", marginBottom: "22px" }} />
+                <p className="slide-brand-label">Dia Lux Kollection</p>
+                <h3 className="slide-title">Raw<br /><em>&amp;</em><br />Refined</h3>
                 <div className="slide-btns">
-                  <a href="/shop/lotus" className="slide-cta">Shop the Collection →</a>
+                  <a href="/shop/dialux" className="slide-cta">Shop Dia Lux →</a>
                 </div>
               </div>
             </div>
 
             <div className={`carousel-slide${cur === 2 ? " active" : ""}`}>
-              <div className="slide-bg" style={{ backgroundColor: "#1c2420", backgroundImage: "url('/lifestyle-tea.jpg')" }} />
+              <div className="slide-bg" style={{ backgroundColor: "var(--off-black)" }} />
               <div className="slide-grad" />
               <div className="slide-content">
-                <p className="slide-brand-label">Lotus House Blends</p>
-                <h3 className="slide-title">Breathe<br /><em>&amp;</em><br />Unwind</h3>
+                <img src="/royal-elite-card.jpg" alt="Royal Elite Moving" style={{ maxWidth: "220px", maxHeight: "140px", objectFit: "cover", borderRadius: "4px", marginBottom: "22px" }} />
+                <p className="slide-brand-label">Royal Elite Moving</p>
+                <h3 className="slide-title">Trusted<br /><em>&amp;</em><br />Transitions</h3>
                 <div className="slide-btns">
-                  <a href="/shop/lotus" className="slide-cta">Learn More →</a>
+                  <a href="/shop/royalelite" className="slide-cta">Explore Royal Elite →</a>
                 </div>
               </div>
             </div>
 
             <div className={`carousel-slide${cur === 3 ? " active" : ""}`}>
+              <div className="slide-bg" style={{ backgroundColor: "var(--emerald-mid)" }} />
+              <div className="slide-grad" />
+              <div className="slide-content">
+                <img src="/omega-card.jpg" alt="Omega Lifestyle" style={{ maxWidth: "220px", maxHeight: "140px", objectFit: "cover", borderRadius: "4px", marginBottom: "22px" }} />
+                <p className="slide-brand-label">Omega Lifestyle</p>
+                <h3 className="slide-title">Strength<br /><em>&amp;</em><br />Style</h3>
+                <div className="slide-btns">
+                  <a href="/coming-soon" className="slide-cta">Coming Soon →</a>
+                </div>
+              </div>
+            </div>
+
+            <div className={`carousel-slide${cur === 4 ? " active" : ""}`}>
               <div className="slide-bg slide-join-bg" />
               <div className="slide-content" style={{ maxWidth: "600px" }}>
                 <p className="slide-brand-label">Partner With OutsYde</p>
@@ -439,7 +454,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
         <nav className="carousel-nav" aria-label="Carousel navigation">
           <button className="c-btn" onClick={() => go(cur - 1)} aria-label="Previous slide">←</button>
           <div className="c-dots">
-            {[0, 1, 2, 3].map((i) => (
+            {[0, 1, 2, 3, 4].map((i) => (
               <button
                 key={i}
                 className={`c-dot${cur === i ? " active" : ""}`}
