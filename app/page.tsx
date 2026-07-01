@@ -399,7 +399,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
             </div>
 
             <div className={`carousel-slide${cur === 1 ? " active" : ""}`}>
-              <div className="slide-bg" style={{ backgroundImage: "url('/dialux-og.png')", backgroundSize: "cover", backgroundPosition: "center" }} />
+              <div className="slide-bg" style={{ backgroundImage: "url('/dialux-hero-clean.jpg')", backgroundSize: "cover", backgroundPosition: "center right" }} />
               <div className="slide-grad" />
               <div className="slide-content">
                 <p className="slide-brand-label">Dia Lux Kollection</p>
