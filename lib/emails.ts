@@ -295,3 +295,114 @@ export async function sendRoyalEliteEstimate(p: {
     html,
   });
 }
+
+
+// ─────────────────────────────────────────────────────────────
+// APPEND THIS ENTIRE BLOCK TO THE BOTTOM OF:  lib/emails.ts
+// ─────────────────────────────────────────────────────────────
+
+// TODO: Replace with Omega's real business inbox once they provide it.
+// Until then, leads only go to info@goutsyde.com — nothing is lost,
+// you'll just need to forward manually. Once you have it, put the
+// real address here and Omega starts getting leads directly.
+const OMEGA_VENDOR_EMAIL = ""; // e.g. "omegalifestyle@gmail.com"
+
+function omegaRecipients(): string[] {
+  return OMEGA_VENDOR_EMAIL
+    ? ["info@goutsyde.com", OMEGA_VENDOR_EMAIL]
+    : ["info@goutsyde.com"];
+}
+
+// ===== OMEGA LIFESTYLE — FREE CONSULTATION BOOKING =====
+export async function sendOmegaConsultation(p: {
+  name: string;
+  email: string;
+  phone: string;
+  preferredDate: string;
+  preferredTime: string;
+  goals: string;
+  heardAbout: string;
+}) {
+  function row(label: string, value?: string): string {
+    return `
+      <tr>
+        <td style="padding:9px 16px;border-bottom:1px solid #2a2a2a;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#999;white-space:nowrap;vertical-align:top;">${label}</td>
+        <td style="padding:9px 16px;border-bottom:1px solid #2a2a2a;font-size:14px;color:#ffffff;">${value || "&mdash;"}</td>
+      </tr>`;
+  }
+
+  const html = `
+  <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;background:#0a0a0a;border:1px solid #2a2a2a;border-radius:8px;overflow:hidden;">
+    <div style="background:#E2231A;padding:24px;">
+      <div style="color:#0a0a0a;font-size:11px;letter-spacing:.2em;text-transform:uppercase;font-weight:bold;">Omega Lifestyle Coaching &middot; via Outsyde</div>
+      <div style="color:#0a0a0a;font-size:21px;font-weight:bold;margin-top:7px;">New Free Consultation Request</div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;">
+      ${row("Name", p.name || "New Lead")}
+      ${row("Email", p.email)}
+      ${row("Phone", p.phone)}
+      ${row("Preferred Date", p.preferredDate)}
+      ${row("Preferred Time", p.preferredTime)}
+      ${row("Goals", p.goals)}
+      ${row("Heard About Omega Via", p.heardAbout || "Not specified")}
+    </table>
+    <div style="padding:16px 24px;font-size:12px;color:#777;border-top:1px solid #2a2a2a;">
+      Reply to this email to reach the client directly at ${p.email}.
+    </div>
+  </div>`;
+
+  return sendEmail({
+    to: omegaRecipients(),
+    reply_to: p.email,
+    subject: `New Consultation Request — ${p.name || "Omega Lifestyle"}`,
+    html,
+  });
+}
+
+// ===== OMEGA LIFESTYLE — MEAL PLAN INTAKE =====
+export async function sendOmegaMealPlan(p: {
+  name: string;
+  email: string;
+  phone: string;
+  goal: string;
+  activityLevel: string;
+  allergies: string;
+  dietaryPreference: string;
+  notes: string;
+}) {
+  function row(label: string, value?: string): string {
+    return `
+      <tr>
+        <td style="padding:9px 16px;border-bottom:1px solid #2a2a2a;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#999;white-space:nowrap;vertical-align:top;">${label}</td>
+        <td style="padding:9px 16px;border-bottom:1px solid #2a2a2a;font-size:14px;color:#ffffff;">${value || "&mdash;"}</td>
+      </tr>`;
+  }
+
+  const html = `
+  <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;background:#0a0a0a;border:1px solid #2a2a2a;border-radius:8px;overflow:hidden;">
+    <div style="background:#E2231A;padding:24px;">
+      <div style="color:#0a0a0a;font-size:11px;letter-spacing:.2em;text-transform:uppercase;font-weight:bold;">Omega Lifestyle Coaching &middot; via Outsyde</div>
+      <div style="color:#0a0a0a;font-size:21px;font-weight:bold;margin-top:7px;">New Meal Plan Request</div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;">
+      ${row("Name", p.name || "New Client")}
+      ${row("Email", p.email)}
+      ${row("Phone", p.phone)}
+      ${row("Goal", p.goal)}
+      ${row("Activity Level", p.activityLevel)}
+      ${row("Allergies / Intolerances", p.allergies || "None listed")}
+      ${row("Dietary Preference", p.dietaryPreference)}
+      ${row("Additional Notes", p.notes || "None")}
+    </table>
+    <div style="padding:16px 24px;font-size:12px;color:#777;border-top:1px solid #2a2a2a;">
+      Reply to this email to reach the client directly at ${p.email}.
+    </div>
+  </div>`;
+
+  return sendEmail({
+    to: omegaRecipients(),
+    reply_to: p.email,
+    subject: `New Meal Plan Request — ${p.name || "Omega Lifestyle"}`,
+    html,
+  });
+}

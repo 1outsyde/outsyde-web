@@ -1,81 +1,39 @@
 ﻿// app/shop/omega/page.tsx
 "use client";
-import { useState } from "react";
+import { useState, FormEvent } from "react";
 
-const SERVICES = [
-  {
-    plate: "FREE",
-    name: "Free Consultation",
-    price: "$0",
-    period: "",
-    items: [
-      "Goal assessment",
-      "Fitness & lifestyle discussion",
-      "Personalized coaching recommendations",
-    ],
-    cta: "Book Consultation",
-    featured: true,
-  },
-  {
-    plate: "150",
-    name: "Group Training",
-    price: "$150",
-    period: "/mo",
-    items: [
-      "Coach-led group workouts",
-      "Accountability and support",
-      "Structured training program",
-    ],
-    cta: "Join the Group",
-    featured: false,
-  },
-  {
-    plate: "200",
-    name: "1-on-1 Personal Training",
-    price: "$200",
-    period: "/mo",
-    items: [
-      "Personalized training sessions",
-      "Individual coaching",
-      "Progress tracking & adjustments",
-    ],
-    cta: "Go One-on-One",
-    featured: false,
-  },
-  {
-    plate: "50",
-    name: "Personalized Meal Plan",
-    price: "$50",
-    period: "",
-    items: [
-      "Customized nutrition plan for your goals",
-      "Tailored to your lifestyle & diet",
-    ],
-    cta: "Add Meal Plan",
-    featured: false,
-  },
+const SERVICES_META = [
+  { plate: "FREE", name: "Free Consultation", price: "$0", period: "", featured: true, action: "consultation" as const,
+    items: ["Goal assessment", "Fitness & lifestyle discussion", "Personalized coaching recommendations"],
+    cta: "Book Consultation" },
+  { plate: "150", name: "Group Training", price: "$150", period: "/mo", featured: false, action: "contact" as const,
+    items: ["Coach-led group workouts", "Accountability and support", "Structured training program"],
+    cta: "Join the Group" },
+  { plate: "200", name: "1-on-1 Personal Training", price: "$200", period: "/mo", featured: false, action: "contact" as const,
+    items: ["Personalized training sessions", "Individual coaching", "Progress tracking & adjustments"],
+    cta: "Go One-on-One" },
+  { plate: "50", name: "Personalized Meal Plan", price: "$50", period: "", featured: false, action: "mealplan" as const,
+    items: ["Customized nutrition plan for your goals", "Tailored to your lifestyle & diet"],
+    cta: "Add Meal Plan" },
 ];
 
 const STEPS = [
-  {
-    n: "01",
-    title: "Book Your Consultation",
-    body: "Free sit-down. We talk goals, history, and what's actually realistic for your life — no sales pitch.",
-  },
-  {
-    n: "02",
-    title: "Get Your Plan",
-    body: "Group, 1-on-1, or both — plus a meal plan if you want it. Built around your schedule, not a template.",
-  },
-  {
-    n: "03",
-    title: "Show Up & Grind",
-    body: "Coached sessions, tracked progress, adjustments made in real time. You put in the work — Omega makes sure it counts.",
-  },
+  { n: "01", title: "Book Your Consultation", body: "Free sit-down. We talk goals, history, and what's actually realistic for your life — no sales pitch." },
+  { n: "02", title: "Get Your Plan", body: "Group, 1-on-1, or both — plus a meal plan if you want it. Built around your schedule, not a template." },
+  { n: "03", title: "Show Up & Grind", body: "Coached sessions, tracked progress, adjustments made in real time. You put in the work — Omega makes sure it counts." },
 ];
+
+const ALLERGY_OPTIONS = ["Dairy", "Gluten", "Nuts", "Shellfish", "Soy", "Eggs"];
+const GOAL_OPTIONS = ["Lose Weight", "Build Muscle", "Maintain & Tone", "Improve Athletic Performance", "General Health"];
+const ACTIVITY_OPTIONS = ["Sedentary", "Lightly Active", "Moderately Active", "Very Active"];
+const DIET_OPTIONS = ["No restrictions", "Vegetarian", "Vegan", "Pescatarian", "Keto", "Halal", "Kosher", "Other"];
+
+type ModalType = "consultation" | "mealplan" | null;
+type Status = "idle" | "submitting" | "success" | "error";
 
 export default function OmegaLifestyleCoaching() {
   const [cartOpen, setCartOpen] = useState(false);
+  const [modal, setModal] = useState<ModalType>(null);
 
   return (
     <>
@@ -127,9 +85,7 @@ export default function OmegaLifestyleCoaching() {
 .oly-root .oly-topbar-cart:hover{ color:var(--red); }
 
 /* ---------- VENDOR BADGE ---------- */
-.oly-root .oly-badge-row{
-  display:flex; justify-content:center; padding:20px 24px 0;
-}
+.oly-root .oly-badge-row{ display:flex; justify-content:center; padding:20px 24px 0; }
 .oly-root .oly-badge{
   display:inline-flex; align-items:center; gap:8px;
   font-family:var(--utility); font-size:11px; letter-spacing:.14em; text-transform:uppercase; font-weight:600;
@@ -174,11 +130,10 @@ export default function OmegaLifestyleCoaching() {
 .oly-root .oly-btn-red:hover{ background:var(--red-dark); }
 .oly-root .oly-btn-outline{ background:transparent; color:var(--white); border-color:var(--white); }
 .oly-root .oly-btn-outline:hover{ border-color:var(--red); color:var(--red); }
+.oly-root .oly-btn:disabled{ opacity:.5; cursor:not-allowed; transform:none; }
 
 /* ---------- STRIP ---------- */
-.oly-root .oly-strip{
-  background:var(--red); color:var(--black); padding:10px 0; overflow:hidden; white-space:nowrap;
-}
+.oly-root .oly-strip{ background:var(--red); color:var(--black); padding:10px 0; overflow:hidden; white-space:nowrap; }
 .oly-root .oly-strip-track{
   display:inline-block; font-family:var(--utility); font-weight:700; font-size:13px; letter-spacing:.12em; text-transform:uppercase;
   animation:oly-marquee 22s linear infinite;
@@ -208,34 +163,26 @@ export default function OmegaLifestyleCoaching() {
   font-family:var(--display); font-weight:400; font-size:clamp(30px,4vw,44px); text-transform:uppercase; line-height:1.04;
   margin-bottom:18px;
 }
-.oly-root .oly-philosophy p{
-  font-size:15px; font-weight:300; line-height:1.8; color:var(--white-dim); margin-bottom:14px; max-width:480px;
-}
+.oly-root .oly-philosophy p{ font-size:15px; font-weight:300; line-height:1.8; color:var(--white-dim); margin-bottom:14px; max-width:480px; }
 
 /* ---------- STEPS ---------- */
 .oly-root .oly-steps{ background:var(--near-black); border-top:1px solid var(--steel-line); border-bottom:1px solid var(--steel-line); padding:80px 32px; }
 .oly-root .oly-steps-inner{ max-width:1160px; margin:0 auto; }
 .oly-root .oly-steps-head{ text-align:center; margin-bottom:52px; }
-.oly-root .oly-steps-head h2{
-  font-family:var(--display); font-weight:400; font-size:clamp(30px,4.5vw,48px); text-transform:uppercase;
-}
+.oly-root .oly-steps-head h2{ font-family:var(--display); font-weight:400; font-size:clamp(30px,4.5vw,48px); text-transform:uppercase; }
 .oly-root .oly-steps-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:36px; }
 @media (max-width:800px){ .oly-root .oly-steps-grid{ grid-template-columns:1fr; } }
 .oly-root .oly-step .oly-step-n{
   font-family:var(--display); font-weight:400; font-size:56px; color:var(--red); line-height:1; margin-bottom:14px;
   -webkit-text-stroke:1px var(--red);
 }
-.oly-root .oly-step h3{
-  font-family:var(--utility); font-weight:700; font-size:19px; letter-spacing:.03em; text-transform:uppercase; margin-bottom:10px;
-}
+.oly-root .oly-step h3{ font-family:var(--utility); font-weight:700; font-size:19px; letter-spacing:.03em; text-transform:uppercase; margin-bottom:10px; }
 .oly-root .oly-step p{ font-size:14px; font-weight:300; color:var(--white-dim); line-height:1.7; }
 
 /* ---------- SERVICES ---------- */
 .oly-root .oly-services{ max-width:1160px; margin:0 auto; padding:88px 32px 100px; }
 .oly-root .oly-services-head{ text-align:center; margin-bottom:52px; }
-.oly-root .oly-services-head h2{
-  font-family:var(--display); font-weight:400; font-size:clamp(32px,5vw,54px); text-transform:uppercase;
-}
+.oly-root .oly-services-head h2{ font-family:var(--display); font-weight:400; font-size:clamp(32px,5vw,54px); text-transform:uppercase; }
 .oly-root .oly-services-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:18px; }
 @media (max-width:1000px){ .oly-root .oly-services-grid{ grid-template-columns:repeat(2,1fr); } }
 @media (max-width:560px){ .oly-root .oly-services-grid{ grid-template-columns:1fr; } }
@@ -266,9 +213,7 @@ export default function OmegaLifestyleCoaching() {
 .oly-root .oly-card .oly-btn{ text-align:center; padding:12px 20px; font-size:12px; }
 
 /* ---------- CTA BAND ---------- */
-.oly-root .oly-cta-band{
-  background:var(--red); padding:76px 32px; text-align:center; position:relative; overflow:hidden;
-}
+.oly-root .oly-cta-band{ background:var(--red); padding:76px 32px; text-align:center; position:relative; overflow:hidden; }
 .oly-root .oly-cta-band h2{
   font-family:var(--display); font-weight:400; font-size:clamp(30px,5.5vw,58px); text-transform:uppercase;
   color:var(--black); max-width:760px; margin:0 auto 28px; line-height:1;
@@ -286,19 +231,64 @@ export default function OmegaLifestyleCoaching() {
 .oly-root .oly-footer a{ color:var(--white-dim); text-decoration:none; }
 .oly-root .oly-footer a:hover{ color:var(--red); }
 
-/* ---------- CART DRAWER (minimal, matches vendor-page cart pattern) ---------- */
-.oly-root .oly-cart-overlay{
-  position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200;
-  display:flex; justify-content:flex-end;
-}
-.oly-root .oly-cart-panel{
-  width:min(360px,88vw); height:100%; background:var(--near-black); border-left:1px solid var(--steel-line);
-  padding:24px; display:flex; flex-direction:column;
-}
+/* ---------- CART DRAWER ---------- */
+.oly-root .oly-cart-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; display:flex; justify-content:flex-end; }
+.oly-root .oly-cart-panel{ width:min(360px,88vw); height:100%; background:var(--near-black); border-left:1px solid var(--steel-line); padding:24px; display:flex; flex-direction:column; }
 .oly-root .oly-cart-panel-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
 .oly-root .oly-cart-panel-head h3{ font-family:var(--utility); font-weight:700; font-size:16px; text-transform:uppercase; letter-spacing:.05em; }
 .oly-root .oly-cart-panel-head button{ background:none; border:none; color:var(--white); font-size:20px; cursor:pointer; }
 .oly-root .oly-cart-panel p{ font-size:13px; color:var(--white-dim); }
+
+/* ---------- FORM MODALS ---------- */
+.oly-root .oly-modal-overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:300;
+  display:flex; align-items:center; justify-content:center; padding:24px; overflow-y:auto;
+}
+.oly-root .oly-modal{
+  width:100%; max-width:560px; background:var(--near-black); border:1px solid var(--steel-line);
+  padding:36px; margin:auto; max-height:90vh; overflow-y:auto;
+}
+.oly-root .oly-modal-head{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; }
+.oly-root .oly-modal-head h3{ font-family:var(--display); font-weight:400; font-size:28px; text-transform:uppercase; line-height:1; }
+.oly-root .oly-modal-head button{ background:none; border:none; color:var(--white-dim); font-size:26px; line-height:1; cursor:pointer; }
+.oly-root .oly-modal-head button:hover{ color:var(--red); }
+.oly-root .oly-modal-sub{ font-size:13px; color:var(--white-dim); font-weight:300; margin-bottom:26px; line-height:1.6; }
+
+.oly-root .oly-field{ margin-bottom:18px; }
+.oly-root .oly-field label{
+  display:block; font-family:var(--utility); font-weight:600; font-size:11px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--white-dim); margin-bottom:8px;
+}
+.oly-root .oly-field input[type="text"],
+.oly-root .oly-field input[type="email"],
+.oly-root .oly-field input[type="tel"],
+.oly-root .oly-field input[type="date"],
+.oly-root .oly-field input[type="time"],
+.oly-root .oly-field select,
+.oly-root .oly-field textarea{
+  width:100%; background:var(--steel); border:1px solid var(--steel-line); color:var(--white);
+  font-family:var(--body); font-size:14px; padding:12px 14px; outline:none;
+  transition:border-color .2s;
+}
+.oly-root .oly-field input:focus,
+.oly-root .oly-field select:focus,
+.oly-root .oly-field textarea:focus{ border-color:var(--red); }
+.oly-root .oly-field textarea{ resize:vertical; min-height:80px; font-family:var(--body); }
+.oly-root .oly-row-2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+@media (max-width:480px){ .oly-root .oly-row-2{ grid-template-columns:1fr; } }
+
+.oly-root .oly-checks{ display:flex; flex-wrap:wrap; gap:10px; }
+.oly-root .oly-check{
+  display:flex; align-items:center; gap:7px; background:var(--steel); border:1px solid var(--steel-line);
+  padding:8px 12px; cursor:pointer; font-size:13px; color:var(--white-dim); transition:border-color .2s, color .2s;
+}
+.oly-root .oly-check input{ accent-color:var(--red); }
+.oly-root .oly-check.checked{ border-color:var(--red); color:var(--white); }
+
+.oly-root .oly-form-submit{ width:100%; text-align:center; margin-top:8px; }
+.oly-root .oly-form-msg{ font-size:13px; margin-top:14px; text-align:center; }
+.oly-root .oly-form-msg.error{ color:var(--red); }
+.oly-root .oly-form-msg.success{ color:#7CCB7C; }
 `,
         }}
       />
@@ -308,9 +298,7 @@ export default function OmegaLifestyleCoaching() {
         <div className="oly-topbar">
           <a href="/shop" className="oly-back">&larr; Marketplace</a>
           <div className="oly-topbar-center">Omega Lifestyle</div>
-          <button className="oly-topbar-cart" onClick={() => setCartOpen(true)}>
-            Cart
-          </button>
+          <button className="oly-topbar-cart" onClick={() => setCartOpen(true)}>Cart</button>
         </div>
 
         {/* BADGE */}
@@ -324,9 +312,7 @@ export default function OmegaLifestyleCoaching() {
         {/* HERO */}
         <section className="oly-hero">
           <img className="oly-hero-logo" src="/omega-card.jpg" alt="Omega Lifestyle" />
-          <h1>
-            Train <span className="oly-red">Different</span>
-          </h1>
+          <h1>Train <span className="oly-red">Different</span></h1>
           <p className="oly-hero-sub">Strength &middot; Structure &middot; Accountability</p>
           <p>
             Omega Lifestyle Coaching builds fitness and nutrition around your
@@ -334,7 +320,7 @@ export default function OmegaLifestyleCoaching() {
             who shows up for you every session.
           </p>
           <div className="oly-hero-ctas">
-            <a href="#services" className="oly-btn oly-btn-red">Book Free Consultation</a>
+            <button className="oly-btn oly-btn-red" onClick={() => setModal("consultation")}>Book Free Consultation</button>
             <a href="#services" className="oly-btn oly-btn-outline">View Pricing</a>
           </div>
         </section>
@@ -401,7 +387,7 @@ export default function OmegaLifestyleCoaching() {
             <h2>Pick Your Program</h2>
           </div>
           <div className="oly-services-grid">
-            {SERVICES.map((s) => (
+            {SERVICES_META.map((s) => (
               <div key={s.name} className={`oly-card${s.featured ? " oly-featured" : ""}`}>
                 <div className="oly-plate">
                   <span className="num">{s.plate}</span>
@@ -413,16 +399,17 @@ export default function OmegaLifestyleCoaching() {
                   {s.period && <span className="period">{s.period}</span>}
                 </div>
                 <ul className="oly-card-list">
-                  {s.items.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
+                  {s.items.map((item) => (<li key={item}>{item}</li>))}
                 </ul>
-                <a
-                  href="/shop/omega/book"
-                  className={`oly-btn ${s.featured ? "oly-btn-red" : "oly-btn-outline"}`}
-                >
-                  {s.cta}
-                </a>
+                {s.action === "consultation" && (
+                  <button className="oly-btn oly-btn-red" onClick={() => setModal("consultation")}>{s.cta}</button>
+                )}
+                {s.action === "mealplan" && (
+                  <button className="oly-btn oly-btn-outline" onClick={() => setModal("mealplan")}>{s.cta}</button>
+                )}
+                {s.action === "contact" && (
+                  <a href="/shop/omega/book" className="oly-btn oly-btn-outline">{s.cta}</a>
+                )}
               </div>
             ))}
           </div>
@@ -432,7 +419,7 @@ export default function OmegaLifestyleCoaching() {
         <section className="oly-cta-band">
           <h2>Stop planning. Start training.</h2>
           <div className="oly-cta-band-ctas">
-            <a href="#services" className="oly-btn oly-btn-red">Book Free Consultation</a>
+            <button className="oly-btn oly-btn-red" onClick={() => setModal("consultation")}>Book Free Consultation</button>
             <a href="/shop" className="oly-btn oly-btn-outline">Explore the Marketplace</a>
           </div>
         </section>
@@ -456,7 +443,247 @@ export default function OmegaLifestyleCoaching() {
             </div>
           </div>
         )}
+
+        {/* CONSULTATION MODAL */}
+        {modal === "consultation" && (
+          <ConsultationModal onClose={() => setModal(null)} />
+        )}
+
+        {/* MEAL PLAN MODAL */}
+        {modal === "mealplan" && (
+          <MealPlanModal onClose={() => setModal(null)} />
+        )}
       </div>
     </>
+  );
+}
+
+function ConsultationModal({ onClose }: { onClose: () => void }) {
+  const [status, setStatus] = useState<Status>("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setStatus("submitting");
+    setErrorMsg("");
+    const form = new FormData(e.currentTarget);
+    const payload = {
+      name: form.get("name"),
+      email: form.get("email"),
+      phone: form.get("phone"),
+      preferredDate: form.get("preferredDate"),
+      preferredTime: form.get("preferredTime"),
+      goals: form.get("goals"),
+      heardAbout: form.get("heardAbout"),
+    };
+    try {
+      const res = await fetch("/api/omega-consultation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong.");
+      setStatus("success");
+    } catch (err) {
+      setStatus("error");
+      setErrorMsg(err instanceof Error ? err.message : "Something went wrong.");
+    }
+  }
+
+  return (
+    <div className="oly-modal-overlay" onClick={onClose}>
+      <div className="oly-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="oly-modal-head">
+          <h3>Book Consultation</h3>
+          <button onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <p className="oly-modal-sub">
+          Free 30-minute sit-down to talk goals and figure out the right program for you.
+        </p>
+
+        {status === "success" ? (
+          <p className="oly-form-msg success">
+            You're booked! Omega will reach out shortly to confirm your time.
+          </p>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <div className="oly-row-2">
+              <div className="oly-field">
+                <label htmlFor="c-name">Name</label>
+                <input id="c-name" name="name" type="text" required />
+              </div>
+              <div className="oly-field">
+                <label htmlFor="c-phone">Phone</label>
+                <input id="c-phone" name="phone" type="tel" required />
+              </div>
+            </div>
+            <div className="oly-field">
+              <label htmlFor="c-email">Email</label>
+              <input id="c-email" name="email" type="email" required />
+            </div>
+            <div className="oly-row-2">
+              <div className="oly-field">
+                <label htmlFor="c-date">Preferred Date</label>
+                <input id="c-date" name="preferredDate" type="date" required />
+              </div>
+              <div className="oly-field">
+                <label htmlFor="c-time">Preferred Time</label>
+                <input id="c-time" name="preferredTime" type="time" required />
+              </div>
+            </div>
+            <div className="oly-field">
+              <label htmlFor="c-goals">What are your goals?</label>
+              <textarea id="c-goals" name="goals" placeholder="e.g. Lose weight, build strength, train for an event..." required />
+            </div>
+            <div className="oly-field">
+              <label htmlFor="c-heard">How did you hear about Omega? (optional)</label>
+              <input id="c-heard" name="heardAbout" type="text" />
+            </div>
+
+            <button type="submit" className="oly-btn oly-btn-red oly-form-submit" disabled={status === "submitting"}>
+              {status === "submitting" ? "Sending..." : "Book Free Consultation"}
+            </button>
+            {status === "error" && <p className="oly-form-msg error">{errorMsg}</p>}
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MealPlanModal({ onClose }: { onClose: () => void }) {
+  const [status, setStatus] = useState<Status>("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [allergies, setAllergies] = useState<string[]>([]);
+
+  function toggleAllergy(item: string) {
+    setAllergies((prev) =>
+      prev.includes(item) ? prev.filter((a) => a !== item) : [...prev, item]
+    );
+  }
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setStatus("submitting");
+    setErrorMsg("");
+    const form = new FormData(e.currentTarget);
+    const otherAllergy = (form.get("allergiesOther") as string) || "";
+    const allAllergies = [...allergies, ...(otherAllergy ? [otherAllergy] : [])];
+    const payload = {
+      name: form.get("name"),
+      email: form.get("email"),
+      phone: form.get("phone"),
+      goal: form.get("goal"),
+      activityLevel: form.get("activityLevel"),
+      allergies: allAllergies.length ? allAllergies.join(", ") : "None listed",
+      dietaryPreference: form.get("dietaryPreference"),
+      notes: form.get("notes"),
+    };
+    try {
+      const res = await fetch("/api/omega-mealplan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong.");
+      setStatus("success");
+    } catch (err) {
+      setStatus("error");
+      setErrorMsg(err instanceof Error ? err.message : "Something went wrong.");
+    }
+  }
+
+  return (
+    <div className="oly-modal-overlay" onClick={onClose}>
+      <div className="oly-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="oly-modal-head">
+          <h3>Meal Plan Intake</h3>
+          <button onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <p className="oly-modal-sub">
+          Tell us your goals and any allergies so Omega can build your $50
+          personalized nutrition plan.
+        </p>
+
+        {status === "success" ? (
+          <p className="oly-form-msg success">
+            Got it! Omega will follow up with your personalized meal plan soon.
+          </p>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <div className="oly-row-2">
+              <div className="oly-field">
+                <label htmlFor="m-name">Name</label>
+                <input id="m-name" name="name" type="text" required />
+              </div>
+              <div className="oly-field">
+                <label htmlFor="m-phone">Phone</label>
+                <input id="m-phone" name="phone" type="tel" required />
+              </div>
+            </div>
+            <div className="oly-field">
+              <label htmlFor="m-email">Email</label>
+              <input id="m-email" name="email" type="email" required />
+            </div>
+
+            <div className="oly-field">
+              <label htmlFor="m-goal">What shape are you going for?</label>
+              <select id="m-goal" name="goal" required defaultValue="">
+                <option value="" disabled>Select a goal</option>
+                {GOAL_OPTIONS.map((g) => (<option key={g} value={g}>{g}</option>))}
+              </select>
+            </div>
+
+            <div className="oly-field">
+              <label htmlFor="m-activity">Current Activity Level</label>
+              <select id="m-activity" name="activityLevel" defaultValue="">
+                <option value="" disabled>Select activity level</option>
+                {ACTIVITY_OPTIONS.map((a) => (<option key={a} value={a}>{a}</option>))}
+              </select>
+            </div>
+
+            <div className="oly-field">
+              <label>Allergies &amp; Food Intolerances</label>
+              <div className="oly-checks">
+                {ALLERGY_OPTIONS.map((item) => (
+                  <label key={item} className={`oly-check${allergies.includes(item) ? " checked" : ""}`}>
+                    <input
+                      type="checkbox"
+                      checked={allergies.includes(item)}
+                      onChange={() => toggleAllergy(item)}
+                    />
+                    {item}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="oly-field">
+              <label htmlFor="m-allergies-other">Other allergies (optional)</label>
+              <input id="m-allergies-other" name="allergiesOther" type="text" placeholder="Anything not listed above" />
+            </div>
+
+            <div className="oly-field">
+              <label htmlFor="m-diet">Dietary Preference</label>
+              <select id="m-diet" name="dietaryPreference" required defaultValue="">
+                <option value="" disabled>Select a preference</option>
+                {DIET_OPTIONS.map((d) => (<option key={d} value={d}>{d}</option>))}
+              </select>
+            </div>
+
+            <div className="oly-field">
+              <label htmlFor="m-notes">Additional Notes (optional)</label>
+              <textarea id="m-notes" name="notes" placeholder="Foods you hate, meals-per-day preference, anything else..." />
+            </div>
+
+            <button type="submit" className="oly-btn oly-btn-red oly-form-submit" disabled={status === "submitting"}>
+              {status === "submitting" ? "Sending..." : "Submit Meal Plan Request"}
+            </button>
+            {status === "error" && <p className="oly-form-msg error">{errorMsg}</p>}
+          </form>
+        )}
+      </div>
+    </div>
   );
 }
