@@ -406,3 +406,55 @@ export async function sendOmegaMealPlan(p: {
     html,
   });
 }
+
+// ─────────────────────────────────────────────────────────────
+// APPEND THIS TO THE BOTTOM OF:  lib/emails.ts
+// (goes after sendOmegaConsultation / sendOmegaMealPlan)
+// ─────────────────────────────────────────────────────────────
+
+// ===== OMEGA LIFESTYLE — CONSULTATION CONFIRMATION TO CUSTOMER =====
+export async function sendOmegaConsultationConfirmation(p: {
+  name: string;
+  email: string;
+  preferredDate: string;
+  preferredTime: string;
+}) {
+  const html = `<!DOCTYPE html><html><body style="margin:0;padding:0;background-color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0a0a;padding:40px 20px;"><tr><td align="center">
+  <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+    <tr><td align="center" style="padding:0 0 32px 0;">
+      <h1 style="color:#E2231A;font-size:26px;letter-spacing:3px;margin:0;text-transform:uppercase;">Omega Lifestyle Coaching</h1>
+      <p style="color:#666;font-size:11px;letter-spacing:2px;margin:4px 0 0 0;text-transform:uppercase;">via Go Outsyde</p>
+    </td></tr>
+    <tr><td style="background-color:#E2231A;padding:16px 24px;border-radius:4px 4px 0 0;">
+      <h2 style="color:#0a0a0a;margin:0;font-size:18px;">You're Booked!</h2>
+    </td></tr>
+    <tr><td style="background-color:#141414;padding:24px;border-radius:0 0 4px 4px;">
+      <p style="color:#ffffff;font-size:15px;line-height:1.7;margin:0 0 20px 0;">
+        Hey ${p.name || "there"}, your free consultation with Omega Lifestyle Coaching is requested. Omega will reach out shortly to confirm your exact time.
+      </p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;background-color:#1e1e1e;border-radius:4px;">
+        <tr>
+          <td style="padding:12px 16px;color:#999;font-size:12px;letter-spacing:1px;text-transform:uppercase;">Preferred Date</td>
+          <td style="padding:12px 16px;color:#ffffff;font-size:14px;text-align:right;">${p.preferredDate || "&mdash;"}</td>
+        </tr>
+        <tr>
+          <td style="padding:12px 16px;color:#999;font-size:12px;letter-spacing:1px;text-transform:uppercase;">Preferred Time</td>
+          <td style="padding:12px 16px;color:#ffffff;font-size:14px;text-align:right;">${p.preferredTime || "&mdash;"}</td>
+        </tr>
+      </table>
+      <p style="color:#999;font-size:13px;line-height:1.7;margin:0;">
+        Questions in the meantime? Just reply to this email.
+      </p>
+    </td></tr>
+    <tr><td align="center" style="padding:24px 0 0 0;">
+      <p style="color:#444;font-size:11px;margin:0;">© ${new Date().getFullYear()} Omega Lifestyle Coaching &middot; Sold via Go Outsyde Platform</p>
+    </td></tr>
+  </table></td></tr></table></body></html>`;
+
+  return sendEmail({
+    to: p.email,
+    subject: `You're Booked — Omega Lifestyle Coaching`,
+    html,
+  });
+}

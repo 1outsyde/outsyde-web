@@ -7,7 +7,7 @@
 // Needs (already in Vercel):  RESEND_API_KEY
 
 import { NextResponse } from "next/server";
-import { sendOmegaConsultation } from "@/lib/emails";
+import { sendOmegaConsultation, sendOmegaConsultationConfirmation } from "@/lib/emails";
 
 function esc(s?: unknown): string {
   return String(s ?? "")
@@ -27,12 +27,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "A valid email is required." }, { status: 400 });
     }
 
+    const name = esc(d.name);
+    const email = d.email.trim();
+    const preferredDate = esc(d.preferredDate);
+    const preferredTime = esc(d.preferredTime);
+
+    // Internal notification (info@goutsyde.com + Omega, once OMEGA_VENDOR_EMAIL is set)
     const ok = await sendOmegaConsultation({
-      name: esc(d.name),
-      email: d.email.trim(),
+      name,
+      email,
       phone: esc(d.phone),
-      preferredDate: esc(d.preferredDate),
-      preferredTime: esc(d.preferredTime),
+      preferredDate,
+      preferredTime,
       goals: esc(d.goals),
       heardAbout: esc(d.heardAbout),
     });
@@ -43,6 +49,11 @@ export async function POST(req: Request) {
         { status: 502 }
       );
     }
+
+    // Customer-facing confirmation. Fired after the internal email succeeds;
+    // if this one fails, we don't fail the whole request — the lead is
+    // already captured internally either way.
+    await sendOmegaConsultationConfirmation({ name, email, preferredDate, preferredTime });
 
     return NextResponse.json({ success: true });
   } catch {
