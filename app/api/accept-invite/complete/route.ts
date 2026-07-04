@@ -4,13 +4,14 @@
 // are ever set in the visitor's browser.
 //
 // POST /api/accept-invite/complete
-// Body: { code, mode: "login"|"signup", email, password, name? }
+// Body: { code, mode: "login"|"signup", email, password, name?, username? }
 //
 // signup path:
-//   POST /api/auth/customer/signup  { email, password, name, inviteCode }
+//   POST /api/auth/customer/signup  { email, password, name, username, inviteCode }
 //   → if staffInviteAccepted === true  → { ok: true }
 //   → if staffInviteAccepted === false → { ok: true, inviteNotLinked: true }
-//   → non-2xx                         → forward backend error message
+//   → 409 username conflict           → { error: msg, field: "username" }
+//   → other non-2xx                   → forward backend error message
 //
 // login path:
 //   POST /api/auth/login             { email, password }
@@ -20,15 +21,24 @@
 
 import { NextResponse } from "next/server";
 
+const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+
 export async function POST(req: Request) {
-  let body: { code?: unknown; mode?: unknown; email?: unknown; password?: unknown; name?: unknown };
+  let body: {
+    code?: unknown;
+    mode?: unknown;
+    email?: unknown;
+    password?: unknown;
+    name?: unknown;
+    username?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { code, mode, email, password, name } = body;
+  const { code, mode, email, password, name, username } = body;
 
   // --- input validation ---
   if (typeof code !== "string" || !code.trim()) {
@@ -46,6 +56,17 @@ export async function POST(req: Request) {
   if (mode === "signup" && (typeof name !== "string" || !name.trim())) {
     return NextResponse.json({ error: "Full name is required to create an account." }, { status: 400 });
   }
+  if (mode === "signup") {
+    if (typeof username !== "string" || !username.trim()) {
+      return NextResponse.json({ error: "Username is required.", field: "username" }, { status: 400 });
+    }
+    if (!USERNAME_RE.test(username.trim())) {
+      return NextResponse.json(
+        { error: "Username must be 3\u201320 lowercase letters, numbers, or underscores.", field: "username" },
+        { status: 400 },
+      );
+    }
+  }
 
   const backendUrl = process.env.OUTSYDE_BACKEND_URL;
   if (!backendUrl) {
@@ -61,6 +82,7 @@ export async function POST(req: Request) {
         email: email.trim().toLowerCase(),
         password,
         name: (name as string).trim(),
+        username: (username as string).trim().toLowerCase(),
       });
     } else {
       return await handleLogin({
@@ -85,17 +107,19 @@ async function handleSignup({
   email,
   password,
   name,
+  username,
 }: {
   backendUrl: string;
   code: string;
   email: string;
   password: string;
   name: string;
+  username: string;
 }): Promise<NextResponse> {
   const signupRes = await fetch(`${backendUrl}/api/auth/customer/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password, name, inviteCode: code }),
+    body: JSON.stringify({ email, password, name, username, inviteCode: code }),
   });
 
   let signupData: Record<string, unknown>;
@@ -109,13 +133,17 @@ async function handleSignup({
   }
 
   if (!signupRes.ok) {
-    // Surface backend's error message verbatim — don't paraphrase
+    // Surface backend's error message verbatim — don't paraphrase.
     const msg =
       typeof signupData.error === "string"
         ? signupData.error
         : typeof signupData.message === "string"
           ? signupData.message
           : "Could not create account. Please try again.";
+    // Tag username conflicts so the UI can show the error on the field, not generically.
+    if (signupRes.status === 409) {
+      return NextResponse.json({ error: msg, field: "username" }, { status: 409 });
+    }
     return NextResponse.json({ error: msg }, { status: signupRes.status });
   }
 
