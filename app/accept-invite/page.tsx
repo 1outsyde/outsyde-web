@@ -61,10 +61,55 @@ function AcceptInviteInner() {
 
   // form fields
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [submitError, setSubmitError] = useState("");
+
+  // username field: inline format/availability feedback
+  const [usernameError, setUsernameError] = useState("");
+  type UsernameAvailability = "idle" | "checking" | "available" | "taken";
+  const [usernameAvailability, setUsernameAvailability] = useState<UsernameAvailability>("idle");
+
+  const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+
+  function validateUsernameFormat(value: string): string {
+    if (!value.trim()) return "Username is required.";
+    if (!USERNAME_RE.test(value.trim())) {
+      return "3\u201320 characters: lowercase letters, numbers, or underscores only.";
+    }
+    return "";
+  }
+
+  async function handleUsernameBlur() {
+    const value = username.trim();
+    const formatErr = validateUsernameFormat(value);
+    if (formatErr) {
+      setUsernameError(formatErr);
+      setUsernameAvailability("idle");
+      return;
+    }
+    setUsernameError("");
+    setUsernameAvailability("checking");
+    try {
+      const res = await fetch(
+        `/api/accept-invite/check-username?username=${encodeURIComponent(value)}`,
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        // Non-fatal — let submit handle it if needed
+        setUsernameAvailability("idle");
+        return;
+      }
+      setUsernameAvailability(data.available === true ? "available" : "taken");
+      if (data.available === false) {
+        setUsernameError("That username is already taken.");
+      }
+    } catch {
+      setUsernameAvailability("idle");
+    }
+  }
 
   // Fetch preview on mount (or when code changes)
   useEffect(() => {
@@ -101,6 +146,16 @@ function AcceptInviteInner() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitError("");
+
+    // Client-side username validation before touching the network
+    if (mode === "signup") {
+      const formatErr = validateUsernameFormat(username);
+      if (formatErr) {
+        setUsernameError(formatErr);
+        return;
+      }
+    }
+
     setSubmitState("submitting");
 
     try {
@@ -112,13 +167,19 @@ function AcceptInviteInner() {
           mode,
           email: email.trim().toLowerCase(),
           password,
-          ...(mode === "signup" ? { name: name.trim() } : {}),
+          ...(mode === "signup" ? { name: name.trim(), username: username.trim() } : {}),
         }),
       });
       const data = await res.json();
 
       if (!res.ok) {
         setSubmitState("error");
+        // Route username-specific errors to the field rather than the generic area
+        if (data.field === "username" && data.error) {
+          setUsernameError(data.error);
+          setUsernameAvailability("taken");
+          return;
+        }
         setSubmitError(data.error || "Something went wrong. Please try again.");
         return;
       }
@@ -203,7 +264,13 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
 .ai-submit:hover:not(:disabled){background:#f2c835;transform:translateY(-1px);}
 .ai-submit:disabled{opacity:.55;cursor:not-allowed;}
 
-/* error */
+/* inline field hints (availability / format errors below a specific input) */
+.ai-field-hint{font-size:11.5px;line-height:1.4;}
+.ai-field-hint.err{color:#ff8080;}
+.ai-field-hint.ok{color:#5cbe8a;}
+.ai-field-hint.muted{color:rgba(245,240,230,.45);}
+
+/* form-level error (below all fields) */
 .ai-err{margin-top:14px;font-size:13px;color:#ff8080;line-height:1.5;}
 
 /* status states */
@@ -380,7 +447,12 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
                 <button
                   type="button"
                   className={`ai-toggle-btn${mode === "login" ? " active" : ""}`}
-                  onClick={() => { setMode("login"); setSubmitError(""); }}
+                  onClick={() => {
+                    setMode("login");
+                    setSubmitError("");
+                    setUsernameError("");
+                    setUsernameAvailability("idle");
+                  }}
                 >
                   I already have an account
                 </button>
@@ -396,18 +468,57 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
               {/* Form */}
               <form onSubmit={handleSubmit} noValidate>
                 {mode === "signup" && (
-                  <div className="ai-field">
-                    <label htmlFor="ai-name">Full Name</label>
-                    <input
-                      id="ai-name"
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Your full name"
-                      required
-                      autoComplete="name"
-                    />
-                  </div>
+                  <>
+                    <div className="ai-field">
+                      <label htmlFor="ai-name">Full Name</label>
+                      <input
+                        id="ai-name"
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Your full name"
+                        required
+                        autoComplete="name"
+                      />
+                    </div>
+
+                    <div className="ai-field">
+                      <label htmlFor="ai-username">Username</label>
+                      <input
+                        id="ai-username"
+                        type="text"
+                        value={username}
+                        onChange={(e) => {
+                          // Sanitise to lowercase as they type — prevents confusion
+                          const v = e.target.value.toLowerCase();
+                          setUsername(v);
+                          // Clear stale availability feedback when the value changes
+                          if (usernameAvailability !== "idle") setUsernameAvailability("idle");
+                          if (usernameError) setUsernameError("");
+                        }}
+                        onBlur={handleUsernameBlur}
+                        placeholder="e.g. jane_smith"
+                        required
+                        autoComplete="username"
+                        style={
+                          usernameError
+                            ? { borderColor: "#ff8080" }
+                            : usernameAvailability === "available"
+                              ? { borderColor: "#5cbe8a" }
+                              : undefined
+                        }
+                      />
+                      {usernameError && (
+                        <span className="ai-field-hint err" role="alert">{usernameError}</span>
+                      )}
+                      {!usernameError && usernameAvailability === "checking" && (
+                        <span className="ai-field-hint muted">Checking…</span>
+                      )}
+                      {!usernameError && usernameAvailability === "available" && (
+                        <span className="ai-field-hint ok">✓ Username available</span>
+                      )}
+                    </div>
+                  </>
                 )}
 
                 <div className="ai-field">
