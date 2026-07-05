@@ -316,8 +316,8 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
           <div className="footer-col">
             <h4>For Businesses</h4>
             <ul>
-              <li><a href="/coming-soon">Join the Marketplace</a></li>
-              <li><a href="/coming-soon">List Your Services</a></li>
+              <li><a href="/business-signup">Join the Marketplace</a></li>
+              <li><a href="/business-signup">List Your Services</a></li>
               <li><a href="/coming-soon">Manage Bookings</a></li>
               <li><a href="/coming-soon">Partner With Us</a></li>
             </ul>

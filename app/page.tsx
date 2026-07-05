@@ -310,7 +310,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
             <h2 className="tri-heading">List Your Business on OutsYde</h2>
             <p className="tri-desc">Get your products, services, and bookings in front of OutsYde&apos;s audience of local culture-seekers and active buyers.</p>
             <div className="tri-btns">
-              <a href="/coming-soon" className="tri-btn btn-tri-gold">
+              <a href="/business-signup" className="tri-btn btn-tri-gold">
                 Inquire to Join <span className="tri-btn-arrow">→</span>
               </a>
               <a href="/coming-soon" className="tri-btn btn-tri-outline-cream">How It Works</a>
@@ -523,7 +523,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
           <p>Whether you&apos;re a local business looking to reach new customers or a creator wanting your products in front of the right audience — OutsYde is your platform.</p>
         </div>
         <div className="biz-band-ctas">
-          <a href="/coming-soon" className="btn-biz-cta btn-biz-gold">Inquire About Listing →</a>
+          <a href="/business-signup" className="btn-biz-cta btn-biz-gold">Inquire About Listing →</a>
           <a href="/coming-soon" className="btn-biz-cta btn-biz-ghost">See How It Works</a>
         </div>
       </div>
@@ -547,8 +547,8 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
           <div className="footer-col">
             <h4>For Businesses</h4>
             <ul>
-              <li><a href="/coming-soon">Join the Marketplace</a></li>
-              <li><a href="/coming-soon">List Your Services</a></li>
+              <li><a href="/business-signup">Join the Marketplace</a></li>
+              <li><a href="/business-signup">List Your Services</a></li>
               <li><a href="/coming-soon">Manage Bookings</a></li>
               <li><a href="/coming-soon">Partner With Us</a></li>
             </ul>
