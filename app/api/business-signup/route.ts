@@ -28,6 +28,7 @@
 //     backend before assuming these are saved.
 
 import { NextResponse } from "next/server";
+import { sendBusinessSignupAlert, sendBusinessSignupConfirmation } from "@/lib/emails";
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 const OFFER_TYPES = new Set(["products", "services", "both"]);
@@ -202,6 +203,36 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: msg, field: "username" }, { status: 409 });
     }
     return NextResponse.json({ error: msg }, { status: signupRes.status });
+  }
+
+  // Fire both emails now that the account + business are confirmed created.
+  // MUST be awaited — on Vercel, a serverless function can be frozen/killed
+  // right after the response is returned, which would silently drop any
+  // in-flight fetch() to Resend that wasn't awaited first. Failures here are
+  // logged but never change the response: the signup itself already
+  // succeeded upstream, so an email hiccup shouldn't make it look broken.
+  try {
+    await sendBusinessSignupAlert({
+      businessName: payload.businessName,
+      ownerName: fullName,
+      ownerEmail: payload.email,
+      businessCategory: payload.businessCategory,
+      offerType: payload.offerType,
+      city: payload.city,
+      state: payload.state,
+    });
+  } catch (err) {
+    console.error("business-signup: alert email failed", err);
+  }
+
+  try {
+    await sendBusinessSignupConfirmation({
+      email: payload.email,
+      businessName: payload.businessName,
+      ownerName: fullName,
+    });
+  } catch (err) {
+    console.error("business-signup: confirmation email failed", err);
   }
 
   // Success — forward the session cookie the backend set so the vendor is

@@ -240,6 +240,78 @@ export async function sendNotifySignupConfirmation(p: { email: string }) {
   });
 }
 
+// ===== BUSINESS SIGNUP — INTERNAL ALERT (to you) =====
+export async function sendBusinessSignupAlert(p: {
+  businessName: string;
+  ownerName: string;
+  ownerEmail: string;
+  businessCategory: string;
+  offerType: string;
+  city?: string;
+  state?: string;
+}) {
+  const location = [p.city, p.state].filter(Boolean).join(", ") || "Not provided";
+  const html = `<!DOCTYPE html><html><body style="margin:0;padding:0;background-color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0a0a;padding:40px 20px;"><tr><td align="center">
+  <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+    <tr><td align="center" style="padding:0 0 32px 0;">
+      <h1 style="color:#E8B930;font-size:28px;letter-spacing:4px;margin:0;text-transform:uppercase;">GO OUTSYDE</h1>
+      <p style="color:#666;font-size:11px;letter-spacing:2px;margin:4px 0 0 0;text-transform:uppercase;">Like A Lavished Local</p></td></tr>
+    <tr><td style="background-color:#E8B930;padding:16px 24px;border-radius:4px 4px 0 0;"><h2 style="color:#0a0a0a;margin:0;font-size:18px;">🏪 New Business Application</h2></td></tr>
+    <tr><td style="background-color:#141414;padding:24px;border-radius:0 0 4px 4px;">
+      <p style="color:#999;margin:0 0 6px 0;font-size:12px;letter-spacing:1px;text-transform:uppercase;">Business</p>
+      <p style="color:#ffffff;margin:0 0 18px 0;font-size:18px;font-weight:600;">${p.businessName}</p>
+      <p style="color:#999;margin:0 0 6px 0;font-size:12px;letter-spacing:1px;text-transform:uppercase;">Owner</p>
+      <p style="color:#ffffff;margin:0 0 4px 0;font-size:15px;">${p.ownerName}</p>
+      <p style="color:#ccc;margin:0 0 18px 0;font-size:13px;">${p.ownerEmail}</p>
+      <p style="color:#999;margin:0 0 6px 0;font-size:12px;letter-spacing:1px;text-transform:uppercase;">Category / Offers</p>
+      <p style="color:#ffffff;margin:0 0 18px 0;font-size:14px;">${p.businessCategory} &middot; ${p.offerType}</p>
+      <p style="color:#999;margin:0 0 6px 0;font-size:12px;letter-spacing:1px;text-transform:uppercase;">Location</p>
+      <p style="color:#ffffff;margin:0;font-size:14px;">${location}</p>
+      <p style="color:#666;margin:20px 0 0 0;font-size:12px;">Status: pending — review in the admin dashboard.</p>
+    </td></tr>
+    <tr><td align="center" style="padding:24px 0 0 0;"><p style="color:#444;font-size:11px;margin:0;">© ${new Date().getFullYear()} Go Outsyde. All rights reserved.</p></td></tr>
+  </table></td></tr></table></body></html>`;
+
+  return sendEmail({
+    to: "info@goutsyde.com",
+    subject: `🏪 New business application: ${p.businessName}`,
+    html,
+  });
+}
+
+// ===== BUSINESS SIGNUP — CONFIRMATION TO THE APPLICANT =====
+export async function sendBusinessSignupConfirmation(p: { email: string; businessName: string; ownerName: string }) {
+  const html = `<!DOCTYPE html><html><body style="margin:0;padding:0;background-color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0a0a;padding:40px 20px;"><tr><td align="center">
+  <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+    <tr><td align="center" style="padding:0 0 32px 0;">
+      <h1 style="color:#E8B930;font-size:28px;letter-spacing:4px;margin:0;text-transform:uppercase;">GO OUTSYDE</h1>
+      <p style="color:#666;font-size:11px;letter-spacing:2px;margin:4px 0 0 0;text-transform:uppercase;">Like A Lavished Local</p></td></tr>
+    <tr><td style="background-color:#E8B930;padding:16px 24px;border-radius:4px 4px 0 0;"><h2 style="color:#0a0a0a;margin:0;font-size:18px;">🎉 Application received</h2></td></tr>
+    <tr><td style="background-color:#141414;padding:24px;border-radius:0 0 4px 4px;">
+      <p style="color:#ffffff;font-size:15px;line-height:1.7;margin:0 0 16px 0;">Hi ${p.ownerName}, thanks for applying to list <strong>${p.businessName}</strong> on Outsyde. Your application is now pending review.</p>
+      <p style="color:#999;font-size:14px;line-height:1.7;margin:0 0 20px 0;">You don't have to wait on approval to get set up — you can choose your subscription plan right now. Log in with the email and password you just created to pick a plan; your business goes live once it's both approved and subscribed.</p>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr><td align="center" style="padding:8px 0;">
+          <a href="https://outsyde-backend.onrender.com/vendor-dashboard" style="display:inline-block;background-color:#E8B930;color:#0a0a0a;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:12px 28px;border-radius:4px;">Choose Your Subscription</a>
+        </td></tr>
+      </table>
+      <p style="color:#666;font-size:12px;line-height:1.6;margin:20px 0 0 0;">We'll email you again the moment your application is reviewed.</p>
+    </td></tr>
+    <tr><td align="center" style="padding:24px 0 0 0;">
+      <p style="color:#666;font-size:12px;margin:0 0 4px 0;">Questions? Just reply to this email.</p>
+      <p style="color:#444;font-size:11px;margin:8px 0 0 0;">© ${new Date().getFullYear()} Go Outsyde. All rights reserved.</p>
+    </td></tr>
+  </table></td></tr></table></body></html>`;
+
+  return sendEmail({
+    to: p.email,
+    subject: `🎉 Application received — ${p.businessName} on Outsyde`,
+    html,
+  });
+}
+
 // ===== ROYAL ELITE MOVING — ESTIMATE REQUEST =====
 export async function sendRoyalEliteEstimate(p: {
   name: string;
