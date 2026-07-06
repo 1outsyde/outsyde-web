@@ -1,22 +1,26 @@
 // app/api/subscription/login/route.ts
-// BFF proxy — logs a vendor in against outsyde-backend and re-issues its
-// session cookie as a first-party, httpOnly cookie on this domain.
+// BFF proxy — logs a vendor in against outsyde-backend using the JWT-issuing
+// mobile login endpoint, and stores the access token as a first-party,
+// httpOnly cookie on this domain.
 //
-// Why: /api/stripe/checkout/tier-subscription on the backend accepts EITHER
-// a JWT Bearer token OR an express-session cookie (req.session.userId).
-// We don't have a JWT flow on the web yet, so we ride the session-cookie
-// path — same one outsyde-backend already uses for its own dashboard.
+// Why /api/auth/mobile/login instead of /api/auth/login:
+// The session-cookie login (/api/auth/login) depends on the backend's
+// server-side session store staying alive between requests. In production
+// that store can be process-memory-backed and gets wiped on a cold
+// start/restart, which silently logs vendors back out mid-flow ("Not
+// authenticated" when trying to change plans). The JWT from
+// /api/auth/mobile/login is stateless and self-contained, so it isn't
+// affected by backend restarts — it's also exactly what the native app
+// already uses for authenticated calls, so this keeps web and app on the
+// same auth mechanism instead of inventing a third one.
 //
 // POST /api/subscription/login   Body: { email, password }
-// → POST ${OUTSYDE_BACKEND_URL}/api/auth/login
-// → capture Set-Cookie (connect.sid=...)
-// → store it in our own httpOnly cookie "outsyde_backend_session"
-// → return { ok: true, business } so the page can confirm which business
-//   is about to subscribe (never trust localStorage/client state for this)
+// → POST ${OUTSYDE_BACKEND_URL}/api/auth/mobile/login
+// → store returned accessToken in httpOnly cookie "outsyde_access_token"
 
 import { NextResponse } from "next/server";
 
-const SESSION_COOKIE = "outsyde_backend_session";
+const TOKEN_COOKIE = "outsyde_access_token";
 
 export async function POST(req: Request) {
   let body: { email?: unknown; password?: unknown };
@@ -40,7 +44,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Server configuration error." }, { status: 500 });
   }
 
-  const loginRes = await fetch(`${backendUrl}/api/auth/login`, {
+  const loginRes = await fetch(`${backendUrl}/api/auth/mobile/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
@@ -56,14 +60,12 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!loginRes.ok) {
+  if (!loginRes.ok || !loginData.accessToken) {
     const msg =
-      typeof loginData.message === "string"
-        ? loginData.message
-        : typeof loginData.error === "string"
-          ? loginData.error
-          : "Invalid email or password.";
-    return NextResponse.json({ error: msg }, { status: loginRes.status });
+      typeof (loginData as { error?: { message?: string } })?.error?.message === "string"
+        ? (loginData as { error: { message: string } }).error.message
+        : "Invalid email or password.";
+    return NextResponse.json({ error: msg }, { status: loginRes.status || 401 });
   }
 
   const user = loginData.user as { isVendor?: boolean } | undefined;
@@ -74,28 +76,15 @@ export async function POST(req: Request) {
     );
   }
 
-  const setCookieHeader = loginRes.headers.get("set-cookie");
-  if (!setCookieHeader) {
-    return NextResponse.json(
-      { error: "Login succeeded but no session was established. Please try again." },
-      { status: 502 },
-    );
-  }
+  const expiresIn = typeof loginData.expiresIn === "number" ? loginData.expiresIn : 60 * 60 * 24 * 7;
 
-  // set-cookie can bundle multiple "name=value; Directive" segments — keep
-  // just the "name=value" pairs to store and later replay as our own Cookie header.
-  const cookieValue = setCookieHeader
-    .split(",")
-    .map((part) => part.split(";")[0].trim())
-    .join("; ");
-
-  const res = NextResponse.json({ ok: true, business: loginData.business ?? null });
-  res.cookies.set(SESSION_COOKIE, cookieValue, {
+  const res = NextResponse.json({ ok: true });
+  res.cookies.set(TOKEN_COOKIE, loginData.accessToken as string, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 7, // 7 days, matches the backend's session TTL
+    maxAge: expiresIn,
   });
   return res;
 }
