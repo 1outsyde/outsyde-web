@@ -20,6 +20,32 @@ export default function Home() {
   const [cur, setCur] = useState(0);
   const startX = useRef(0);
 
+  // Session check — reflects real login state in the nav instead of
+  // always showing "Log In" regardless of whether someone's signed in.
+  const [session, setSession] = useState<{
+    authenticated: boolean;
+    displayName?: string | null;
+    username?: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => res.json())
+      .then((data) => setSession(data))
+      .catch(() => setSession({ authenticated: false }));
+  }, []);
+
+  async function handleLogout() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // ignore — clear local state regardless, the cookie gets cleared
+      // server-side by the route even if this request itself hiccups
+    }
+    setSession({ authenticated: false });
+    window.location.href = "/";
+  }
+
   // nav background on scroll
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 55);
@@ -247,7 +273,16 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
           <a href="/about">About</a>
         </div>
         <div className="nav-actions">
-          <a href="/coming-soon">Log In</a>
+          {session?.authenticated ? (
+            <>
+              <span style={{ fontSize: "11.5px", letterSpacing: ".08em", textTransform: "uppercase", color: "rgba(245,240,230,.65)" }}>
+                Hi, {session.displayName || session.username}
+              </span>
+              <a href="#" onClick={(e) => { e.preventDefault(); handleLogout(); }}>Log Out</a>
+            </>
+          ) : (
+            <a href="/login">Log In</a>
+          )}
           <a href="/shop" className="nav-cta">Shop Now</a>
         </div>
       </nav>
@@ -560,7 +595,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
               <li><a href="/shop">Browse the Collection</a></li>
               <li><a href="/coming-soon">Book a Photographer</a></li>
               <li><a href="/coming-soon">Discover Local Brands</a></li>
-              <li><a href="/coming-soon">My Account</a></li>
+              <li><a href="/login">My Account</a></li>
             </ul>
           </div>
 
