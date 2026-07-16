@@ -4,8 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 interface Business {
   id: string;
   name: string;
@@ -55,8 +53,6 @@ interface Booking {
 
 type Tab = "overview" | "orders" | "bookings";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function formatCents(cents: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 }
@@ -65,14 +61,10 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-}
-
 function statusColor(status: string): string {
   const s = status?.toLowerCase();
   if (["confirmed", "completed", "delivered", "paid", "shipped"].includes(s)) return "status-green";
-  if (["pending", "processing"].includes(s)) return "status-yellow";
+  if (["pending", "processing", "pending_payment"].includes(s)) return "status-yellow";
   if (["cancelled", "rejected", "refunded"].includes(s)) return "status-red";
   return "status-gray";
 }
@@ -83,8 +75,6 @@ function approvalBadge(status: string) {
   if (status === "rejected") return { label: "Rejected", cls: "approval-rejected" };
   return { label: status, cls: "approval-pending" };
 }
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function VendorDashboardPage() {
   const router = useRouter();
@@ -101,7 +91,6 @@ export default function VendorDashboardPage() {
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [error, setError] = useState("");
 
-  // ── Fetch profile + stats on mount ────────────────────────────────────────
   useEffect(() => {
     (async () => {
       try {
@@ -120,10 +109,7 @@ export default function VendorDashboardPage() {
     (async () => {
       try {
         const res = await fetch("/api/vendor-dashboard/stats");
-        if (res.ok) {
-          const data = await res.json();
-          setStats(data.stats);
-        }
+        if (res.ok) { const data = await res.json(); setStats(data.stats); }
       } catch { /* non-blocking */ }
       finally { setLoadingStats(false); }
     })();
@@ -131,10 +117,7 @@ export default function VendorDashboardPage() {
     (async () => {
       try {
         const res = await fetch("/api/vendor-dashboard/orders");
-        if (res.ok) {
-          const data = await res.json();
-          setOrders(data.orders ?? []);
-        }
+        if (res.ok) { const data = await res.json(); setOrders(data.orders ?? []); }
       } catch { /* non-blocking */ }
       finally { setLoadingOrders(false); }
     })();
@@ -142,16 +125,11 @@ export default function VendorDashboardPage() {
     (async () => {
       try {
         const res = await fetch("/api/vendor-dashboard/bookings");
-        if (res.ok) {
-          const data = await res.json();
-          setBookings(data.bookings ?? []);
-        }
+        if (res.ok) { const data = await res.json(); setBookings(data.bookings ?? []); }
       } catch { /* non-blocking */ }
       finally { setLoadingBookings(false); }
     })();
   }, [router]);
-
-  // ─── Loading / error states ───────────────────────────────────────────────
 
   if (loadingProfile) {
     return (
@@ -173,189 +151,55 @@ export default function VendorDashboardPage() {
   const badge = approvalBadge(business.approvalStatus);
   const isPending = business.approvalStatus === "pending";
 
-  // ─── Render ───────────────────────────────────────────────────────────────
-
   return (
     <>
       <style>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: #0a0a0a; }
-
-        .page {
-          min-height: 100vh;
-          background: #0a0a0a;
-          font-family: 'Hanken Grotesk', sans-serif;
-          color: #f5f0e8;
-        }
-
-        /* Top nav */
-        .topnav {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 0 24px;
-          height: 56px;
-          border-bottom: 1px solid #1e1e1e;
-          background: #0d0d0d;
-          position: sticky;
-          top: 0;
-          z-index: 10;
-        }
-        .nav-logo {
-          font-family: 'Bebas Neue', sans-serif;
-          font-size: 22px;
-          letter-spacing: 0.12em;
-          color: #c9a84c;
-          text-decoration: none;
-        }
+        .page { min-height: 100vh; background: #0a0a0a; font-family: 'Hanken Grotesk', sans-serif; color: #f5f0e8; }
+        .topnav { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 56px; border-bottom: 1px solid #1e1e1e; background: #0d0d0d; position: sticky; top: 0; z-index: 10; }
+        .nav-logo { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 0.12em; color: #c9a84c; text-decoration: none; }
         .nav-right { display: flex; align-items: center; gap: 16px; }
         .nav-biz { font-size: 13px; color: #888; }
-        .nav-logout {
-          font-size: 12px;
-          color: #555;
-          text-decoration: none;
-          letter-spacing: 0.04em;
-          transition: color 0.15s;
-        }
+        .nav-logout { font-size: 12px; color: #555; text-decoration: none; letter-spacing: 0.04em; transition: color 0.15s; }
         .nav-logout:hover { color: #c9a84c; }
-
-        /* Pending banner */
-        .pending-banner {
-          background: #1a1200;
-          border-bottom: 1px solid #3a2800;
-          padding: 12px 24px;
-          font-size: 13px;
-          color: #c9a84c;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        /* Main layout */
+        .pending-banner { background: #1a1200; border-bottom: 1px solid #3a2800; padding: 12px 24px; font-size: 13px; color: #c9a84c; display: flex; align-items: center; gap: 8px; }
         .main { max-width: 960px; margin: 0 auto; padding: 32px 24px 80px; }
-
-        /* Profile header */
-        .profile-header {
-          display: flex;
-          align-items: flex-start;
-          gap: 20px;
-          margin-bottom: 32px;
-        }
-        .biz-avatar {
-          width: 64px;
-          height: 64px;
-          border-radius: 10px;
-          background: #1e1e1e;
-          border: 1px solid #2a2a2a;
-          object-fit: cover;
-          flex-shrink: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-family: 'Bebas Neue', sans-serif;
-          font-size: 24px;
-          color: #c9a84c;
-          letter-spacing: 0.05em;
-        }
+        .profile-header { display: flex; align-items: flex-start; gap: 20px; margin-bottom: 32px; }
+        .biz-avatar { width: 64px; height: 64px; border-radius: 10px; background: #1e1e1e; border: 1px solid #2a2a2a; object-fit: cover; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: 'Bebas Neue', sans-serif; font-size: 24px; color: #c9a84c; letter-spacing: 0.05em; }
         .biz-info { flex: 1; min-width: 0; }
-        .biz-name {
-          font-family: 'Bebas Neue', sans-serif;
-          font-size: 26px;
-          letter-spacing: 0.06em;
-          color: #f5f0e8;
-          margin-bottom: 4px;
-        }
+        .biz-name { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 0.06em; color: #f5f0e8; margin-bottom: 4px; }
         .biz-meta { font-size: 13px; color: #666; margin-bottom: 8px; }
         .biz-badges { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-
         .approval-approved { background: #0d2b0d; color: #27ae60; border: 1px solid #1a4a1a; font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 99px; }
         .approval-pending { background: #1a1200; color: #c9a84c; border: 1px solid #3a2800; font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 99px; }
         .approval-rejected { background: #2b0d0d; color: #c0392b; border: 1px solid #4a1a1a; font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 99px; }
         .sub-badge { background: #0d1f1a; color: #1abc9c; border: 1px solid #0d3328; font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 99px; }
-
-        /* Stat cards */
-        .stat-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-          gap: 12px;
-          margin-bottom: 32px;
-        }
-        .stat-card {
-          background: #141414;
-          border: 1px solid #2a2a2a;
-          border-radius: 10px;
-          padding: 16px 18px;
-        }
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 32px; }
+        .stat-card { background: #141414; border: 1px solid #2a2a2a; border-radius: 10px; padding: 16px 18px; }
         .stat-label { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #555; margin-bottom: 8px; }
         .stat-value { font-family: 'Bebas Neue', sans-serif; font-size: 30px; letter-spacing: 0.04em; color: #c9a84c; }
         .stat-sub { font-size: 11px; color: #444; margin-top: 2px; }
-
-        /* Tabs */
-        .tabs {
-          display: flex;
-          border-bottom: 1px solid #1e1e1e;
-          margin-bottom: 24px;
-          gap: 0;
-        }
-        .tab-btn {
-          padding: 10px 20px;
-          font-size: 13px;
-          font-weight: 500;
-          font-family: inherit;
-          letter-spacing: 0.04em;
-          color: #555;
-          background: transparent;
-          border: none;
-          border-bottom: 2px solid transparent;
-          cursor: pointer;
-          transition: color 0.15s, border-color 0.15s;
-          white-space: nowrap;
-        }
+        .tabs { display: flex; border-bottom: 1px solid #1e1e1e; margin-bottom: 24px; }
+        .tab-btn { padding: 10px 20px; font-size: 13px; font-weight: 500; font-family: inherit; letter-spacing: 0.04em; color: #555; background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: color 0.15s, border-color 0.15s; white-space: nowrap; }
         .tab-btn:hover { color: #aaa; }
         .tab-btn.active { color: #c9a84c; border-bottom-color: #c9a84c; }
-
-        /* Table */
         .table-wrap { overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        th {
-          text-align: left;
-          font-size: 11px;
-          font-weight: 500;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          color: #555;
-          padding: 8px 12px;
-          border-bottom: 1px solid #1e1e1e;
-          white-space: nowrap;
-        }
-        td {
-          padding: 12px 12px;
-          border-bottom: 1px solid #141414;
-          color: #aaa;
-          vertical-align: middle;
-        }
+        th { text-align: left; font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #555; padding: 8px 12px; border-bottom: 1px solid #1e1e1e; white-space: nowrap; }
+        td { padding: 12px 12px; border-bottom: 1px solid #141414; color: #aaa; vertical-align: middle; }
         tr:last-child td { border-bottom: none; }
         tr:hover td { background: #0f0f0f; }
-
         .status-green { background: #0d2b0d; color: #27ae60; border: 1px solid #1a4a1a; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
         .status-yellow { background: #1a1200; color: #c9a84c; border: 1px solid #3a2800; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
         .status-red { background: #2b0d0d; color: #c0392b; border: 1px solid #4a1a1a; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
         .status-gray { background: #1a1a1a; color: #666; border: 1px solid #2a2a2a; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
-
         .amount { color: #f5f0e8; font-weight: 500; }
         .id-cell { font-family: monospace; font-size: 11px; color: #444; }
-
-        .empty-state {
-          text-align: center;
-          padding: 48px 24px;
-          color: #444;
-          font-size: 14px;
-        }
+        .empty-state { text-align: center; padding: 48px 24px; color: #444; font-size: 14px; }
         .empty-state p { margin-bottom: 6px; }
         .empty-sub { font-size: 12px; color: #333; }
-
         .loading-row td { color: #333; text-align: center; padding: 32px; }
-
         @media (max-width: 600px) {
           .main { padding: 20px 16px 60px; }
           .profile-header { flex-direction: column; gap: 12px; }
@@ -365,7 +209,6 @@ export default function VendorDashboardPage() {
       `}</style>
 
       <div className="page">
-        {/* Nav */}
         <nav className="topnav">
           <Link href="/" className="nav-logo">OUTSYDE</Link>
           <div className="nav-right">
@@ -374,7 +217,6 @@ export default function VendorDashboardPage() {
           </div>
         </nav>
 
-        {/* Pending banner */}
         {isPending && (
           <div className="pending-banner">
             ⏳ Your application is under review. You'll be notified once approved.
@@ -382,7 +224,6 @@ export default function VendorDashboardPage() {
         )}
 
         <div className="main">
-          {/* Profile header */}
           <div className="profile-header">
             {business.logoImage ? (
               <img src={business.logoImage} alt={business.name} className="biz-avatar" />
@@ -400,20 +241,17 @@ export default function VendorDashboardPage() {
                 {business.subscriptionActive && <span className="sub-badge">Subscription Active</span>}
                 {business.reviewCount ? (
                   <span style={{ fontSize: 12, color: "#666" }}>
-                    ⭐ {business.averageRating?.toFixed(1) ?? (business.rating ? (business.rating / 10).toFixed(1) : "—")} ({business.reviewCount} reviews)
+                    ⭐ {business.rating ? (business.rating / 10).toFixed(1) : "—"} ({business.reviewCount} reviews)
                   </span>
                 ) : null}
               </div>
             </div>
           </div>
 
-          {/* Stat cards */}
           <div className="stat-grid">
             <div className="stat-card">
               <div className="stat-label">Monthly Revenue</div>
-              <div className="stat-value">
-                {loadingStats ? "—" : formatCents(stats?.monthlyRevenueCents ?? 0)}
-              </div>
+              <div className="stat-value">{loadingStats ? "—" : formatCents(stats?.monthlyRevenueCents ?? 0)}</div>
               <div className="stat-sub">This month (paid orders)</div>
             </div>
             <div className="stat-card">
@@ -429,20 +267,13 @@ export default function VendorDashboardPage() {
             <div className="stat-card">
               <div className="stat-label">Reviews</div>
               <div className="stat-value">{loadingStats ? "—" : stats?.reviewCount ?? 0}</div>
-              <div className="stat-sub">
-                {stats?.averageRating ? `Avg ${stats.averageRating.toFixed(1)} ⭐` : "No reviews yet"}
-              </div>
+              <div className="stat-sub">{stats?.averageRating ? `Avg ${stats.averageRating.toFixed(1)} ⭐` : "No reviews yet"}</div>
             </div>
           </div>
 
-          {/* Tabs */}
           <div className="tabs">
             {(["overview", "orders", "bookings"] as Tab[]).map((t) => (
-              <button
-                key={t}
-                className={`tab-btn${tab === t ? " active" : ""}`}
-                onClick={() => setTab(t)}
-              >
+              <button key={t} className={`tab-btn${tab === t ? " active" : ""}`} onClick={() => setTab(t)}>
                 {t.charAt(0).toUpperCase() + t.slice(1)}
                 {t === "orders" && orders.length > 0 && ` (${orders.length})`}
                 {t === "bookings" && bookings.length > 0 && ` (${bookings.length})`}
@@ -450,7 +281,6 @@ export default function VendorDashboardPage() {
             ))}
           </div>
 
-          {/* ── Overview tab ── */}
           {tab === "overview" && (
             <div>
               {business.description && (
@@ -469,21 +299,12 @@ export default function VendorDashboardPage() {
                   <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, color: "#c9a84c" }}>{business.followingCount ?? 0}</div>
                 </div>
               </div>
-
-              {/* Recent orders preview */}
               {!loadingOrders && orders.length > 0 && (
                 <div style={{ marginTop: 20 }}>
                   <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "#555", marginBottom: 12 }}>Recent orders</div>
                   <div className="table-wrap">
                     <table>
-                      <thead>
-                        <tr>
-                          <th>Order ID</th>
-                          <th>Date</th>
-                          <th>Amount</th>
-                          <th>Status</th>
-                        </tr>
-                      </thead>
+                      <thead><tr><th>Order ID</th><th>Date</th><th>Amount</th><th>Status</th></tr></thead>
                       <tbody>
                         {orders.slice(0, 5).map((o) => (
                           <tr key={o.id}>
@@ -506,27 +327,15 @@ export default function VendorDashboardPage() {
             </div>
           )}
 
-          {/* ── Orders tab ── */}
           {tab === "orders" && (
             <div className="table-wrap">
               {loadingOrders ? (
                 <table><tbody><tr><td className="loading-row" colSpan={5}>Loading orders…</td></tr></tbody></table>
               ) : orders.length === 0 ? (
-                <div className="empty-state">
-                  <p>No orders yet</p>
-                  <p className="empty-sub">Orders will appear here once customers make purchases.</p>
-                </div>
+                <div className="empty-state"><p>No orders yet</p><p className="empty-sub">Orders will appear here once customers make purchases.</p></div>
               ) : (
                 <table>
-                  <thead>
-                    <tr>
-                      <th>Order ID</th>
-                      <th>Date</th>
-                      <th>Customer</th>
-                      <th>Amount</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
+                  <thead><tr><th>Order ID</th><th>Date</th><th>Customer</th><th>Amount</th><th>Status</th></tr></thead>
                   <tbody>
                     {orders.map((o) => (
                       <tr key={o.id}>
@@ -543,28 +352,18 @@ export default function VendorDashboardPage() {
             </div>
           )}
 
-          {/* ── Bookings tab ── */}
           {tab === "bookings" && (
             <div className="table-wrap">
               {loadingBookings ? (
-                <table><tbody><tr><td className="loading-row" colSpan={5}>Loading bookings…</td></tr></tbody></table>
+                <table><tbody><tr><td className="loading-row" colSpan={8}>Loading bookings…</td></tr></tbody></table>
               ) : bookings.length === 0 ? (
-                <div className="empty-state">
-                  <p>No bookings yet</p>
-                  <p className="empty-sub">Bookings will appear here once customers schedule sessions.</p>
-                </div>
+                <div className="empty-state"><p>No bookings yet</p><p className="empty-sub">Bookings will appear here once customers schedule sessions.</p></div>
               ) : (
                 <table>
                   <thead>
                     <tr>
-                      <th>Customer</th>
-                      <th>Date</th>
-                      <th>Time</th>
-                      <th>Service</th>
-                      <th>Subtotal</th>
-                      <th>Fee</th>
-                      <th>You Earn</th>
-                      <th>Status</th>
+                      <th>Customer</th><th>Date</th><th>Time</th><th>Service</th>
+                      <th>Subtotal</th><th>Fee</th><th>You Earn</th><th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
