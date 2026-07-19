@@ -150,6 +150,7 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
               <div className={`ct-note${status === "error" ? " err" : ""}`}>{msg}</div>
             </div>
           )}
+        <a href="/" style={{display:"inline-block",marginTop:"48px",fontSize:"11px",letterSpacing:".14em",textTransform:"uppercase",color:"rgba(245,240,230,.5)",textDecoration:"none"}}>← Back to Home</a>
         </div>
       </main>
     </>
