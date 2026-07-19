@@ -605,7 +605,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
               <li><a href="/coming-soon">Join Our Collective</a></li>
               <li><a href="/coming-soon">Start Taking Bookings</a></li>
               <li><a href="/coming-soon">Meet the Team</a></li>
-              <li><a href="/coming-soon">Contact Us</a></li>
+              <li><a href="/contact">Contact Us</a></li>
             </ul>
           </div>
         </div>
