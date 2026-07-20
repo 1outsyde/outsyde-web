@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const token = getToken(req);
   if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const res = await fetch(`${process.env.OUTSYDE_BACKEND_URL}/api/users/me`, {
+  const res = await fetch(`${process.env.OUTSYDE_BACKEND_URL}/api/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 

@@ -5,17 +5,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 interface UserProfile {
-  id: number;
+  userId: string;
   email: string;
-  name: string;
-  firstName?: string;
-  lastName?: string;
   username: string;
+  displayName: string;
   bio?: string;
-  profileImageUrl?: string;
+  profilePhotoUrl?: string;
   coverMediaUrl?: string;
-  city?: string;
-  state?: string;
   loyaltyPoints?: number;
   isVendor?: boolean;
   isPhotographer?: boolean;
@@ -32,6 +28,7 @@ export default function AccountPage() {
     bio: "",
     profileImageUrl: "",
     coverMediaUrl: "",
+    coverMediaType: "image" as "image" | "video",
   });
 
   useEffect(() => {
@@ -42,13 +39,13 @@ export default function AccountPage() {
 
       const profileRes = await fetch("/api/account/profile");
       if (profileRes.ok) {
-        const data = await profileRes.json();
-        const user = data.user || data;
+        const user = await profileRes.json();
         setProfile(user);
         setEditFields({
           bio: user.bio || "",
-          profileImageUrl: user.profileImageUrl || "",
+          profileImageUrl: user.profilePhotoUrl || "",
           coverMediaUrl: user.coverMediaUrl || "",
+          coverMediaType: "image",
         });
       }
       setLoading(false);
@@ -59,29 +56,31 @@ export default function AccountPage() {
   async function handleSave() {
     setSaving(true);
     setSaveError("");
+    const payload: Record<string, any> = { bio: editFields.bio };
+    if (editFields.profileImageUrl) payload.profileImageUrl = editFields.profileImageUrl;
+    if (editFields.coverMediaUrl) {
+      payload.coverMediaUrl = editFields.coverMediaUrl;
+      payload.coverMediaType = editFields.coverMediaType;
+    }
     const res = await fetch("/api/account/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editFields),
+      body: JSON.stringify(payload),
     });
     if (res.ok) {
-      const data = await res.json();
-      const updated = data.user || data;
-      setProfile((p) => p ? { ...p, ...updated } : updated);
+      // Re-fetch profile to get updated data
+      const updated = await fetch("/api/account/profile").then(r => r.json());
+      setProfile(updated);
       setEditing(false);
     } else {
-      setSaveError("Failed to save. Try again.");
+      const err = await res.json();
+      setSaveError(err.error || "Failed to save. Try again.");
     }
     setSaving(false);
   }
 
   const pts = profile?.loyaltyPoints ?? 0;
-  const displayName =
-    profile?.name ||
-    `${profile?.firstName ?? ""} ${profile?.lastName ?? ""}`.trim() ||
-    profile?.username ||
-    "—";
-  const location = [profile?.city, profile?.state].filter(Boolean).join(", ");
+  const displayName = profile?.displayName || profile?.username || "—";
 
   const css = `
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -209,13 +208,14 @@ export default function AccountPage() {
     .modal-title { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 0.08em; margin-bottom: 24px; }
     .field-group { margin-bottom: 18px; }
     .field-label { display: block; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(245,240,230,0.4); margin-bottom: 8px; }
-    .field-input, .field-textarea {
+    .field-input, .field-textarea, .field-select {
       width: 100%; background: rgba(245,240,230,0.05); border: 1px solid rgba(245,240,230,0.1);
       border-radius: 6px; color: #F5F0E6; font-family: inherit; font-size: 14px;
       padding: 10px 14px; outline: none; transition: border .15s;
     }
-    .field-input:focus, .field-textarea:focus { border-color: rgba(232,185,48,0.4); }
+    .field-input:focus, .field-textarea:focus, .field-select:focus { border-color: rgba(232,185,48,0.4); }
     .field-textarea { resize: vertical; min-height: 90px; }
+    .field-select option { background: #111; }
     .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 26px; }
     .error-msg { color: #ff6b6b; font-size: 13px; margin-top: 10px; }
 
@@ -230,8 +230,7 @@ export default function AccountPage() {
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
     @media (max-width: 720px) {
-      .nav { padding: 0 20px; }
-      .nav-links { display: none; }
+      .nav { padding: 0 20px; } .nav-links { display: none; }
       .wrap { padding: 0 20px; }
       .id-block { flex-direction: column; align-items: flex-start; gap: 14px; }
       .avatar { width: 108px; height: 108px; font-size: 40px; }
@@ -281,11 +280,21 @@ export default function AccountPage() {
                 placeholder="https://..." />
             </div>
             <div className="field-group">
-              <label className="field-label">Cover Image URL</label>
+              <label className="field-label">Cover Image / Video URL</label>
               <input className="field-input" value={editFields.coverMediaUrl}
                 onChange={(e) => setEditFields((f) => ({ ...f, coverMediaUrl: e.target.value }))}
                 placeholder="https://..." />
             </div>
+            {editFields.coverMediaUrl && (
+              <div className="field-group">
+                <label className="field-label">Cover Media Type</label>
+                <select className="field-select" value={editFields.coverMediaType}
+                  onChange={(e) => setEditFields((f) => ({ ...f, coverMediaType: e.target.value as "image" | "video" }))}>
+                  <option value="image">Image</option>
+                  <option value="video">Video</option>
+                </select>
+              </div>
+            )}
             <div className="field-group">
               <label className="field-label">Bio</label>
               <textarea className="field-textarea" value={editFields.bio}
@@ -326,8 +335,8 @@ export default function AccountPage() {
         <div className="profile-header">
           <div className="id-block">
             <div className="avatar">
-              {profile.profileImageUrl
-                ? <img src={profile.profileImageUrl} alt={displayName} />
+              {profile.profilePhotoUrl
+                ? <img src={profile.profilePhotoUrl} alt={displayName} />
                 : initials}
               <div className="avatar-status" />
             </div>
@@ -335,7 +344,6 @@ export default function AccountPage() {
               <div className="id-name">{displayName}</div>
               <div className="id-meta">
                 <span>@{profile.username}</span>
-                {location && <><span className="sep">·</span><span>📍 {location}</span></>}
                 {profile.isVendor && <><span className="sep">·</span><span style={{ color: "#E8B930" }}>Vendor</span></>}
                 {profile.isPhotographer && <><span className="sep">·</span><span style={{ color: "#E8B930" }}>Photographer</span></>}
               </div>
