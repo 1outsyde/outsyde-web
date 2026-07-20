@@ -6,20 +6,38 @@ import Link from "next/link";
 
 interface UserProfile {
   userId: string;
-  email: string;
+  email?: string;
   username: string;
-  displayName: string;
+  name?: string;
+  displayName?: string;
   bio?: string;
-  profilePhotoUrl?: string;
+  profileImageUrl?: string;
   coverMediaUrl?: string;
+  coverMediaType?: string;
+  city?: string;
+  state?: string;
   loyaltyPoints?: number;
+  followerCount?: number;
+  followingCount?: number;
   isVendor?: boolean;
   isPhotographer?: boolean;
+}
+
+interface Post {
+  id: string;
+  mediaUrl?: string;
+  imageUrl?: string;
+  thumbnailUrl?: string;
+  mediaType?: string;
+  caption?: string;
+  likesCount?: number;
+  commentsCount?: number;
 }
 
 export default function AccountPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -37,17 +55,27 @@ export default function AccountPage() {
       const me = await meRes.json();
       if (!me.authenticated) { router.push("/login"); return; }
 
-      const profileRes = await fetch("/api/account/profile");
+      const [profileRes, postsRes] = await Promise.all([
+        fetch("/api/account/profile"),
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || ""}/api/profiles/${me.userId}/posts`),
+      ]);
+
       if (profileRes.ok) {
         const user = await profileRes.json();
         setProfile(user);
         setEditFields({
           bio: user.bio || "",
-          profileImageUrl: user.profilePhotoUrl || "",
+          profileImageUrl: user.profileImageUrl || "",
           coverMediaUrl: user.coverMediaUrl || "",
-          coverMediaType: "image",
+          coverMediaType: (user.coverMediaType as "image" | "video") || "image",
         });
       }
+
+      if (postsRes.ok) {
+        const postsData = await postsRes.json();
+        setPosts(postsData.posts || []);
+      }
+
       setLoading(false);
     }
     load();
@@ -68,7 +96,6 @@ export default function AccountPage() {
       body: JSON.stringify(payload),
     });
     if (res.ok) {
-      // Re-fetch profile to get updated data
       const updated = await fetch("/api/account/profile").then(r => r.json());
       setProfile(updated);
       setEditing(false);
@@ -80,7 +107,9 @@ export default function AccountPage() {
   }
 
   const pts = profile?.loyaltyPoints ?? 0;
-  const displayName = profile?.displayName || profile?.username || "—";
+  const displayName = profile?.name || profile?.displayName || profile?.username || "—";
+  const location = [profile?.city, profile?.state].filter(Boolean).join(", ");
+  const avatarUrl = profile?.profileImageUrl;
 
   const css = `
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -151,7 +180,7 @@ export default function AccountPage() {
     .id-name { font-family: 'Bebas Neue', sans-serif; font-size: 32px; letter-spacing: 0.04em; line-height: 1; }
     .id-meta {
       display: flex; align-items: center; gap: 10px;
-      margin-top: 6px; color: rgba(245,240,230,0.5); font-size: 13px;
+      margin-top: 6px; color: rgba(245,240,230,0.5); font-size: 13px; flex-wrap: wrap;
     }
     .id-meta .sep { opacity: 0.3; }
     .id-bio { margin-top: 10px; color: rgba(245,240,230,0.7); font-size: 14px; max-width: 460px; line-height: 1.6; }
@@ -173,6 +202,7 @@ export default function AccountPage() {
       flex-wrap: wrap; gap: 18px;
     }
     .stats { display: flex; gap: 44px; }
+    .stat { cursor: default; }
     .stat .num { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 0.04em; }
     .stat .lbl { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(245,240,230,0.35); margin-top: 2px; }
 
@@ -197,6 +227,40 @@ export default function AccountPage() {
 
     .section-content { padding: 28px 0 80px; }
 
+    /* POSTS GRID */
+    .posts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+    .post-tile {
+      aspect-ratio: 1/1; position: relative; overflow: hidden;
+      background: #111; cursor: pointer;
+    }
+    .post-tile img { width: 100%; height: 100%; object-fit: cover; transition: transform .2s; }
+    .post-tile:hover img { transform: scale(1.04); }
+    .post-tile-placeholder {
+      width: 100%; height: 100%;
+      background: linear-gradient(145deg, #1a1a0f, #0d0d00);
+    }
+    .post-overlay {
+      position: absolute; inset: 0; display: flex; align-items: flex-end; padding: 10px;
+      background: linear-gradient(0deg, rgba(0,0,0,0.6), transparent 50%);
+      opacity: 0; transition: opacity .15s;
+    }
+    .post-tile:hover .post-overlay { opacity: 1; }
+    .post-stats { display: flex; gap: 12px; color: #fff; font-size: 12px; font-weight: 600; }
+    .video-badge {
+      position: absolute; top: 8px; right: 8px;
+      background: rgba(0,0,0,0.6); border-radius: 4px; padding: 2px 6px;
+      font-size: 10px; color: #fff;
+    }
+    .new-post-tile {
+      aspect-ratio: 1/1; border: 1.5px dashed rgba(232,185,48,0.25);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+      color: #E8B930; cursor: pointer; transition: border-color .15s;
+    }
+    .new-post-tile:hover { border-color: rgba(232,185,48,0.5); }
+    .new-post-tile .plus { font-family: 'Bebas Neue', sans-serif; font-size: 28px; }
+    .new-post-tile .lbl { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }
+
+    /* MODAL */
     .modal-backdrop {
       position: fixed; inset: 0; background: rgba(0,0,0,0.75);
       display: flex; align-items: center; justify-content: center; z-index: 100; padding: 20px;
@@ -219,13 +283,6 @@ export default function AccountPage() {
     .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 26px; }
     .error-msg { color: #ff6b6b; font-size: 13px; margin-top: 10px; }
 
-    .empty-state {
-      border: 1px dashed rgba(245,240,230,0.1); border-radius: 8px;
-      padding: 64px 32px; text-align: center;
-    }
-    .empty-icon { font-size: 36px; margin-bottom: 14px; opacity: 0.35; }
-    .empty-text { color: rgba(245,240,230,0.35); font-size: 14px; }
-
     .skeleton { background: rgba(245,240,230,0.06); border-radius: 4px; animation: pulse 1.4s ease-in-out infinite; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
@@ -236,6 +293,7 @@ export default function AccountPage() {
       .avatar { width: 108px; height: 108px; font-size: 40px; }
       .stats-row { flex-direction: column; align-items: flex-start; }
       .tabs-bar { overflow-x: auto; }
+      .posts-grid { grid-template-columns: repeat(2, 1fr); }
     }
   `;
 
@@ -326,7 +384,11 @@ export default function AccountPage() {
       </nav>
 
       <div className="cover">
-        {profile.coverMediaUrl && <img src={profile.coverMediaUrl} alt="cover" />}
+        {profile.coverMediaUrl && (
+          profile.coverMediaType === "video"
+            ? <video src={profile.coverMediaUrl} autoPlay muted loop playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            : <img src={profile.coverMediaUrl} alt="cover" />
+        )}
         <div className="cover-overlay" />
         <button className="cover-edit-btn" onClick={() => setEditing(true)}>✎ Edit Cover</button>
       </div>
@@ -335,8 +397,8 @@ export default function AccountPage() {
         <div className="profile-header">
           <div className="id-block">
             <div className="avatar">
-              {profile.profilePhotoUrl
-                ? <img src={profile.profilePhotoUrl} alt={displayName} />
+              {avatarUrl
+                ? <img src={avatarUrl} alt={displayName} />
                 : initials}
               <div className="avatar-status" />
             </div>
@@ -344,6 +406,7 @@ export default function AccountPage() {
               <div className="id-name">{displayName}</div>
               <div className="id-meta">
                 <span>@{profile.username}</span>
+                {location && <><span className="sep">·</span><span>📍 {location}</span></>}
                 {profile.isVendor && <><span className="sep">·</span><span style={{ color: "#E8B930" }}>Vendor</span></>}
                 {profile.isPhotographer && <><span className="sep">·</span><span style={{ color: "#E8B930" }}>Photographer</span></>}
               </div>
@@ -358,9 +421,18 @@ export default function AccountPage() {
 
         <div className="stats-row">
           <div className="stats">
-            <div className="stat"><div className="num">0</div><div className="lbl">Followers</div></div>
-            <div className="stat"><div className="num">0</div><div className="lbl">Posts</div></div>
-            <div className="stat"><div className="num">0</div><div className="lbl">Following</div></div>
+            <div className="stat">
+              <div className="num">{(profile.followerCount ?? 0).toLocaleString()}</div>
+              <div className="lbl">Followers</div>
+            </div>
+            <div className="stat">
+              <div className="num">{posts.length.toLocaleString()}</div>
+              <div className="lbl">Posts</div>
+            </div>
+            <div className="stat">
+              <div className="num">{(profile.followingCount ?? 0).toLocaleString()}</div>
+              <div className="lbl">Following</div>
+            </div>
           </div>
           <Link href="/account/points" className="points-pill">
             <span className="star">★</span>
@@ -377,9 +449,29 @@ export default function AccountPage() {
         </div>
 
         <div className="section-content">
-          <div className="empty-state">
-            <div className="empty-icon">📸</div>
-            <div className="empty-text">No posts yet. Share your first outsyde experience.</div>
+          <div className="posts-grid">
+            <div className="new-post-tile">
+              <div className="plus">+</div>
+              <div className="lbl">New Post</div>
+            </div>
+            {posts.map((post) => {
+              const thumb = post.thumbnailUrl || post.imageUrl || post.mediaUrl;
+              const isVideo = post.mediaType === "video";
+              return (
+                <div key={post.id} className="post-tile">
+                  {thumb
+                    ? <img src={thumb} alt={post.caption || "post"} loading="lazy" />
+                    : <div className="post-tile-placeholder" />}
+                  {isVideo && <div className="video-badge">▶</div>}
+                  <div className="post-overlay">
+                    <div className="post-stats">
+                      <span>♥ {(post.likesCount ?? 0).toLocaleString()}</span>
+                      <span>💬 {(post.commentsCount ?? 0).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
