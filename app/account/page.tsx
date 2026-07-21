@@ -57,7 +57,7 @@ export default function AccountPage() {
 
       const [profileRes, postsRes] = await Promise.all([
         fetch("/api/account/profile"),
-        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || ""}/api/profiles/${me.userId}/posts`),
+        fetch("/api/account/posts"),
       ]);
 
       if (profileRes.ok) {
