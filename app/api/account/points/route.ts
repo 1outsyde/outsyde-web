@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-function getToken(req: NextRequest): string | null {
-  const cookie = req.headers.get("cookie") || "";
-  return cookie.match(/outsyde_access_token=([^;]+)/)?.[1] ?? null;
-}
-
 export async function GET(req: NextRequest) {
-  const token = getToken(req);
+  const cookie = req.headers.get("cookie") || "";
+  const token = cookie.match(/outsyde_access_token=([^;]+)/)?.[1];
   if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
@@ -14,7 +10,10 @@ export async function GET(req: NextRequest) {
   const endpoint = type === "history" ? "/api/points/history" : "/api/points/balance";
 
   const res = await fetch(`${process.env.OUTSYDE_BACKEND_URL}${endpoint}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Cookie: cookie, // forward session cookie too
+    },
   });
 
   const data = await res.json();

@@ -9,31 +9,30 @@ export async function GET(req: NextRequest) {
   const token = getToken(req);
   if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const [apptRes, shootRes] = await Promise.all([
-    fetch(`${process.env.OUTSYDE_BACKEND_URL}/api/my-appointments`, {
-      headers: { Authorization: `Bearer ${token}` },
-    }),
-    fetch(`${process.env.OUTSYDE_BACKEND_URL}/api/my-shoot-bookings`, {
-      headers: { Authorization: `Bearer ${token}` },
-    }),
-  ]);
+  const cookie = req.headers.get("cookie") || "";
 
-  const [apptData, shootData] = await Promise.all([apptRes.json(), shootRes.json()]);
+  const res = await fetch(`${process.env.OUTSYDE_BACKEND_URL}/api/my-appointments`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Cookie: cookie,
+    },
+  });
 
-  const appointments = (apptData.appointments || apptData || []).map((a: any) => ({
+  if (!res.ok) {
+    return NextResponse.json({ bookings: [] }, { status: 200 });
+  }
+
+  const data = await res.json();
+  const appointments = (data.appointments || data || []).map((a: any) => ({
     ...a,
     _type: "appointment",
   }));
-  const shoots = (shootData.bookings || shootData || []).map((s: any) => ({
-    ...s,
-    _type: "shoot",
-  }));
 
-  const combined = [...appointments, ...shoots].sort(
-    (a, b) =>
-      new Date(b.scheduledAt || b.date || 0).getTime() -
-      new Date(a.scheduledAt || a.date || 0).getTime()
+  const sorted = appointments.sort(
+    (a: any, b: any) =>
+      new Date(b.scheduledAt || b.date || b.startTime || 0).getTime() -
+      new Date(a.scheduledAt || a.date || a.startTime || 0).getTime()
   );
 
-  return NextResponse.json({ bookings: combined });
+  return NextResponse.json({ bookings: sorted });
 }
