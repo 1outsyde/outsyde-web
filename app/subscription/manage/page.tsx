@@ -98,8 +98,7 @@ function ManageContent() {
       setLoading(true);
       setLoadError(null);
       const urlToken = searchParams.get("token");
-      const authHeaders = urlToken ? { "x-auth-token": urlToken } : {};
-
+      const authHeaders: HeadersInit = urlToken ? { "x-auth-token": urlToken } : {};
       try {
         const [statusRes, tiersRes] = await Promise.all([
           fetch("/api/subscription/status", { headers: authHeaders }),
@@ -145,7 +144,7 @@ function ManageContent() {
   async function reloadStatus() {
     try {
       const urlToken = searchParams.get("token");
-      const authHeaders = urlToken ? { "x-auth-token": urlToken } : {};
+      const authHeaders: HeadersInit = urlToken ? { "x-auth-token": urlToken } : {};
       const res = await fetch("/api/subscription/status", { headers: authHeaders });
       if (res.status === 401) {
         router.push("/login");
