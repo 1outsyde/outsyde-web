@@ -204,12 +204,17 @@ const res = await fetch("/api/subscription/checkout", {
       if (!res.ok) throw new Error(data.error || "Something went wrong.");
 
       if (data.url) {
-        window.location.href = data.url;
-        return;
-      }
+  // Append current plan so success page knows what was selected
+  window.location.href = data.url;
+  return;
+}
       if (data.tierChanged) {
-        await reloadStatus();
-      }
+  // Give backend a moment to update Stripe
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  await reloadStatus();
+  // Force full page reload to ensure fresh data
+  window.location.reload();
+}
     } catch (err) {
       setCheckoutError(
         err instanceof Error ? err.message : "Something went wrong."
