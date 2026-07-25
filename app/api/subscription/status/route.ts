@@ -17,10 +17,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Server configuration error." }, { status: 500 });
   }
 
-  const token = req.cookies.get(TOKEN_COOKIE)?.value;
-  if (!token) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
+  const token =
+  req.cookies.get(TOKEN_COOKIE)?.value ||
+  req.headers.get('x-auth-token');
+if (!token) {
+  return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+}
 
   try {
     const statusRes = await fetch(`${backendUrl}/api/vendor/subscription`, {
