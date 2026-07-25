@@ -294,7 +294,7 @@ export async function sendBusinessSignupConfirmation(p: { email: string; busines
       <p style="color:#999;font-size:14px;line-height:1.7;margin:0 0 20px 0;">You don't have to wait on approval to get set up — you can choose your subscription plan right now. Log in with the email and password you just created to pick a plan; your business goes live once it's both approved and subscribed.</p>
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr><td align="center" style="padding:8px 0;">
-          <a href="https://outsyde-backend.onrender.com/vendor-dashboard" style="display:inline-block;background-color:#E8B930;color:#0a0a0a;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:12px 28px;border-radius:4px;">Choose Your Subscription</a>
+          <a href="https://goutsyde.com/subscription" style="display:inline-block;background-color:#E8B930;color:#0a0a0a;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:12px 28px;border-radius:4px;">Choose Your Subscription</a>
         </td></tr>
       </table>
       <p style="color:#666;font-size:12px;line-height:1.6;margin:20px 0 0 0;">We'll email you again the moment your application is reviewed.</p>

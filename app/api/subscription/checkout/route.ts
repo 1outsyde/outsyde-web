@@ -37,13 +37,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Server configuration error." }, { status: 500 });
   }
 
-  const token = req.cookies.get(TOKEN_COOKIE)?.value;
-  if (!token) {
-    return NextResponse.json(
-      { error: "Please log in to your business account first." },
-      { status: 401 },
-    );
-  }
+  const token =
+  req.cookies.get(TOKEN_COOKIE)?.value ||
+  req.headers.get('x-auth-token');
+if (!token) {
+  return NextResponse.json(
+    { error: "Please log in to your business account first." },
+    { status: 401 },
+  );
+}
 
   try {
     const checkoutRes = await fetch(`${backendUrl}/api/stripe/checkout/tier-subscription`, {
