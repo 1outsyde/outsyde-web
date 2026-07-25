@@ -9,5 +9,5 @@
 import { redirect } from "next/navigation";
 
 export default function VendorDashboard() {
-  redirect("/subscription/manage");
+  redirect("/subscription/success");
 }

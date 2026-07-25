@@ -170,6 +170,22 @@ function ManageContent() {
     load();
   }, [tokenReady, router]);
 
+  async function reloadStatus() {
+    try {
+      const res = await fetch("/api/subscription/status");
+      if (res.status === 401) {
+        router.push("/login");
+        return;
+      }
+      if (!res.ok) return;
+      const data = await res.json() as { subscription?: CurrentSubscription };
+      setCurrent(data.subscription ?? null);
+      setSelected(data.subscription?.tierId ?? null);
+    } catch {
+      // silent — current plan card stays visible
+    }
+  }
+
   async function handleChangePlan() {
     if (!selected || selected === current?.tierId) return;
     setCheckoutError(null);
@@ -180,11 +196,7 @@ function ManageContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tierId: selected }),
       });
-      const data = (await res.json()) as {
-        url?: string;
-        tierChanged?: boolean;
-        error?: string;
-      };
+      const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong.");
 
       if (data.url) {
@@ -192,13 +204,7 @@ function ManageContent() {
         return;
       }
       if (data.tierChanged) {
-        // Downgrade/upgrade handled server-side — reload status
-        const statusRes = await fetch("/api/subscription/status");
-        const statusData = (await statusRes.json()) as {
-          subscription?: CurrentSubscription;
-        };
-        setCurrent(statusData.subscription ?? null);
-        setSelected(statusData.subscription?.tierId ?? null);
+        await reloadStatus();
       }
     } catch (err) {
       setCheckoutError(
