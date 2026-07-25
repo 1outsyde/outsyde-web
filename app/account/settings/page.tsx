@@ -29,11 +29,13 @@ export default function AccountSettingsPage() {
       const profileRes = await fetch("/api/account/profile");
       if (profileRes.ok) {
         const data = await profileRes.json();
+        // deletionStatus and scheduledDeletionAt come from /api/auth/me (the session state),
+        // not the profile endpoint which doesn't expose them.
         setAccount({
           username: data.username,
           email: me.email,
-          deletionStatus: data.deletionStatus ?? "active",
-          scheduledDeletionAt: data.scheduledDeletionAt ?? null,
+          deletionStatus: me.deletionStatus ?? "active",
+          scheduledDeletionAt: me.scheduledDeletionAt ?? null,
         });
       }
       setLoading(false);
