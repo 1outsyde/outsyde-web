@@ -47,9 +47,10 @@ export default function BusinessLoginPage() {
         return;
       }
 
-      // Logged in — session cookie is set. Dashboard page doesn't exist yet,
-      // so send them home for now; update this once /business-dashboard ships.
-      window.location.href = "/";
+      // Redirect to the ?return= param if present (e.g. /subscription),
+      // otherwise fall back to home.
+      const params = new URLSearchParams(window.location.search);
+      window.location.href = params.get("return") || "/";
     } catch {
       setSubmitState("error");
       setSubmitError("Couldn\u2019t reach the server. Please try again.");

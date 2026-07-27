@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plan, PLAN_SECTIONS } from '@/lib/types/subscription'
 import { FeatureRow } from './FeatureRow'
@@ -10,6 +11,28 @@ interface PlanCardProps {
   isOnboarding?: boolean
   isSelected?: boolean
   onSelect?: (planId: string) => void
+}
+
+// Auth state resolved once per page load — shared across all PlanCard instances
+// via module-level cache so we only hit /api/auth/me once, not three times.
+type AuthState = { authenticated: boolean; isVendor: boolean } | null
+let _authCache: AuthState = null
+let _authPromise: Promise<AuthState> | null = null
+
+function resolveAuth(): Promise<AuthState> {
+  if (_authCache !== null) return Promise.resolve(_authCache)
+  if (_authPromise) return _authPromise
+  _authPromise = fetch('/api/auth/me')
+    .then(r => r.json())
+    .then((d: { authenticated?: boolean; isVendor?: boolean }) => {
+      _authCache = { authenticated: !!d.authenticated, isVendor: !!d.isVendor }
+      return _authCache
+    })
+    .catch(() => {
+      _authCache = { authenticated: false, isVendor: false }
+      return _authCache
+    })
+  return _authPromise
 }
 
 const STYLES: Record<string, { border: string; cta: string; ctaText: string; badgeBg: string; badgeText: string }> = {
@@ -23,13 +46,55 @@ export function PlanCard({ plan, isCurrent = false, isOnboarding = false, isSele
   const s = STYLES[plan.id]
   const highlighted = plan.id === 'growth' || isSelected
 
+  const [auth, setAuth] = useState<AuthState>(null)
+
+  useEffect(() => {
+    // Skip the auth check when this card is used inside the onboarding flow —
+    // onboarding already gates on auth before rendering PlanCard.
+    if (isOnboarding) return
+    resolveAuth().then(setAuth)
+  }, [isOnboarding])
+
   const handleCta = () => {
+    // ── Onboarding mode: delegate to parent ──────────────────────────────
     if (isOnboarding && onSelect) { onSelect(plan.id); return }
     if (isCurrent) return
-    router.push(`/subscription/checkout?plan=${plan.id}`)
+
+    // ── Auth not yet resolved: wait (button shows spinner) ───────────────
+    if (auth === null) return
+
+    // ── Signed in as a vendor → go straight to /subscription/manage ─────
+    // Pre-select the chosen tier via query param so the manage page lands
+    // on the right plan without the user having to re-click.
+    if (auth.authenticated && auth.isVendor) {
+      router.push(`/subscription/manage?tier=${plan.id}`)
+      return
+    }
+
+    // ── Signed in but NOT a vendor (consumer / photographer) ────────────
+    // They need a business account to subscribe. Send them to the business
+    // sign-up page with a return URL so they land back here after registering.
+    if (auth.authenticated && !auth.isVendor) {
+      router.push(`/business-signup?return=/subscription`)
+      return
+    }
+
+    // ── Not signed in at all ─────────────────────────────────────────────
+    // Send to /login. After login the app currently redirects to "/", but
+    // we append ?return= so future login improvements can honour it.
+    router.push(`/login?return=/subscription`)
   }
 
-  const ctaLabel = isCurrent ? '✓ Current plan' : isOnboarding ? (isSelected ? '✓ Selected' : 'Select plan') : 'Get started'
+  // Button label adapts to auth state
+  const ctaLabel = isCurrent
+    ? '✓ Current plan'
+    : isOnboarding
+      ? (isSelected ? '✓ Selected' : 'Select plan')
+      : auth === null && !isOnboarding
+        ? 'Get started'           // still resolving — show neutral text
+        : auth?.authenticated && auth.isVendor
+          ? 'Switch to this plan'
+          : 'Get started'
 
   return (
     <div

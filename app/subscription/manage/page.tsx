@@ -125,10 +125,20 @@ function ManageContent() {
 
         const sub = statusData.subscription ?? null;
         setCurrent(sub);
-        setSelected(sub?.tierId ?? null);
+
+        // If the visitor arrived from /subscription with a ?tier= param (e.g.
+        // they clicked "Growth" on the public plans page), pre-select that tier
+        // so they don't have to click it again. Fall back to their current tier.
+        const tierParam = searchParams.get("tier");
+        setSelected(tierParam ?? sub?.tierId ?? null);
 
         if (tiersRes.ok && Array.isArray(tiersData.tiers)) {
           const sorted = [...tiersData.tiers].sort((a, b) => a.sortOrder - b.sortOrder);
+          // Validate the ?tier= param against real tier IDs from the backend.
+          // If it doesn't match anything, fall back to the current subscription tier.
+          if (tierParam && !sorted.some(t => t.id === tierParam)) {
+            setSelected(sub?.tierId ?? null);
+          }
           setTiers(sorted);
         }
       } catch (err) {
