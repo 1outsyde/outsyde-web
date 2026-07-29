@@ -114,6 +114,10 @@ export default function BusinessSignupPage() {
   const [submitError, setSubmitError] = useState("");
   const [success, setSuccess] = useState<{ message: string; businessName: string } | null>(null);
 
+  const [currentStep, setCurrentStep] = useState<0 | 1>(0);
+  const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
+  const [agreementChecked, setAgreementChecked] = useState(false);
+
   function toggleIndustry(name: string) {
     setIndustries((prev) => (prev.includes(name) ? prev.filter((i) => i !== name) : [...prev, name]));
   }
@@ -183,6 +187,11 @@ export default function BusinessSignupPage() {
     }
     if (!acceptedTerms) {
       setSubmitError("You\u2019ll need to accept the vendor terms to continue.");
+      return;
+    }
+
+    if (currentStep === 0) {
+      setCurrentStep(1);
       return;
     }
 
@@ -319,6 +328,25 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
 .bs-back:hover{color:var(--gold);}
 
 @media (max-width:600px){.bs-card{padding:24px 18px;}.bs-row{flex-direction:column;}}
+
+/* ── Vendor Agreement Step ── */
+.bs-agreement-card{background:rgba(255,255,255,.97);border-radius:8px;max-width:640px;width:100%;margin:0 auto;text-align:left;}
+.bs-agreement-title{font-family:var(--serif);font-size:26px;letter-spacing:.04em;color:#000;margin-bottom:6px;text-transform:uppercase;}
+.bs-agreement-subtitle{font-size:14px;color:#555;margin-bottom:20px;}
+.bs-agreement-scroll{max-height:380px;overflow-y:scroll;border:1px solid #ddd;border-radius:8px;padding:20px;background:#fafafa;scroll-behavior:smooth;}
+.bs-ag-section-header{font-weight:700;font-size:12px;color:#000;margin-top:18px;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;}
+.bs-ag-subsection{font-weight:600;font-size:13px;color:#222;margin-top:12px;margin-bottom:2px;}
+.bs-ag-body{font-size:13px;color:#444;line-height:1.65;margin-bottom:4px;}
+.bs-ag-warning{font-size:13px;color:#c0392b;font-weight:600;margin-bottom:8px;}
+.bs-ag-scroll-hint{font-size:12px;color:var(--gold);text-align:center;margin-top:10px;font-style:italic;}
+.bs-ag-checkbox-row{display:flex;align-items:flex-start;gap:12px;margin-top:18px;cursor:pointer;}
+.bs-ag-checkbox-disabled{opacity:.4;cursor:not-allowed;}
+.bs-ag-checkbox-input{width:18px;height:18px;margin-top:2px;accent-color:var(--gold);flex-shrink:0;cursor:inherit;}
+.bs-ag-checkbox-label{font-size:14px;color:#111;line-height:1.5;}
+.bs-ag-actions{display:flex;align-items:center;justify-content:space-between;margin-top:28px;gap:16px;}
+.bs-ag-back-btn{background:transparent;border:1px solid #ccc;border-radius:6px;padding:10px 20px;font-size:14px;color:#555;cursor:pointer;font-family:var(--sans);}
+.bs-ag-back-btn:hover{border-color:#000;color:#000;}
+.bs-submit-disabled{opacity:.45;cursor:not-allowed;}
 `,
         }}
       />
@@ -342,6 +370,125 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
                 <strong>{email}</strong> once <strong>{success.businessName}</strong> has been
                 reviewed.
               </p>
+            </div>
+          ) : currentStep === 1 ? (
+            <div className="bs-card bs-agreement-card">
+              <form onSubmit={handleSubmit} noValidate>
+                <h2 className="bs-agreement-title">Vendor Agreement</h2>
+                <p className="bs-agreement-subtitle">Read the full agreement below, then check the box to confirm.</p>
+
+                <div
+                  className="bs-agreement-scroll"
+                  onScroll={(e: React.UIEvent<HTMLDivElement>) => {
+                    const el = e.currentTarget;
+                    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 30;
+                    if (atBottom && !hasScrolledToBottom) setHasScrolledToBottom(true);
+                  }}
+                >
+                  <p className="bs-ag-section-header">OUTSYDE VENDOR MARKETPLACE AGREEMENT</p>
+                  <p className="bs-ag-body"><em>Payment Processing Compliance &amp; Permitted Products Addendum</em></p>
+
+                  <p className="bs-ag-section-header">1. Parties &amp; Purpose</p>
+                  <p className="bs-ag-body">This agreement is between Outsyde, LLC and you, the Vendor, governing your access to the Outsyde marketplace. It establishes explicit standards for permitted products and protects both parties from payment processing disruptions caused by violations of Stripe&rsquo;s policies.</p>
+
+                  <p className="bs-ag-section-header">2. Payment Processor Compliance</p>
+                  <p className="bs-ag-body">Outsyde processes all vendor payments through Stripe Connect. Stripe maintains a Prohibited and Restricted Businesses list. Violations may result in immediate account termination and fund holds of 90&ndash;180+ days without prior notice. This step exists to ensure no vendor listing puts the Platform or fellow vendors at risk.</p>
+
+                  <p className="bs-ag-section-header">3. Explicitly Permitted Products</p>
+                  <p className="bs-ag-body">Approved without additional review: physical goods (apparel, home goods, art, electronics, beauty products without medical claims, packaged food and non-alcoholic beverages, fitness equipment, pet products, outdoor gear); digital products (downloads, photography, creative services, coaching, courses, event planning); event services (ticketing, catering, entertainment bookings, photography); professional services (moving, cleaning, contracting, notary).</p>
+
+                  <p className="bs-ag-section-header">4. Explicitly Prohibited Products &mdash; Read Carefully</p>
+                  <p className="bs-ag-warning">The following are strictly prohibited and may not be listed on Outsyde under any circumstances:</p>
+
+                  <p className="bs-ag-subsection">Tobacco &amp; Smoking Products</p>
+                  <p className="bs-ag-body">Cigarettes (tobacco or herbal), pre-rolled cones or sticks of ANY plant material intended for smoking &mdash; including hemp, lavender, chamomile, eucalyptus, or any other botanical &mdash; herbal cigarettes, loose smoking blends, vape pens, vape cartridges, e-cigarette products of any kind. Labeling a pre-rolled product as &ldquo;aromatherapy&rdquo; does not exempt it. The physical form of the product controls its classification.</p>
+
+                  <p className="bs-ag-subsection">Cannabis &amp; CBD</p>
+                  <p className="bs-ag-body">THC-containing products of any kind, CBD products exceeding 0.3% THC by dry weight, CBD edibles or ingestibles, hemp flower sold for smoking.</p>
+
+                  <p className="bs-ag-subsection">Alcohol</p>
+                  <p className="bs-ag-body">Alcoholic beverages of any kind &mdash; beer, wine, spirits, hard seltzers &mdash; and alcohol subscription boxes or delivery services.</p>
+
+                  <p className="bs-ag-subsection">Adult Content &amp; Services</p>
+                  <p className="bs-ag-body">Pornographic or sexually explicit content in any format, escort or companionship services, adult novelty products, AI-generated adult content.</p>
+
+                  <p className="bs-ag-subsection">Gambling &amp; Games of Chance</p>
+                  <p className="bs-ag-body">Online casino services, poker, sports betting, fantasy sports with real-money prizes, lotteries, sweepstakes where prizes are contingent on purchase, bidding-fee auctions.</p>
+
+                  <p className="bs-ag-subsection">Weapons &amp; Dangerous Items</p>
+                  <p className="bs-ag-body">Firearms, ammunition, switchblades or other weapons prohibited by law, explosives, pyrotechnics, replica or unregistered weapon facsimiles.</p>
+
+                  <p className="bs-ag-subsection">Pharmaceutical &amp; Medical Products</p>
+                  <p className="bs-ag-body">Prescription medications, supplements or vitamins making disease-prevention or cure claims (FDA prohibited without approval), prescription veterinary products.</p>
+
+                  <p className="bs-ag-subsection">Financial Services &amp; Fraud</p>
+                  <p className="bs-ag-body">Unlicensed investment or securities services, cryptocurrency or NFT sales, payday loans, debt settlement or credit repair services, pyramid schemes or MLM structures with recruitment-based income.</p>
+
+                  <p className="bs-ag-subsection">Counterfeit Goods &amp; IP Violations</p>
+                  <p className="bs-ag-body">Counterfeit goods of any brand, pirated software or media, products using trademarked names or logos without authorization, fake identification documents or credentials.</p>
+
+                  <p className="bs-ag-subsection">Illegal Activity</p>
+                  <p className="bs-ag-body">Any product or service that is illegal under applicable federal, state, or local law.</p>
+
+                  <p className="bs-ag-section-header">5. Restricted Categories &mdash; Prior Approval Required</p>
+                  <p className="bs-ag-body">The following require written approval from Outsyde before listing: herbal supplements and ingestible wellness products, food products with health claims, age-restricted products (18+/21+), subscription box services, extended warranties over 12 months, telehealth or wellness consultation services. Email vendors@outsyde.com with subject &ldquo;Category Approval Request&rdquo; before listing any of these.</p>
+
+                  <p className="bs-ag-section-header">6. Vendor Representations</p>
+                  <p className="bs-ag-body">By agreeing, you confirm: (a) all your listed products fall within permitted categories or you have received written approval; (b) all listings are truthful and not deceptively described to evade compliance review; (c) you will notify Outsyde immediately if any product may conflict with this Agreement; (d) you hold all required licenses, permits, and regulatory approvals for your products.</p>
+
+                  <p className="bs-ag-section-header">7. Enforcement</p>
+                  <p className="bs-ag-body">Violations may result in immediate listing removal, account suspension, payout holds up to 90 days, or permanent termination. If Outsyde&rsquo;s Stripe account incurs holds, fund freezes, or penalties as a direct result of your prohibited product listings, you may be held financially liable for documented losses including held funds, chargeback fees, and platform remediation costs.</p>
+
+                  <p className="bs-ag-section-header">8. Governing Law</p>
+                  <p className="bs-ag-body">This Agreement is governed by the laws of the State of New York. Disputes are resolved by binding arbitration under AAA rules in Nassau County, NY.</p>
+
+                  <p className="bs-ag-body" style={{ marginTop: "16px", fontStyle: "italic" }}>
+                    By checking the box below, you confirm you have read this Agreement in full and agree to be bound by its terms.
+                  </p>
+                </div>
+
+                {!hasScrolledToBottom && (
+                  <p className="bs-ag-scroll-hint">↓ Scroll through the agreement to enable the checkbox</p>
+                )}
+
+                <label className={`bs-ag-checkbox-row${!hasScrolledToBottom ? " bs-ag-checkbox-disabled" : ""}`}>
+                  <input
+                    type="checkbox"
+                    className="bs-ag-checkbox-input"
+                    checked={agreementChecked}
+                    disabled={!hasScrolledToBottom}
+                    onChange={(e) => setAgreementChecked(e.target.checked)}
+                  />
+                  <span className="bs-ag-checkbox-label">
+                    I have read the Outsyde Vendor Agreement in full and agree to its terms
+                  </span>
+                </label>
+
+                {submitState === "error" && submitError && (
+                  <p className="bs-err" role="alert">{submitError}</p>
+                )}
+
+                <div className="bs-ag-actions">
+                  <button
+                    type="button"
+                    className="bs-ag-back-btn"
+                    onClick={() => {
+                      setCurrentStep(0);
+                      setHasScrolledToBottom(false);
+                      setAgreementChecked(false);
+                    }}
+                  >
+                    ← Back
+                  </button>
+                  <button
+                    type="submit"
+                    className={`bs-submit${!agreementChecked ? " bs-submit-disabled" : ""}`}
+                    disabled={!agreementChecked || submitState === "submitting"}
+                  >
+                    {submitState === "submitting" ? "Please wait…" : "Confirm & Submit Application"}
+                  </button>
+                </div>
+              </form>
             </div>
           ) : (
             <>
@@ -710,7 +857,7 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
                   )}
 
                   <button type="submit" className="bs-submit" disabled={submitState === "submitting"}>
-                    {submitState === "submitting" ? "Please wait\u2026" : "Create Business Account"}
+                    {submitState === "submitting" ? "Please wait\u2026" : "Submit Application"}
                   </button>
                 </form>
               </div>
