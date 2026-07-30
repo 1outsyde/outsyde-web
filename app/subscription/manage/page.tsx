@@ -191,7 +191,6 @@ function ManageContent() {
         return;
       }
       if (data.tierChanged) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
         await reloadStatus();
         window.location.reload();
       }
