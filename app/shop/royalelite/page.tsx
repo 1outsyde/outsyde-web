@@ -182,6 +182,7 @@ export default function RoyalEliteStore() {
 .re-ld{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:760px;margin:0 auto;}
 .re-ld-card{background:linear-gradient(165deg,#3A1A5C,#26123F);border:1px solid var(--re-line);border-radius:6px;padding:26px;text-align:center;}
 .re-ld-card .re-ld-size{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--re-gold-light);margin-bottom:10px;}
+.re-ld-card .re-ld-starting{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--re-muted);margin-bottom:2px;}
 .re-ld-card .re-ld-price{font-family:var(--re-serif);font-size:2rem;font-weight:700;color:var(--re-cream);}
 .re-ld-note{text-align:center;font-size:12.5px;color:var(--re-muted);margin-top:20px;line-height:1.8;}
 
@@ -378,14 +379,17 @@ export default function RoyalEliteStore() {
           <div className="re-ld">
             <div className="re-ld-card">
               <div className="re-ld-size">1 Bedroom</div>
+              <div className="re-ld-starting">Starting at</div>
               <div className="re-ld-price">$1,700</div>
             </div>
             <div className="re-ld-card">
               <div className="re-ld-size">2 Bedroom</div>
+              <div className="re-ld-starting">Starting at</div>
               <div className="re-ld-price">$2,500</div>
             </div>
             <div className="re-ld-card">
               <div className="re-ld-size">3 Bedroom</div>
+              <div className="re-ld-starting">Starting at</div>
               <div className="re-ld-price">$3,200</div>
             </div>
           </div>
