@@ -8,6 +8,7 @@ import { useState } from "react";
 const NAV_LINKS: { label: string; href: string }[] = [
   { label: "Overview", href: "/admin" },
   { label: "Applications", href: "/admin/applications" },
+  { label: "Refunds", href: "/admin/refunds" },
 ];
 
 // "/admin" must match only itself, otherwise it would light up on every
