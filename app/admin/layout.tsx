@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { hasAdminTokenCookie } from "@/lib/admin-auth";
+import AdminNav from "./AdminNav";
 
 export default async function AdminLayout({
   children,
@@ -34,6 +35,7 @@ export default async function AdminLayout({
         >
           OUTSYDE ADMIN
         </span>
+        <AdminNav />
       </div>
       <div style={{ padding: "32px" }}>{children}</div>
     </div>
