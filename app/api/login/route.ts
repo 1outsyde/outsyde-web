@@ -77,11 +77,14 @@ export async function POST(req: Request) {
     response.headers.append("Set-Cookie", cookie);
   }
 
-  // Store accessToken in a cookie so BFF routes can forward it to JWT-only endpoints
+  // Store accessToken in a cookie so BFF routes can forward it to JWT-only endpoints.
+  // Max-Age matches the backend's ACCESS_TOKEN_EXPIRY_SECONDS (7 days) so the cookie
+  // doesn't expire while the token it holds is still valid.
   if (accessToken) {
+    const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
     response.headers.append(
       "Set-Cookie",
-      `outsyde_access_token=${accessToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=900`
+      `outsyde_access_token=${accessToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800${secure}`
     );
   }
 
