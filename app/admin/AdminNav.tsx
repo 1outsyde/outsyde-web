@@ -9,6 +9,7 @@ const NAV_LINKS: { label: string; href: string }[] = [
   { label: "Overview", href: "/admin" },
   { label: "Applications", href: "/admin/applications" },
   { label: "Refunds", href: "/admin/refunds" },
+  { label: "Users", href: "/admin/users" },
 ];
 
 // "/admin" must match only itself, otherwise it would light up on every
