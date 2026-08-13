@@ -1,5 +1,5 @@
 // lib/lotus-products.ts
-// Single source of truth for the 9 Lotus House Blends products.
+// Single source of truth for the 6 Lotus House Blends products.
 // Used by the product detail pages (app/shop/lotus/[slug]/page.tsx).
 //
 // WHERE THIS GOES:  outsyde-web/lib/lotus-products.ts
@@ -33,17 +33,6 @@ export type LotusProduct = {
 export const LOTUS_PRODUCTS: LotusProduct[] = [
   // ---------- DREAM TEMPLE — NIGHT ----------
   {
-    id: "dt-cones", slug: "dream-temple-pre-rolls",
-    name: "Dream Temple Herbal Cones",
-    blend: "Dream Temple", blendTime: "Night Blend",
-    blendNote: "Ease into rest · Calm the nervous system",
-    format: "cones", formatLabel: "Herbal Cones",
-    price: 10.0, bundle: "3 for $20", image: "/dream-temple-prerolls.jpg",
-    short: "Four herbal cones. Eases stress and tension, promotes deep sleep, supports dream clarity, and relaxes the nervous system.",
-    long: "Dream Temple is our night blend. Each herbal cone is a slow evening ritual — easing stress and tension, promoting deep sleep, supporting dream clarity, and relaxing the nervous system.",
-    details: ["4 herbal cones per pack", "Night blend", "No tobacco · No nicotine · No cannabis"],
-  },
-  {
     id: "dt-herbs", slug: "dream-temple-loose-herbs",
     name: "Dream Temple Loose-Herbs",
     blend: "Dream Temple", blendTime: "Night Blend",
@@ -68,17 +57,6 @@ export const LOTUS_PRODUCTS: LotusProduct[] = [
 
   // ---------- HEART FLOW — MIDDAY ----------
   {
-    id: "hf-cones", slug: "heart-flow-pre-rolls",
-    name: "Heart Flow Herbal Cones",
-    blend: "Heart Flow", blendTime: "Midday Blend",
-    blendNote: "Stay balanced & grounded · Supports digestion",
-    format: "cones", formatLabel: "Herbal Cones",
-    price: 10.0, bundle: "3 for $20", image: "/heart-flow-prerolls.jpg",
-    short: "Four herbal cones. Keeps you balanced and grounded. Reduces hormonal inflammation and promotes emotional clarity.",
-    long: "Heart Flow is our midday blend. Each herbal cone keeps you balanced and grounded through the middle of the day — reducing hormonal inflammation and promoting emotional clarity.",
-    details: ["4 herbal cones per pack", "Midday blend", "No tobacco · No nicotine · No cannabis"],
-  },
-  {
     id: "hf-herbs", slug: "heart-flow-loose-herbs",
     name: "Heart Flow Loose-Herbs",
     blend: "Heart Flow", blendTime: "Midday Blend",
@@ -102,17 +80,6 @@ export const LOTUS_PRODUCTS: LotusProduct[] = [
   },
 
   // ---------- RISE & BLOOM — MORNING ----------
-  {
-    id: "rb-cones", slug: "rise-bloom-pre-rolls",
-    name: "Rise & Bloom Herbal Cones",
-    blend: "Rise & Bloom", blendTime: "Morning Blend",
-    blendNote: "Clear the mind · Get the day moving",
-    format: "cones", formatLabel: "Herbal Cones",
-    price: 10.0, bundle: "3 for $20", image: "/rise-bloom-prerolls.png",
-    short: "Four herbal cones. Clears brain fog, reduces inflammation, supports focus and clarity, and gets the day moving.",
-    long: "Rise & Bloom is our morning blend. Each herbal cone helps clear brain fog, reduce inflammation, and support focus and clarity to get the day moving.",
-    details: ["4 herbal cones per pack", "Morning blend", "No tobacco · No nicotine · No cannabis"],
-  },
   {
     id: "rb-herbs", slug: "rise-bloom-loose-herbs",
     name: "Rise & Bloom Loose-Herbs",

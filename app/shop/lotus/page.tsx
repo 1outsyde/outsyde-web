@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { addToCart, getCart, setQty, removeFromCart, subscribe, type CartItem } from "@/lib/cart";
 
-type Filter = "all" | "morning" | "midday" | "night" | "tea" | "herbs" | "prerolls";
+type Filter = "all" | "morning" | "midday" | "night" | "tea" | "herbs";
 
 export default function LotusHouseBlends() {
   const [active, setActive] = useState<Filter>("all");
@@ -27,7 +27,7 @@ export default function LotusHouseBlends() {
     (["morning", "midday", "night"] as Filter[]).includes(active) && active !== (blend as Filter);
 
   const cardDisplay = (type: string) =>
-    (["tea", "herbs", "prerolls"] as Filter[]).includes(active) && active !== (type as Filter)
+    (["tea", "herbs"] as Filter[]).includes(active) && active !== (type as Filter)
       ? "none"
       : "block";
 
@@ -324,7 +324,6 @@ html{scroll-behavior:smooth;}
                 ["night", "Dream Temple — Night"],
                 ["tea", "Tea Boxes"],
                 ["herbs", "Loose Herbs"],
-                ["prerolls", "Herbal Blends"],
               ] as [Filter, string][]).map(([key, label]) => (
                 <button
                   key={key}
@@ -344,24 +343,6 @@ html{scroll-behavior:smooth;}
                 <span className="blend-group-sub">Ease into rest · Calm the nervous system</span>
               </div>
               <div className="product-grid">
-                <a href="/shop/lotus/dream-temple-pre-rolls" className="pcard" style={{ display: cardDisplay("prerolls") }}>
-                  <div className="pcard-img">
-                    <img src="/dream-temple-prerolls.jpg" alt="Dream Temple Herbal Cones" />
-                    <span className="ptype-tag">Herbal Blend</span>
-                  </div>
-                  <div className="pcard-body">
-                    <div className="pcard-name">Dream Temple Herbal Cones</div>
-                    <div className="pcard-desc">4 herbal cones. Eases stress and tension, promotes deep sleep, supports dream clarity, relaxes the nervous system.</div>
-                    <div className="pcard-footer">
-                      <div>
-                        <span className="pcard-price">$10.00</span>
-                        <span className="pcard-bundle">Bundle: 3 for $20</span>
-                      </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "dt-cones", name: "Dream Temple Herbal Cones", price: 10.00, image: "/dream-temple-prerolls.jpg" }); }}>+</button>
-                    </div>
-                  </div>
-                </a>
-
                 <a href="/shop/lotus/dream-temple-loose-herbs" className="pcard" style={{ display: cardDisplay("herbs") }}>
                   <div className="pcard-img">
                     <img src="/dream-temple-loose-herbs.jpg" alt="Dream Temple Loose Herbs" />
@@ -444,23 +425,6 @@ html{scroll-behavior:smooth;}
                   </div>
                 </a>
 
-                <a href="/shop/lotus/heart-flow-pre-rolls" className="pcard" style={{ display: cardDisplay("prerolls") }}>
-                  <div className="pcard-img">
-                    <img src="/heart-flow-prerolls.jpg" alt="Heart Flow Herbal Cones" />
-                    <span className="ptype-tag">Herbal Blend</span>
-                  </div>
-                  <div className="pcard-body">
-                    <div className="pcard-name">Heart Flow Herbal Cones</div>
-                    <div className="pcard-desc">4 herbal cones. Keeps you balanced and grounded. Reduces hormonal inflammation, promotes emotional clarity.</div>
-                    <div className="pcard-footer">
-                      <div>
-                        <span className="pcard-price">$10.00</span>
-                        <span className="pcard-bundle">Bundle: 3 for $20</span>
-                      </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "hf-cones", name: "Heart Flow Herbal Cones", price: 10.00, image: "/heart-flow-prerolls.jpg" }); }}>+</button>
-                    </div>
-                  </div>
-                </a>
               </div>
             </div>
 
@@ -508,23 +472,6 @@ html{scroll-behavior:smooth;}
                   </div>
                 </a>
 
-                <a href="/shop/lotus/rise-bloom-pre-rolls" className="pcard" style={{ display: cardDisplay("prerolls") }}>
-                  <div className="pcard-img">
-                    <img src="/rise-bloom-prerolls.png" alt="Rise & Bloom Herbal Cones" />
-                    <span className="ptype-tag">Herbal Blend</span>
-                  </div>
-                  <div className="pcard-body">
-                    <div className="pcard-name">Rise &amp; Bloom Herbal Cones</div>
-                    <div className="pcard-desc">4 herbal cones. Clears brain fog, reduces inflammation, supports focus and clarity. Gets the day moving.</div>
-                    <div className="pcard-footer">
-                      <div>
-                        <span className="pcard-price">$10.00</span>
-                        <span className="pcard-bundle">Bundle: 3 for $20</span>
-                      </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "rb-cones", name: "Rise & Bloom Herbal Cones", price: 10.00, image: "/rise-bloom-prerolls.png" }); }}>+</button>
-                    </div>
-                  </div>
-                </a>
               </div>
             </div>
           </section>
