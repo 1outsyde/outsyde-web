@@ -5,12 +5,13 @@
 // WHERE THIS GOES:  outsyde-web/lib/cart.ts   (create a "lib" folder at the project root)
 
 export type CartItem = {
-  id: string;          // unique product id
-  name: string;        // shopper-facing name
-  price: number;       // BASE price in dollars (e.g. 10.00)
+  id: string;           // unique product id (= productId sent to backend)
+  name: string;         // shopper-facing name
+  priceCents: number;   // BASE price in cents, integer (e.g. 1875 = $18.75)
   qty: number;
-  vendor: string;      // display name, e.g. "Lotus House Blends"
-  vendorId: string;    // stable id for grouping + Stripe destination later, e.g. "lotus"
+  vendor: string;       // display name, e.g. "Lotus House Blends"
+  vendorId: string;     // stable id for grouping + Stripe destination, e.g. "lotus"
+  stripePriceId?: string;
   image?: string;
 };
 
@@ -45,6 +46,14 @@ export function addToCart(item: Omit<CartItem, "qty"> & { qty?: number }) {
     items.push({ ...item, qty: item.qty || 1 });
   }
   write(items);
+}
+
+/** Convenience: add with price expressed in dollars (converts to priceCents). */
+export function addToCartDollars(
+  item: Omit<CartItem, "qty" | "priceCents"> & { price: number; qty?: number }
+) {
+  const { price, ...rest } = item;
+  addToCart({ ...rest, priceCents: Math.round(price * 100) });
 }
 
 export function setQty(id: string, qty: number) {

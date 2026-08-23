@@ -29,11 +29,11 @@ export default function CartPage() {
       vendorId: vid,
       vendor: items[0]?.vendor || "Vendor",
       items,
-      subtotal: items.reduce((s, i) => s + i.price * i.qty, 0),
+      subtotal: items.reduce((s, i) => s + (i.priceCents / 100) * i.qty, 0),
     };
   });
 
-  const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const subtotal = cart.reduce((s, i) => s + (i.priceCents / 100) * i.qty, 0);
   const count = cart.reduce((n, i) => n + i.qty, 0);
 
   return (
@@ -142,7 +142,7 @@ export default function CartPage() {
                         {i.image && <img className="line-img" src={i.image} alt={i.name} />}
                         <div className="line-main">
                           <div className="line-name">{i.name}</div>
-                          <div className="line-unit">${i.price.toFixed(2)} each</div>
+                          <div className="line-unit">${(i.priceCents / 100).toFixed(2)} each</div>
                           <div className="line-controls">
                             <div className="qty">
                               <button onClick={() => setQty(i.id, i.qty - 1)} aria-label="Decrease">−</button>
@@ -152,7 +152,7 @@ export default function CartPage() {
                             <button className="line-remove" onClick={() => removeFromCart(i.id)}>Remove</button>
                           </div>
                         </div>
-                        <div className="line-amt">${(i.price * i.qty).toFixed(2)}</div>
+                        <div className="line-amt">${((i.priceCents / 100) * i.qty).toFixed(2)}</div>
                       </div>
                     ))}
                   </div>
@@ -166,7 +166,7 @@ export default function CartPage() {
                   vendors.map((v) => (
                     <div className="summary-row vendor-line" key={v.vendorId}>
                       <span>{v.vendor}</span>
-                      <span>${v.subtotal.toFixed(2)}</span>
+                      <span>${(v.subtotal).toFixed(2)}</span>
                     </div>
                   ))}
                 <div className="summary-row">
@@ -184,7 +184,7 @@ export default function CartPage() {
                 </div>
                 <p className="summary-note">Service fee &amp; shipping are added on the next step.</p>
 
-                <a href="/shop/lotus/checkout" className="checkout-btn">Proceed to Checkout</a>
+                <a href="/checkout" className="checkout-btn">Proceed to Checkout</a>
                 <a href="/shop/lotus" className="keep-shopping">← Continue Shopping</a>
               </aside>
             </div>

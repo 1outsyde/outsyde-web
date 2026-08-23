@@ -17,8 +17,8 @@ export default function LotusHouseBlends() {
     return subscribe(() => setCart(getCart()));
   }, []);
   const count = cart.reduce((n, i) => n + i.qty, 0);
-  const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
-  const addItem = (p: { id: string; name: string; price: number; image: string }) => {
+  const subtotal = cart.reduce((s, i) => s + (i.priceCents / 100) * i.qty, 0);
+  const addItem = (p: { id: string; name: string; priceCents: number; image: string }) => {
     addToCart({ ...p, vendor: "Lotus House Blends", vendorId: "lotus" });
     setDrawerOpen(true);
   };
@@ -356,7 +356,7 @@ html{scroll-behavior:smooth;}
                         <span className="pcard-price">$18.75</span>
                         <span className="pcard-bundle">Bundle: 3 for $35</span>
                       </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "dt-herbs", name: "Dream Temple Loose-Herbs", price: 18.75, image: "/dream-temple-loose-herbs.jpg" }); }}>+</button>
+                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "dt-herbs", name: "Dream Temple Loose-Herbs", priceCents: 1875, image: "/dream-temple-loose-herbs.jpg" }); }}>+</button>
                     </div>
                   </div>
                 </a>
@@ -374,7 +374,7 @@ html{scroll-behavior:smooth;}
                         <span className="pcard-price">$12.50</span>
                         <span className="pcard-bundle">Bundle: 3 for $25</span>
                       </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "dt-tea", name: "Dream Temple Tea Box", price: 12.50, image: "/dream-temple-tea-box.jpg" }); }}>+</button>
+                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "dt-tea", name: "Dream Temple Tea Box", priceCents: 1250, image: "/dream-temple-tea-box.jpg" }); }}>+</button>
                     </div>
                   </div>
                 </a>
@@ -402,7 +402,7 @@ html{scroll-behavior:smooth;}
                         <span className="pcard-price">$18.75</span>
                         <span className="pcard-bundle">Bundle: 3 for $35</span>
                       </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "hf-herbs", name: "Heart Flow Loose-Herbs", price: 18.75, image: "/heart-flow-loose-herbs.jpg" }); }}>+</button>
+                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "hf-herbs", name: "Heart Flow Loose-Herbs", priceCents: 1875, image: "/heart-flow-loose-herbs.jpg" }); }}>+</button>
                     </div>
                   </div>
                 </a>
@@ -420,7 +420,7 @@ html{scroll-behavior:smooth;}
                         <span className="pcard-price">$12.50</span>
                         <span className="pcard-bundle">Bundle: 3 for $25</span>
                       </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "hf-tea", name: "Heart Flow Tea Box", price: 12.50, image: "/heart-flow-tea-box.jpg" }); }}>+</button>
+                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "hf-tea", name: "Heart Flow Tea Box", priceCents: 1250, image: "/heart-flow-tea-box.jpg" }); }}>+</button>
                     </div>
                   </div>
                 </a>
@@ -449,7 +449,7 @@ html{scroll-behavior:smooth;}
                         <span className="pcard-price">$18.75</span>
                         <span className="pcard-bundle">Bundle: 3 for $35</span>
                       </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "rb-herbs", name: "Rise & Bloom Loose-Herbs", price: 18.75, image: "/rise-bloom-loose-herbs.jpg" }); }}>+</button>
+                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "rb-herbs", name: "Rise & Bloom Loose-Herbs", priceCents: 1875, image: "/rise-bloom-loose-herbs.jpg" }); }}>+</button>
                     </div>
                   </div>
                 </a>
@@ -467,7 +467,7 @@ html{scroll-behavior:smooth;}
                         <span className="pcard-price">$12.50</span>
                         <span className="pcard-bundle">Bundle: 3 for $25</span>
                       </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "rb-tea", name: "Rise & Bloom Tea Box", price: 12.50, image: "/rise-bloom-tea-box.jpg" }); }}>+</button>
+                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "rb-tea", name: "Rise & Bloom Tea Box", priceCents: 1250, image: "/rise-bloom-tea-box.jpg" }); }}>+</button>
                     </div>
                   </div>
                 </a>
@@ -557,7 +557,7 @@ html{scroll-behavior:smooth;}
                     {i.image && <img className="cart-line-img" src={i.image} alt={i.name} />}
                     <div className="cart-line-info">
                       <div className="cart-line-name">{i.name}</div>
-                      <div className="cart-line-price">${i.price.toFixed(2)}</div>
+                      <div className="cart-line-price">${(i.priceCents / 100).toFixed(2)}</div>
                       <div className="cart-qty">
                         <button onClick={() => setQty(i.id, i.qty - 1)} aria-label="Decrease">−</button>
                         <span>{i.qty}</span>
