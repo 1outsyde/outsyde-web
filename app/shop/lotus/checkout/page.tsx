@@ -75,7 +75,7 @@ function CheckoutForm() {
     return subscribe(() => setCart(getCart()));
   }, []);
 
-  const subtotalCents = cart.reduce((c, i) => c + Math.round(i.price * 100) * i.qty, 0);
+  const subtotalCents = cart.reduce((c, i) => c + i.priceCents * i.qty, 0);
   const feeCents = calculateFee(subtotalCents, "product").clientUpchargeCents;
   const totalCents = subtotalCents + feeCents;
   const subtotal = subtotalCents / 100;
@@ -88,7 +88,7 @@ function CheckoutForm() {
       vendorId: vid,
       vendor: vItems[0]?.vendor || "Vendor",
       items: vItems,
-      subtotal: vItems.reduce((s, i) => s + i.price * i.qty, 0),
+      subtotal: vItems.reduce((s, i) => s + (i.priceCents / 100) * i.qty, 0),
     };
   });
 
@@ -270,7 +270,7 @@ function CheckoutForm() {
                   {v.items.map((i) => (
                     <div className="srow" key={i.id}>
                       <span className="nm">{i.name} <span className="q">×{i.qty}</span></span>
-                      <span className="pr">${(i.price * i.qty).toFixed(2)}</span>
+                      <span className="pr">${((i.priceCents / 100) * i.qty).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>

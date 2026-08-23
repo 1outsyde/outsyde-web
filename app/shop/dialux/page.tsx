@@ -34,7 +34,7 @@ export default function DiaLuxStore() {
   }, []);
 
   const count = cart.reduce((n, i) => n + i.qty, 0);
-  const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const subtotal = cart.reduce((s, i) => s + (i.priceCents / 100) * i.qty, 0);
 
   const addSingle = (e: React.MouseEvent, p: DialuxProduct) => {
     e.preventDefault();
@@ -44,7 +44,7 @@ export default function DiaLuxStore() {
     addToCart({
       id: `${p.id}-${len}`,
       name: `${p.name} — ${len}\u2033`,
-      price,
+      priceCents: Math.round(price * 100),
       image: p.image,
       vendor: "Dia Lux Kollection",
       vendorId: "dialux",
@@ -58,7 +58,7 @@ export default function DiaLuxStore() {
     addToCart({
       id: d.id,
       name: d.name,
-      price: d.price ?? 0,
+      priceCents: Math.round((d.price ?? 0) * 100),
       image: d.image,
       vendor: "Dia Lux Kollection",
       vendorId: "dialux",
@@ -323,7 +323,7 @@ export default function DiaLuxStore() {
                   <div className="dlx-line-img" style={{ backgroundImage: `url('${i.image}')` }} />
                   <div className="dlx-line-info">
                     <div className="dlx-line-name">{i.name}</div>
-                    <div className="dlx-line-price">${i.price.toFixed(2)}</div>
+                    <div className="dlx-line-price">${(i.priceCents / 100).toFixed(2)}</div>
                     <div className="dlx-qty">
                       <button onClick={() => setQty(i.id, Math.max(1, i.qty - 1))}>−</button>
                       <span>{i.qty}</span>

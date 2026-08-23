@@ -53,7 +53,7 @@ export default function DialuxProductPage() {
       addToCart({
         id: cartId,
         name: cartName,
-        price: unitPrice,
+        priceCents: Math.round(unitPrice * 100),
         image: product.image,
         vendor: "Dia Lux Kollection",
         vendorId: "dialux",
