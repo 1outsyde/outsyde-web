@@ -15,6 +15,11 @@ interface MeUser {
 
 type AuthState = "loading" | false | MeUser;
 
+const VENDOR_SHOP_PATHS: Record<string, string> = {
+  "8523e3c5-fc07-461b-9452-087d2b4aada6": "/shop/lotus",
+  "9733f28e-a809-4e99-b2b4-32e6203f15de": "/shop/dialux",
+};
+
 export default function Navbar() {
   const [auth, setAuth] = useState<AuthState>("loading");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -160,7 +165,7 @@ export default function Navbar() {
 
             {user && isVendor && (
               <>
-                <a href="/shop/lotus" className="on-link">My Shop</a>
+                <a href={VENDOR_SHOP_PATHS[user.businessId ?? ""] || "/shop"} className="on-link">My Shop</a>
                 <a href="/vendor-dashboard" className="on-link">Dashboard</a>
                 <button onClick={handleLogout} className="on-link">Log Out</button>
               </>
@@ -221,7 +226,7 @@ export default function Navbar() {
 
           {user && isVendor && (
             <>
-              <a href="/shop/lotus" onClick={() => setMenuOpen(false)}>My Shop</a>
+              <a href={VENDOR_SHOP_PATHS[user.businessId ?? ""] || "/shop"} onClick={() => setMenuOpen(false)}>My Shop</a>
               <a href="/vendor-dashboard" onClick={() => setMenuOpen(false)}>Dashboard</a>
               <button onClick={handleLogout}>Log Out</button>
             </>
