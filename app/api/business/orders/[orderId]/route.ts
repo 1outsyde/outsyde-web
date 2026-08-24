@@ -10,15 +10,16 @@ function getAccessToken(req: NextRequest): string | null {
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { orderId: string } }
+  { params }: { params: Promise<{ orderId: string }> }
 ) {
   try {
+    const { orderId } = await params;
     const token = getAccessToken(req);
     if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
 
-    const backendRes = await fetch(`${BACKEND}/api/business/orders/${params.orderId}`, {
+    const backendRes = await fetch(`${BACKEND}/api/business/orders/${orderId}`, {
       method: "PATCH",
       headers: {
         Authorization: `Bearer ${token}`,
