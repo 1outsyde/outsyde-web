@@ -38,7 +38,7 @@ export default function LotusProductPage() {
     for (let i = 0; i < qty; i++) {
       addToCart({
         id: product.id, name: product.name, priceCents: Math.round(product.price * 100),
-        image: product.image, vendor: "Lotus House Blends", vendorId: "lotus",
+        image: product.image, vendor: "Lotus House Blends", vendorId: "8523e3c5-fc07-461b-9452-087d2b4aada6", isExternalProduct: true,
       });
     }
     setAdded(true);
