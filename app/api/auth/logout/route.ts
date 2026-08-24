@@ -30,5 +30,6 @@ export async function POST(req: Request) {
 
   const response = NextResponse.json({ ok: true });
   response.cookies.set("connect.sid", "", { expires: new Date(0), path: "/" });
+  response.cookies.set("outsyde_access_token", "", { expires: new Date(0), path: "/" });
   return response;
 }
