@@ -16,42 +16,8 @@ import { useEffect, useRef, useState } from "react";
 const SLIDES = 5;
 
 export default function Home() {
-  const [scrolled, setScrolled] = useState(false);
   const [cur, setCur] = useState(0);
   const startX = useRef(0);
-
-  // Session check — reflects real login state in the nav instead of
-  // always showing "Log In" regardless of whether someone's signed in.
-  const [session, setSession] = useState<{
-    authenticated: boolean;
-    displayName?: string | null;
-    username?: string | null;
-  } | null>(null);
-
-  useEffect(() => {
-    fetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data) => setSession(data))
-      .catch(() => setSession({ authenticated: false }));
-  }, []);
-
-  async function handleLogout() {
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-    } catch {
-      // ignore — clear local state regardless, the cookie gets cleared
-      // server-side by the route even if this request itself hiccups
-    }
-    setSession({ authenticated: false });
-    window.location.href = "/";
-  }
-
-  // nav background on scroll
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 55);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
 
   // carousel autoplay (resets whenever the slide changes, incl. manual nav)
   useEffect(() => {
@@ -80,21 +46,6 @@ html{scroll-behavior:smooth;}
 body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow-x:hidden;}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
 
-#nav{position:fixed;top:0;left:0;right:0;z-index:200;padding:22px 52px;display:flex;align-items:center;gap:24px;transition:background .45s ease,padding .35s ease,border-color .45s ease;border-bottom:0.5px solid transparent;}
-#nav.scrolled{background:rgba(0,0,0,.93);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 52px;border-bottom-color:rgba(232,185,48,.18);}
-.nav-logo{display:flex;align-items:center;gap:11px;text-decoration:none;}
-.nav-y-mark{width:40px;height:40px;object-fit:contain;flex-shrink:0;}
-.nav-wordmark{line-height:1;}
-.nav-wordmark strong{display:block;font-family:var(--serif);font-weight:300;font-size:19px;letter-spacing:.14em;color:var(--cream);text-transform:uppercase;}
-.nav-wordmark span{display:block;font-size:8.5px;letter-spacing:.22em;color:var(--gold);text-transform:uppercase;margin-top:1px;}
-.nav-links{flex:1;display:flex;justify-content:center;gap:34px;}
-.nav-links a{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:rgba(245,240,230,.65);text-decoration:none;transition:color .2s;}
-.nav-links a:hover{color:var(--gold);}
-.nav-actions{display:flex;align-items:center;gap:22px;}
-.nav-actions a{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:rgba(245,240,230,.65);text-decoration:none;transition:color .2s;}
-.nav-actions a:hover{color:var(--cream);}
-.nav-cta{padding:9px 20px;background:var(--gold);color:var(--black)!important;font-size:11px!important;letter-spacing:.1em!important;font-weight:600!important;border-radius:3px;transition:background .2s,transform .2s!important;}
-.nav-cta:hover{background:#f2c835!important;transform:translateY(-1px);}
 
 #hero{position:relative;height:100dvh;min-height:640px;display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden;}
 #hero-bg{position:absolute;inset:0;background:var(--off-black);overflow:hidden;}
@@ -255,37 +206,6 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
 `,
         }}
       />
-
-      {/* ══ NAV ══ */}
-      <nav id="nav" className={scrolled ? "scrolled" : ""} aria-label="Main navigation">
-        <a href="/" className="nav-logo" aria-label="Go OutsYde home">
-          <img src="/outsyde-y-transparent.png" className="nav-y-mark" alt="OutsYde" />
-          <div className="nav-wordmark">
-            <strong>Go OutsYde</strong>
-            <span>Like a Lavished Local</span>
-          </div>
-        </a>
-        <div className="nav-links">
-          <a href="/shop">Shop</a>
-          <a href="#photographers">Photographers</a>
-          <a href="#business-band">For Businesses</a>
-          <a href="#photographers">For Creators</a>
-          <a href="/about">About</a>
-        </div>
-        <div className="nav-actions">
-          {session?.authenticated ? (
-            <>
-              <span style={{ fontSize: "11.5px", letterSpacing: ".08em", textTransform: "uppercase", color: "rgba(245,240,230,.65)" }}>
-                Hi, {session.displayName || session.username}
-              </span>
-              <a href="#" onClick={(e) => { e.preventDefault(); handleLogout(); }}>Log Out</a>
-            </>
-          ) : (
-            <a href="/login">Log In</a>
-          )}
-          <a href="/shop" className="nav-cta">Shop Now</a>
-        </div>
-      </nav>
 
       {/* ══ HERO ══ */}
       <section id="hero" aria-label="Hero — Go OutsYde">

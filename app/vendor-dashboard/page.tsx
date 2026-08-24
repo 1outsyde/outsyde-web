@@ -209,14 +209,6 @@ export default function VendorDashboardPage() {
       `}</style>
 
       <div className="page">
-        <nav className="topnav">
-          <Link href="/" className="nav-logo">OUTSYDE</Link>
-          <div className="nav-right">
-            <span className="nav-biz">{business.name}</span>
-            <Link href="/api/auth/logout" className="nav-logout">Sign out</Link>
-          </div>
-        </nav>
-
         {isPending && (
           <div className="pending-banner">
             ⏳ Your application is under review. You'll be notified once approved.

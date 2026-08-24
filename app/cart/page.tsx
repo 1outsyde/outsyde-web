@@ -107,13 +107,9 @@ export default function CartPage() {
       />
 
       <div className="cartpage">
-        <nav className="outsyde-nav">
-          <a href="/" className="nav-logo">
-            <span className="nav-y">Y</span>
-            <span className="nav-wordmark">OUTSYDE</span>
-          </a>
+        <div style={{ padding: "0.75rem 2rem" }}>
           <a href="/shop/lotus" className="nav-back">← Continue Shopping</a>
-        </nav>
+        </div>
 
         {!mounted ? (
           <div className="cart-wrap" />

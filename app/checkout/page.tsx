@@ -386,10 +386,9 @@ function CheckoutForm() {
       />
 
       <div className="co">
-        <nav className="nav">
-          <a href="/"><span className="nav-y">Y OUTSYDE</span></a>
+        <div style={{ padding: "0.75rem 1.5rem" }}>
           <a href="/cart" className="nav-back">← Back to Cart</a>
-        </nav>
+        </div>
 
         {!mounted || authed === null ? (
           <div className="loading-auth">Verifying session…</div>

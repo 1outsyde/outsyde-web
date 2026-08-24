@@ -138,13 +138,6 @@ export default function PointsPage() {
       <style dangerouslySetInnerHTML={{ __html: css }} />
       <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-      <nav className="nav">
-        <a href="/"><span className="nav-logo">OUTSYDE</span></a>
-        <div className="nav-links">
-          <a href="/">Home</a><a href="/shop">Shop</a><a href="/account">My Account</a>
-        </div>
-      </nav>
-
       <div className="wrap">
         <div className="breadcrumb">
           <Link href="/account">Account</Link><span>›</span><span>Points</span>

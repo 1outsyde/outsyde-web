@@ -212,24 +212,12 @@ html{scroll-behavior:smooth;}
       />
 
       <div className="lhb-root">
-        {/* OUTSYDE NAV */}
-        <nav className="outsyde-nav">
-          <a href="/" className="nav-logo">
-            <div className="nav-y">Y</div>
-            <div className="nav-wordmark">OUTSYDE</div>
-          </a>
-          <div className="nav-right">
-            <a href="/" className="nav-back">
-              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M9 11L5 7l4-4" />
-              </svg>
-              Back to Platform
-            </a>
-            <button className="cart-btn" onClick={() => setDrawerOpen(true)} aria-label="Open cart">
-              Cart{count > 0 && <span className="cart-count">{count}</span>}
-            </button>
-          </div>
-        </nav>
+        {/* Cart opener — shown inline since the cart drawer is page-specific */}
+        <div style={{ display: "flex", justifyContent: "flex-end", padding: "0.75rem 2.5rem" }}>
+          <button className="cart-btn" onClick={() => setDrawerOpen(true)} aria-label="Open cart">
+            Cart{count > 0 && <span className="cart-count">{count}</span>}
+          </button>
+        </div>
 
         <div className="page">
           {/* HERO */}

@@ -302,7 +302,6 @@ export default function AccountPage() {
       <>
         <style dangerouslySetInnerHTML={{ __html: css }} />
         <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
-        <nav className="nav"><span className="nav-logo">OUTSYDE</span></nav>
         <div className="cover" />
         <div className="wrap">
           <div className="profile-header">
@@ -369,19 +368,6 @@ export default function AccountPage() {
           </div>
         </div>
       )}
-
-      <nav className="nav">
-        <a href="/"><span className="nav-logo">OUTSYDE</span></a>
-        <div className="nav-links">
-          <a href="/">Home</a>
-          <a href="/shop">Shop</a>
-          <a href="/photographers">Photographers</a>
-        </div>
-        <div className="nav-right">
-          <div className="nav-icon">⌕</div>
-          <div className="nav-icon">♡</div>
-        </div>
-      </nav>
 
       <div className="cover">
         {profile.coverMediaUrl && (
