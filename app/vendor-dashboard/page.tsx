@@ -230,10 +230,9 @@ export default function VendorDashboardPage() {
               </div>
               <div className="biz-badges">
                 <span className={badge.cls}>{badge.label}</span>
-                {business.subscriptionActive && <span className="sub-badge">Subscription Active</span>}
                 {business.reviewCount ? (
                   <span style={{ fontSize: 12, color: "#666" }}>
-                    ⭐ {business.rating ? (business.rating / 10).toFixed(1) : "—"} ({business.reviewCount} reviews)
+                    ⭐ {business.rating ? business.rating.toFixed(1) : "—"} ({business.reviewCount} reviews)
                   </span>
                 ) : null}
               </div>
