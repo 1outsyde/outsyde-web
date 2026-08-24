@@ -32,8 +32,9 @@ export default function Navbar() {
       .catch(() => setAuth(false));
   }, []);
 
-  function handleLogout() {
-    window.location.href = "/api/auth/logout";
+  async function handleLogout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/';
   }
 
   const user = auth !== "loading" && auth !== false ? auth : null;
