@@ -202,7 +202,7 @@ function CheckoutForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items: cart.map((i) => ({
-            productId: i.id,
+            ...(i.isExternalProduct ? { isExternalProduct: true } : { productId: i.id }),
             vendorId: i.vendorId,
             priceCents: i.priceCents,
             quantity: i.qty,
