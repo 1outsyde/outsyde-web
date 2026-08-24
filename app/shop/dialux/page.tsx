@@ -48,6 +48,7 @@ export default function DiaLuxStore() {
       image: p.image,
       vendor: "Dia Lux Kollection",
       vendorId: "dialux",
+      isExternalProduct: true,
     });
     setDrawerOpen(true);
   };
@@ -62,6 +63,7 @@ export default function DiaLuxStore() {
       image: d.image,
       vendor: "Dia Lux Kollection",
       vendorId: "dialux",
+      isExternalProduct: true,
     });
     setDrawerOpen(true);
   };

@@ -13,6 +13,8 @@ export type CartItem = {
   vendorId: string;     // stable id for grouping + Stripe destination, e.g. "lotus"
   stripePriceId?: string;
   image?: string;
+  // true for products without a backend UUID (e.g. Dia Lux) — skips DB price lookup
+  isExternalProduct?: boolean;
 };
 
 const KEY = "outsyde_cart_v1";

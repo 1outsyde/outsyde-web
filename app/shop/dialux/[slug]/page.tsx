@@ -57,6 +57,7 @@ export default function DialuxProductPage() {
         image: product.image,
         vendor: "Dia Lux Kollection",
         vendorId: "dialux",
+        isExternalProduct: true,
       });
     }
     setAdded(true);
