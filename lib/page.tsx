@@ -37,7 +37,7 @@ export default function LotusProductPage() {
     if (!product) return;
     for (let i = 0; i < qty; i++) {
       addToCart({
-        id: product.id, name: product.name, price: product.price,
+        id: product.id, name: product.name, priceCents: Math.round(product.price * 100),
         image: product.image, vendor: "Lotus House Blends", vendorId: "lotus",
       });
     }
