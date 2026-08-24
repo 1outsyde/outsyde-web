@@ -19,7 +19,7 @@ export default function LotusHouseBlends() {
   const count = cart.reduce((n, i) => n + i.qty, 0);
   const subtotal = cart.reduce((s, i) => s + (i.priceCents / 100) * i.qty, 0);
   const addItem = (p: { id: string; name: string; priceCents: number; image: string }) => {
-    addToCart({ ...p, vendor: "Lotus House Blends", vendorId: "lotus" });
+    addToCart({ ...p, vendor: "Lotus House Blends", vendorId: "8523e3c5-fc07-461b-9452-087d2b4aada6", isExternalProduct: true });
     setDrawerOpen(true);
   };
 
@@ -576,7 +576,7 @@ html{scroll-behavior:smooth;}
                 <span>Subtotal</span>
                 <strong>${subtotal.toFixed(2)}</strong>
               </div>
-              <a href="/shop/lotus/checkout" className="cart-checkout">Checkout</a>
+              <a href="/checkout" className="cart-checkout">Checkout</a>
               <a href="/cart" className="cart-viewcart">View full cart</a>
             </div>
           )}
