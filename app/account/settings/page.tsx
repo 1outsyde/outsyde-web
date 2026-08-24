@@ -150,7 +150,6 @@ export default function AccountSettingsPage() {
     return (
       <>
         <style dangerouslySetInnerHTML={{ __html: css }} />
-        <nav className="nav"><a href="/"><span className="nav-logo">OUTSYDE</span></a></nav>
         <div className="wrap">
           <div className="skeleton" style={{ width: 200, marginBottom: 40 }} />
           <div className="card"><div className="skeleton" style={{ height: 80 }} /></div>

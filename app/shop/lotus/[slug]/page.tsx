@@ -140,10 +140,6 @@ export default function LotusProductPage() {
     return (
       <div className="lhb-pd">
         {styles}
-        <nav className="outsyde-nav">
-          <a href="/" className="nav-logo"><span className="nav-y">Y</span><span className="nav-wordmark">OUTSYDE</span></a>
-          <a href="/shop/lotus" className="nav-back">← Back to Lotus House Blends</a>
-        </nav>
         <div className="notfound">
           <h1>Blend not found</h1>
           <p style={{ color: "#7A6A50", marginBottom: "1.5rem" }}>We couldn&rsquo;t find that product.</p>
@@ -160,14 +156,6 @@ export default function LotusProductPage() {
   return (
     <div className="lhb-pd">
       {styles}
-
-      <nav className="outsyde-nav">
-        <a href="/" className="nav-logo"><span className="nav-y">Y</span><span className="nav-wordmark">OUTSYDE</span></a>
-        <div className="nav-right">
-          <a href="/shop/lotus" className="nav-back">← Back to Lotus</a>
-          <a href="/cart" className="cart-btn">Cart{count > 0 && <span className="cart-count">{count}</span>}</a>
-        </div>
-      </nav>
 
       <div className="crumb">
         <a href="/shop/lotus">Lotus House Blends</a> &nbsp;/&nbsp; {product.blend} &nbsp;/&nbsp; {product.formatLabel}

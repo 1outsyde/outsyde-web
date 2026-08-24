@@ -59,10 +59,7 @@ export default function Navbar() {
           text-decoration: none; flex-shrink: 0; margin-right: auto;
         }
         .on-logo-y {
-          width: 30px; height: 30px; background: #E8B930; border-radius: 6px;
-          display: flex; align-items: center; justify-content: center;
-          font-family: 'Bebas Neue', Impact, sans-serif; font-size: 17px; color: #000;
-          line-height: 1;
+          width: 30px; height: 30px; object-fit: contain; flex-shrink: 0;
         }
         .on-logo-word {
           font-family: 'Bebas Neue', Impact, sans-serif; font-size: 16px;
@@ -134,7 +131,7 @@ export default function Navbar() {
 
       <nav className="on-nav">
         <a href="/" className="on-logo" aria-label="Go OutsYde home">
-          <span className="on-logo-y" aria-hidden="true">Y</span>
+          <img src="/outsyde-y-transparent.png" className="on-logo-y" alt="" aria-hidden="true" />
           <span className="on-logo-word">Outsyde</span>
         </a>
 
