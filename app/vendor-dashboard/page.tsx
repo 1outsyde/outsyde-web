@@ -34,7 +34,8 @@ interface Order {
   totalAmount: number;
   createdAt: string;
   customerName?: string;
-  items?: { name: string; quantity: number }[];
+  items?: { name: string; quantity: number; priceCents?: number }[];
+  shippingAddress?: string | null;
 }
 
 interface Booking {
@@ -69,6 +70,17 @@ function statusColor(status: string): string {
   return "status-gray";
 }
 
+function orderStatusClass(status: string): string {
+  switch (status) {
+    case "paid": return "status-green";
+    case "pending": return "status-yellow";
+    case "shipped": return "status-blue";
+    case "delivered": return "status-gray";
+    case "cancelled": return "status-red";
+    default: return "status-gray";
+  }
+}
+
 function approvalBadge(status: string) {
   if (status === "approved") return { label: "Approved", cls: "approval-approved" };
   if (status === "pending") return { label: "Pending Review", cls: "approval-pending" };
@@ -90,6 +102,14 @@ export default function VendorDashboardPage() {
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [error, setError] = useState("");
+
+  const [orderStatusFilter, setOrderStatusFilter] = useState("all");
+  const [shipFormOrderId, setShipFormOrderId] = useState<string | null>(null);
+  const [shipTracking, setShipTracking] = useState("");
+  const [shipCarrier, setShipCarrier] = useState("UPS");
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
+  const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     (async () => {
@@ -130,6 +150,54 @@ export default function VendorDashboardPage() {
       finally { setLoadingBookings(false); }
     })();
   }, [router]);
+
+  async function handleMarkShipped(orderId: string) {
+    setActionLoading(l => ({ ...l, [orderId]: true }));
+    setActionErrors(e => ({ ...e, [orderId]: "" }));
+    try {
+      const res = await fetch(`/api/business/orders/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "shipped", trackingNumber: shipTracking, carrier: shipCarrier }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        setActionErrors(e => ({ ...e, [orderId]: d.error || "Failed to update order." }));
+      } else {
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: "shipped" } : o));
+        setShipFormOrderId(null);
+        setShipTracking("");
+        setShipCarrier("UPS");
+      }
+    } catch {
+      setActionErrors(e => ({ ...e, [orderId]: "Network error. Please try again." }));
+    } finally {
+      setActionLoading(l => ({ ...l, [orderId]: false }));
+    }
+  }
+
+  async function handleCancelOrder(orderId: string) {
+    setActionLoading(l => ({ ...l, [orderId]: true }));
+    setActionErrors(e => ({ ...e, [orderId]: "" }));
+    try {
+      const res = await fetch(`/api/business/orders/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "cancelled" }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        setActionErrors(e => ({ ...e, [orderId]: d.error || "Failed to cancel order." }));
+      } else {
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: "cancelled" } : o));
+        setCancelConfirmId(null);
+      }
+    } catch {
+      setActionErrors(e => ({ ...e, [orderId]: "Network error. Please try again." }));
+    } finally {
+      setActionLoading(l => ({ ...l, [orderId]: false }));
+    }
+  }
 
   if (loadingProfile) {
     return (
@@ -200,6 +268,36 @@ export default function VendorDashboardPage() {
         .empty-state p { margin-bottom: 6px; }
         .empty-sub { font-size: 12px; color: #333; }
         .loading-row td { color: #333; text-align: center; padding: 32px; }
+        .status-blue { background: #0d1a2b; color: #3498db; border: 1px solid #1a3a5e; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+        .order-filter-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; }
+        .order-filter-tab { font-size: 12px; font-weight: 500; font-family: inherit; letter-spacing: 0.04em; padding: 5px 14px; border-radius: 99px; border: 1px solid #2a2a2a; background: #141414; color: #666; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+        .order-filter-tab:hover { color: #aaa; border-color: #3a3a3a; }
+        .order-filter-tab.active { background: #c9a84c; color: #000; border-color: #c9a84c; }
+        .order-card { background: #141414; border: 1px solid #2a2a2a; border-radius: 10px; padding: 18px 20px; margin-bottom: 12px; }
+        .order-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+        .order-customer { font-size: 14px; font-weight: 600; color: #f5f0e8; }
+        .order-meta { font-size: 11px; color: #555; margin-bottom: 10px; }
+        .order-items-list { list-style: none; margin-bottom: 10px; }
+        .order-items-list li { font-size: 13px; color: #aaa; padding: 3px 0; border-bottom: 1px solid #1e1e1e; }
+        .order-items-list li:last-child { border-bottom: none; }
+        .order-address { font-size: 12px; color: #555; margin-bottom: 12px; }
+        .order-total { font-size: 14px; font-weight: 600; color: #f5f0e8; margin-bottom: 14px; }
+        .order-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn-gold { font-size: 12px; font-weight: 600; font-family: inherit; letter-spacing: 0.05em; padding: 7px 16px; border-radius: 5px; border: none; background: #c9a84c; color: #000; cursor: pointer; transition: background 0.15s; }
+        .btn-gold:hover { background: #d4b55e; }
+        .btn-gold:disabled { opacity: 0.5; cursor: default; }
+        .btn-red-outline { font-size: 12px; font-weight: 600; font-family: inherit; letter-spacing: 0.05em; padding: 7px 16px; border-radius: 5px; border: 1px solid #c0392b; background: transparent; color: #c0392b; cursor: pointer; transition: background 0.15s; }
+        .btn-red-outline:hover { background: rgba(192,57,43,0.08); }
+        .btn-red-outline:disabled { opacity: 0.5; cursor: default; }
+        .btn-gray { font-size: 12px; font-weight: 600; font-family: inherit; letter-spacing: 0.05em; padding: 7px 16px; border-radius: 5px; border: 1px solid #3a3a3a; background: transparent; color: #666; cursor: pointer; transition: background 0.15s; }
+        .btn-gray:hover { background: #1e1e1e; }
+        .order-ship-form { margin-top: 14px; padding: 16px; background: #0f0f0f; border: 1px solid #2a2a2a; border-radius: 8px; }
+        .order-ship-form label { display: block; font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #555; margin-bottom: 5px; }
+        .order-ship-form input, .order-ship-form select { width: 100%; padding: 8px 10px; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 5px; color: #f5f0e8; font-size: 13px; font-family: inherit; margin-bottom: 12px; outline: none; }
+        .order-ship-form input:focus, .order-ship-form select:focus { border-color: #c9a84c; }
+        .order-cancel-confirm { margin-top: 14px; padding: 14px 16px; background: #160808; border: 1px solid #4a1a1a; border-radius: 8px; }
+        .order-cancel-confirm p { font-size: 13px; color: #c0392b; margin-bottom: 12px; }
+        .order-action-error { font-size: 12px; color: #c0392b; margin-top: 8px; }
         @media (max-width: 600px) {
           .main { padding: 20px 16px 60px; }
           .profile-header { flex-direction: column; gap: 12px; }
@@ -318,30 +416,156 @@ export default function VendorDashboardPage() {
             </div>
           )}
 
-          {tab === "orders" && (
-            <div className="table-wrap">
-              {loadingOrders ? (
-                <table><tbody><tr><td className="loading-row" colSpan={5}>Loading orders…</td></tr></tbody></table>
-              ) : orders.length === 0 ? (
-                <div className="empty-state"><p>No orders yet</p><p className="empty-sub">Orders will appear here once customers make purchases.</p></div>
-              ) : (
-                <table>
-                  <thead><tr><th>Order ID</th><th>Date</th><th>Customer</th><th>Amount</th><th>Status</th></tr></thead>
-                  <tbody>
-                    {orders.map((o) => (
-                      <tr key={o.id}>
-                        <td className="id-cell">#{o.id.slice(-8).toUpperCase()}</td>
-                        <td>{formatDate(o.createdAt)}</td>
-                        <td>{o.customerName ?? "—"}</td>
-                        <td className="amount">{formatCents(o.totalAmount ?? 0)}</td>
-                        <td><span className={statusColor(o.status)}>{o.status}</span></td>
-                      </tr>
+          {tab === "orders" && (() => {
+            const filteredOrders = orderStatusFilter === "all"
+              ? orders
+              : orders.filter(o => o.status === orderStatusFilter);
+            return (
+              <div>
+                {loadingOrders ? (
+                  <p style={{ color: "#333", fontSize: 13, padding: "32px 0", textAlign: "center" }}>Loading orders…</p>
+                ) : orders.length === 0 ? (
+                  <div className="empty-state"><p>No orders yet</p><p className="empty-sub">Orders will appear here once customers make purchases.</p></div>
+                ) : (
+                  <>
+                    <div className="order-filter-tabs">
+                      {(["all", "pending", "paid", "shipped", "delivered", "cancelled"] as const).map(f => (
+                        <button
+                          key={f}
+                          className={`order-filter-tab${orderStatusFilter === f ? " active" : ""}`}
+                          onClick={() => setOrderStatusFilter(f)}
+                        >
+                          {f.charAt(0).toUpperCase() + f.slice(1)}
+                          {f !== "all" && ` (${orders.filter(o => o.status === f).length})`}
+                        </button>
+                      ))}
+                    </div>
+
+                    {filteredOrders.length === 0 ? (
+                      <div className="empty-state"><p>No {orderStatusFilter} orders</p></div>
+                    ) : filteredOrders.map(o => (
+                      <div key={o.id} className="order-card">
+                        <div className="order-card-header">
+                          <span className="order-customer">{o.customerName ?? "Unknown customer"}</span>
+                          <span className={orderStatusClass(o.status)}>{o.status}</span>
+                        </div>
+
+                        <div className="order-meta">
+                          #{o.id.slice(-8).toUpperCase()} · {formatDate(o.createdAt)}
+                        </div>
+
+                        {o.items && o.items.length > 0 && (
+                          <ul className="order-items-list">
+                            {o.items.map((item, idx) => (
+                              <li key={idx}>
+                                {item.quantity}× {item.name}
+                                {item.priceCents != null ? ` — ${formatCents(item.priceCents)}` : ""}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+
+                        <div className="order-total">Total: {formatCents(o.totalAmount ?? 0)}</div>
+
+                        <div className="order-address">
+                          {o.shippingAddress
+                            ? (() => {
+                                try {
+                                  const a = typeof o.shippingAddress === "string"
+                                    ? JSON.parse(o.shippingAddress)
+                                    : o.shippingAddress;
+                                  return `${a.line1}, ${a.city}, ${a.state} ${a.zipCode}`;
+                                } catch {
+                                  return o.shippingAddress as string;
+                                }
+                              })()
+                            : <span style={{ color: "#444" }}>No shipping address on file</span>
+                          }
+                        </div>
+
+                        {(o.status === "paid" || o.status === "pending") && (
+                          <div className="order-actions">
+                            {o.status === "paid" && (
+                              <button
+                                className="btn-gold"
+                                disabled={!!actionLoading[o.id]}
+                                onClick={() => {
+                                  setCancelConfirmId(null);
+                                  setShipFormOrderId(shipFormOrderId === o.id ? null : o.id);
+                                }}
+                              >
+                                {shipFormOrderId === o.id ? "Close" : "Mark Shipped"}
+                              </button>
+                            )}
+                            <button
+                              className="btn-red-outline"
+                              disabled={!!actionLoading[o.id]}
+                              onClick={() => {
+                                setShipFormOrderId(null);
+                                setCancelConfirmId(cancelConfirmId === o.id ? null : o.id);
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+
+                        {shipFormOrderId === o.id && (
+                          <div className="order-ship-form">
+                            <label>Tracking Number</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 1Z999AA10123456784"
+                              value={shipTracking}
+                              onChange={e => setShipTracking(e.target.value)}
+                            />
+                            <label>Carrier</label>
+                            <select value={shipCarrier} onChange={e => setShipCarrier(e.target.value)}>
+                              <option value="UPS">UPS</option>
+                              <option value="USPS">USPS</option>
+                              <option value="FedEx">FedEx</option>
+                              <option value="DHL">DHL</option>
+                              <option value="Other">Other</option>
+                            </select>
+                            <div className="order-actions">
+                              <button
+                                className="btn-gold"
+                                disabled={!shipTracking.trim() || !!actionLoading[o.id]}
+                                onClick={() => handleMarkShipped(o.id)}
+                              >
+                                {actionLoading[o.id] ? "Saving…" : "Confirm Shipment"}
+                              </button>
+                              <button className="btn-gray" onClick={() => setShipFormOrderId(null)}>Cancel</button>
+                            </div>
+                          </div>
+                        )}
+
+                        {cancelConfirmId === o.id && (
+                          <div className="order-cancel-confirm">
+                            <p>Cancel this order? The customer will be refunded. This cannot be undone.</p>
+                            <div className="order-actions">
+                              <button
+                                className="btn-red-outline"
+                                disabled={!!actionLoading[o.id]}
+                                onClick={() => handleCancelOrder(o.id)}
+                              >
+                                {actionLoading[o.id] ? "Cancelling…" : "Yes, Cancel Order"}
+                              </button>
+                              <button className="btn-gray" onClick={() => setCancelConfirmId(null)}>Keep Order</button>
+                            </div>
+                          </div>
+                        )}
+
+                        {actionErrors[o.id] && (
+                          <div className="order-action-error">{actionErrors[o.id]}</div>
+                        )}
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           {tab === "bookings" && (
             <div className="table-wrap">
