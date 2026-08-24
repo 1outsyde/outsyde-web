@@ -14,9 +14,9 @@ export async function GET(req: NextRequest) {
   });
   if (!meRes.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const me = await meRes.json();
-  if (!me.authenticated) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!me.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const res = await fetch(`${process.env.OUTSYDE_BACKEND_URL}/api/profiles/${me.userId}/posts`, {
+  const res = await fetch(`${process.env.OUTSYDE_BACKEND_URL}/api/profiles/${me.user?.id}/posts`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 

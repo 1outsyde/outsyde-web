@@ -16,10 +16,10 @@ export async function GET(req: NextRequest) {
   });
   if (!meRes.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const me = await meRes.json();
-  if (!me.authenticated) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!me.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const [profileRes, pointsRes] = await Promise.all([
-    fetch(`${process.env.OUTSYDE_BACKEND_URL}/api/users/${me.userId}`, {
+    fetch(`${process.env.OUTSYDE_BACKEND_URL}/api/users/${me.user?.id}`, {
       headers: { Authorization: `Bearer ${token}`, Cookie: cookie },
     }),
     fetch(`${process.env.OUTSYDE_BACKEND_URL}/api/points/balance`, {
