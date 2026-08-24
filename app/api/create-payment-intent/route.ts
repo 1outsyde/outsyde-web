@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
         customer_total_cents: String(amount),
         // Reporting only — Stripe's processing fee is billed to Outsyde's
         // platform balance on this charge type, not the vendor's.
-        estimated_stripe_fee_cents_charged_to_platform: String(
+        stripe_platform_fee_cents: String(
           Math.round(amount * 0.029 + 30)
         ),
         tax_calculation_id: taxCalculationId,
