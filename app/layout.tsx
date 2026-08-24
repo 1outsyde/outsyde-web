@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
+import Navbar from "@/components/Navbar";
 import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL("https://goutsyde.com"),
@@ -38,6 +39,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <Navbar />
         {children}
         <Analytics />
       </body>

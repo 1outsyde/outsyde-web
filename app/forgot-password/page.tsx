@@ -1,59 +1,38 @@
-// app/login/page.tsx
-// Generic sign-in page for any account type — /login
-//
-// Posts to /api/login (BFF -> outsyde-backend's
-// /api/auth/mobile/login), which forwards the session cookie the backend
-// sets. Reuses the exact same visual system as /business-signup (.bs-*
-// namespace, same --gold/--cream/--black tokens).
-
 "use client";
 
 import { useState } from "react";
 
-type SubmitState = "idle" | "submitting" | "error";
+type State = "idle" | "submitting" | "success" | "error";
 
-export default function BusinessLoginPage() {
-  const [identifier, setIdentifier] = useState("");
-  const [password, setPassword] = useState("");
-  const [submitState, setSubmitState] = useState<SubmitState>("idle");
-  const [submitError, setSubmitError] = useState("");
+export default function ForgotPasswordPage() {
+  const [email, setEmail] = useState("");
+  const [state, setState] = useState<State>("idle");
+  const [errorMsg, setErrorMsg] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSubmitError("");
-
-    if (!identifier.trim()) {
-      setSubmitError("Enter your email or username.");
+    setErrorMsg("");
+    if (!email.trim() || !email.includes("@")) {
+      setErrorMsg("Enter a valid email address.");
       return;
     }
-    if (!password) {
-      setSubmitError("Enter your password.");
-      return;
-    }
-
-    setSubmitState("submitting");
-
+    setState("submitting");
     try {
-      const res = await fetch("/api/login", {
+      const res = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier: identifier.trim(), password }),
+        body: JSON.stringify({ email: email.trim() }),
       });
-      const data = await res.json();
-
       if (!res.ok) {
-        setSubmitState("error");
-        setSubmitError(data.error || "Invalid email/username or password.");
+        const data = await res.json().catch(() => ({}));
+        setState("error");
+        setErrorMsg((data as { error?: string }).error || "Something went wrong. Please try again.");
         return;
       }
-
-      // Redirect to the ?return= param if present (e.g. /subscription),
-      // otherwise fall back to home.
-      const params = new URLSearchParams(window.location.search);
-      window.location.href = params.get("return") || "/";
+      setState("success");
     } catch {
-      setSubmitState("error");
-      setSubmitError("Couldn\u2019t reach the server. Please try again.");
+      setState("error");
+      setErrorMsg("Couldn’t reach the server. Please try again.");
     }
   }
 
@@ -100,14 +79,10 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
 .bs-submit:disabled{opacity:.55;cursor:not-allowed;}
 
 .bs-err{margin-top:14px;font-size:13px;color:#ff8080;line-height:1.5;}
+.bs-success{margin-top:14px;font-size:13px;color:#7ecf7e;line-height:1.6;background:rgba(126,207,126,.08);border:1px solid rgba(126,207,126,.2);border-radius:4px;padding:12px 14px;}
 
 .bs-back{display:inline-block;margin-top:32px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(245,240,230,.45);text-decoration:none;transition:color .2s;}
 .bs-back:hover{color:var(--gold);}
-.bs-forgot{display:block;text-align:right;margin-top:6px;margin-bottom:4px;font-size:11px;color:var(--gold);text-decoration:none;}
-.bs-forgot:hover{text-decoration:underline;}
-.bs-signup-link{display:block;margin-top:18px;font-size:12px;color:rgba(245,240,230,.5);}
-.bs-signup-link a{color:var(--gold);text-decoration:none;}
-.bs-signup-link a:hover{text-decoration:underline;}
 `,
         }}
       />
@@ -122,55 +97,44 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
             <span className="bs-word">Go OutsYde</span>
           </a>
 
-          <p className="bs-eyebrow">Sign in</p>
+          <p className="bs-eyebrow">Account Recovery</p>
           <h1 className="bs-h1">
-            Welcome <span>Back</span>
+            Forgot <span>Password</span>
           </h1>
-          <p className="bs-sub">Log in with the email or username and password from your account.</p>
+          <p className="bs-sub">Enter your email and we&rsquo;ll send you a reset link.</p>
 
           <div className="bs-card">
-            <form onSubmit={handleSubmit} noValidate>
-              <div className="bs-field">
-                <label htmlFor="bl-identifier">Email or username</label>
-                <input
-                  id="bl-identifier"
-                  type="text"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="you@business.com"
-                  autoComplete="username"
-                  required
-                />
+            {state === "success" ? (
+              <div className="bs-success" role="status">
+                Check your email for a reset link. It expires in 1 hour.
               </div>
-              <div className="bs-field">
-                <label htmlFor="bl-password">Password</label>
-                <input
-                  id="bl-password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Your password"
-                  autoComplete="current-password"
-                  required
-                />
-              </div>
+            ) : (
+              <form onSubmit={handleSubmit} noValidate>
+                <div className="bs-field">
+                  <label htmlFor="fp-email">Email address</label>
+                  <input
+                    id="fp-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@email.com"
+                    autoComplete="email"
+                    required
+                  />
+                </div>
 
-              <a href="/forgot-password" className="bs-forgot">Forgot password?</a>
+                {state === "error" && errorMsg && (
+                  <p className="bs-err" role="alert">{errorMsg}</p>
+                )}
 
-              {submitState === "error" && submitError && (
-                <p className="bs-err" role="alert">{submitError}</p>
-              )}
-
-              <button type="submit" className="bs-submit" disabled={submitState === "submitting"}>
-                {submitState === "submitting" ? "Logging in\u2026" : "Log In"}
-              </button>
-            </form>
-            <p className="bs-signup-link">
-              New here? <a href="/signup">Create an account</a>
-            </p>
+                <button type="submit" className="bs-submit" disabled={state === "submitting"}>
+                  {state === "submitting" ? "Sending…" : "Send Reset Link"}
+                </button>
+              </form>
+            )}
           </div>
 
-          <a href="/" className="bs-back">← Back to Home</a>
+          <a href="/login" className="bs-back">← Back to login</a>
         </div>
       </main>
     </>

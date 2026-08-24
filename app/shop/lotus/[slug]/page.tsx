@@ -211,7 +211,7 @@ export default function LotusProductPage() {
               <span className="ok">✓ Added to your cart</span>
               <div className="links">
                 <a href="/cart" className="view">View Cart</a>
-                <a href="/shop/lotus/checkout" className="checkout">Checkout</a>
+                <a href="/checkout" className="checkout">Checkout</a>
               </div>
             </div>
           )}

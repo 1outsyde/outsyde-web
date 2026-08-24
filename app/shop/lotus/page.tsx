@@ -576,7 +576,7 @@ html{scroll-behavior:smooth;}
                 <span>Subtotal</span>
                 <strong>${subtotal.toFixed(2)}</strong>
               </div>
-              <a href="/shop/lotus/checkout" className="cart-checkout">Checkout</a>
+              <a href="/checkout" className="cart-checkout">Checkout</a>
               <a href="/cart" className="cart-viewcart">View full cart</a>
             </div>
           )}
