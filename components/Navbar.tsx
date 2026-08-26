@@ -141,7 +141,7 @@ export default function Navbar() {
           <div className="on-links">
             {!user && (
               <>
-                <a href="/shop/lotus" className="on-link">Shop</a>
+                <a href="/shop" className="on-link">Shop</a>
                 <a href="/login" className="on-link-btn on-link-outline">Log In</a>
                 <a href="/signup" className="on-link-btn on-link-fill">Sign Up</a>
               </>
@@ -149,7 +149,7 @@ export default function Navbar() {
 
             {user && isConsumer && (
               <>
-                <a href="/shop/lotus" className="on-link">Shop</a>
+                <a href="/shop" className="on-link">Shop</a>
                 <a href="/account" className="on-link">My Activity</a>
                 <a href="/account/points" className="on-points">
                   {(user.loyaltyPoints ?? 0).toLocaleString()} pts
@@ -202,7 +202,7 @@ export default function Navbar() {
         <div className={`on-drawer${menuOpen ? " open" : ""}`} aria-hidden={!menuOpen}>
           {!user && (
             <>
-              <a href="/shop/lotus" onClick={() => setMenuOpen(false)}>Shop</a>
+              <a href="/shop" onClick={() => setMenuOpen(false)}>Shop</a>
               <a href="/login" onClick={() => setMenuOpen(false)}>Log In</a>
               <a href="/signup" onClick={() => setMenuOpen(false)}>Sign Up</a>
             </>
@@ -210,7 +210,7 @@ export default function Navbar() {
 
           {user && isConsumer && (
             <>
-              <a href="/shop/lotus" onClick={() => setMenuOpen(false)}>Shop</a>
+              <a href="/shop" onClick={() => setMenuOpen(false)}>Shop</a>
               <a href="/account" onClick={() => setMenuOpen(false)}>My Activity</a>
               <a href="/account/points" onClick={() => setMenuOpen(false)}>
                 Points ({(user.loyaltyPoints ?? 0).toLocaleString()})
