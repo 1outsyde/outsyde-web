@@ -7,6 +7,7 @@ import Link from "next/link";
 interface OrderItem { name: string; quantity: number; price: number; }
 interface Order {
   id: string | number;
+  orderNumber?: number;
   businessName?: string;
   items?: OrderItem[];
   total?: number;
@@ -173,7 +174,7 @@ export default function OrdersPage() {
             <div key={order.id} className="order-card">
               <div className="order-head">
                 <div>
-                  <div className="order-id">Order #{String(order.id).slice(0, 8).toUpperCase()}</div>
+                  <div className="order-id">Order {order.orderNumber != null ? `#${String(order.orderNumber).padStart(4, '0')}` : `#${String(order.id).slice(0, 8).toUpperCase()}`}</div>
                   <div className="order-vendor">{order.businessName || "Outsyde Shop"}</div>
                   <div className="order-date">{fmtDate(order.createdAt)}</div>
                 </div>

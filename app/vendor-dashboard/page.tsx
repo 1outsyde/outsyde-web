@@ -30,6 +30,7 @@ interface Stats {
 
 interface Order {
   id: string;
+  orderNumber?: number;
   status: string;
   totalAmount: number;
   createdAt: string;
@@ -397,7 +398,7 @@ export default function VendorDashboardPage() {
                       <tbody>
                         {orders.slice(0, 5).map((o) => (
                           <tr key={o.id}>
-                            <td className="id-cell">#{o.id.slice(-8).toUpperCase()}</td>
+                            <td className="id-cell">{o.orderNumber != null ? `#${String(o.orderNumber).padStart(4, '0')}` : `#${o.id.slice(-8).toUpperCase()}`}</td>
                             <td>{formatDate(o.createdAt)}</td>
                             <td className="amount">{formatCents(o.totalAmount ?? 0)}</td>
                             <td><span className={statusColor(o.status)}>{o.status}</span></td>
@@ -451,7 +452,7 @@ export default function VendorDashboardPage() {
                         </div>
 
                         <div className="order-meta">
-                          #{o.id.slice(-8).toUpperCase()} · {formatDate(o.createdAt)}
+                          {o.orderNumber != null ? `#${String(o.orderNumber).padStart(4, '0')}` : `#${o.id.slice(-8).toUpperCase()}`} · {formatDate(o.createdAt)}
                         </div>
 
                         {o.items && o.items.length > 0 && (

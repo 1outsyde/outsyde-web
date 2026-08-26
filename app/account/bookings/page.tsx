@@ -6,6 +6,7 @@ import Link from "next/link";
 
 interface Booking {
   id: string;
+  bookingNumber?: number;
   _type: "appointment";
   status?: string;
   appointmentDate?: string;
@@ -283,7 +284,7 @@ export default function BookingsPage() {
                     )}
                     <div className="detail-item">
                       <div className="detail-label">Booking ID</div>
-                      <div className="detail-value" style={{ fontSize: 11, opacity: 0.4 }}>{b.id.slice(0, 8).toUpperCase()}</div>
+                      <div className="detail-value" style={{ fontSize: 11, opacity: 0.4 }}>{b.bookingNumber != null ? `#A${String(b.bookingNumber).padStart(4, '0')}` : b.id.slice(0, 8).toUpperCase()}</div>
                     </div>
                   </div>
                 )}
