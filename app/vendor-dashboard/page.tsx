@@ -89,6 +89,15 @@ function approvalBadge(status: string) {
   return { label: status, cls: "approval-pending" };
 }
 
+function safeParseAddress(raw: string | null | undefined) {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+
 export default function VendorDashboardPage() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("overview");
@@ -469,19 +478,12 @@ export default function VendorDashboardPage() {
                         <div className="order-total">Total: {formatCents(o.totalAmount ?? 0)}</div>
 
                         <div className="order-address">
-                          {o.shippingAddress
-                            ? (() => {
-                                try {
-                                  const a = typeof o.shippingAddress === "string"
-                                    ? JSON.parse(o.shippingAddress)
-                                    : o.shippingAddress;
-                                  return `${a.line1}, ${a.city}, ${a.state} ${a.zipCode}`;
-                                } catch {
-                                  return o.shippingAddress as string;
-                                }
-                              })()
-                            : <span style={{ color: "#444" }}>No shipping address on file</span>
-                          }
+                          {(() => {
+                            const a = safeParseAddress(o.shippingAddress);
+                            if (!a) return <span style={{ color: "#444" }}>No shipping address on file</span>;
+                            if (typeof a === "object") return `${a.line1}, ${a.city}, ${a.state} ${a.zipCode}`;
+                            return a;
+                          })()}
                         </div>
 
                         {(o.status === "paid" || o.status === "pending") && (
