@@ -1,14 +1,11 @@
 // app/shop/page.tsx
 // OutsYde Marketplace — the multi-vendor hub.
 // Shows all vendor storefronts as cards; each "Enter Store" links into that vendor.
-// Coming soon cards link to /shop/coming-soon/[slug] with email capture.
+// Pure front-end. Built to look full with 2 vendors and scale to many.
 //
 // Vendor card images expected in /public:
 //   lifestyle-ritual.jpg (Lotus), dialux-hero-clean.jpg (Dia Lux), royal-elite-card.jpg (Royal Elite),
 //   omega-card.jpg (Omega Lifestyle)
-//
-// Coming soon logos expected in /public:
-//   xo-beauty-lashes.png (XO Beauty & Lashes)
 
 "use client";
 
@@ -22,14 +19,6 @@ type Vendor = {
   category: string;
   href: string;
   image: string;
-};
-
-type ComingSoonVendor = {
-  id: string;
-  name: string;
-  category: string;
-  logo: string;
-  href: string;
 };
 
 const VENDORS: Vendor[] = [
@@ -64,16 +53,6 @@ const VENDORS: Vendor[] = [
     category: "Fitness & Lifestyle",
     href: "/shop/omega",
     image: "/omega-card.jpg",
-  },
-];
-
-const COMING_SOON: ComingSoonVendor[] = [
-  {
-    id: "xo-beauty",
-    name: "XO Beauty & Lashes",
-    category: "Beauty & Lashes",
-    logo: "/xo-beauty-lashes.png",
-    href: "/shop/coming-soon/xo-beauty",
   },
 ];
 
@@ -137,100 +116,7 @@ export default function Marketplace() {
 .mkt-enter{display:inline-flex;align-items:center;gap:9px;background:var(--mk-gold);color:#000;padding:12px 24px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;transition:background .2s,gap .2s;}
 .mkt-card:hover .mkt-enter{gap:14px;}
 
-/* coming soon section */
-.mkt-cs-section{margin-top:72px;}
-.mkt-cs-label{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--mk-muted);text-align:center;margin-bottom:40px;}
-.mkt-cs-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:30px;}
-
-/* coming soon card */
-.mkt-cs-card{
-  position:relative;
-  border:1px dashed rgba(245,240,230,.18);
-  border-radius:6px;
-  overflow:hidden;
-  min-height:300px;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  background:linear-gradient(160deg,#0d0d0d,#111111);
-  transition:transform .3s,border-color .3s;
-  cursor:pointer;
-  text-decoration:none;
-  color:inherit;
-}
-.mkt-cs-card:hover{transform:translateY(-4px);border-color:rgba(232,185,48,.3);}
-
-/* noise/grain overlay for locked feel */
-.mkt-cs-card::before{
-  content:'';
-  position:absolute;
-  inset:0;
-  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
-  background-size:200px 200px;
-  pointer-events:none;
-  z-index:0;
-}
-
-.mkt-cs-inner{
-  position:relative;
-  z-index:1;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:20px;
-  padding:40px 32px;
-  text-align:center;
-}
-
-/* logo container — desaturated + locked */
-.mkt-cs-logo-wrap{
-  width:160px;
-  height:160px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  border-radius:50%;
-  background:rgba(255,255,255,.04);
-  border:1px solid rgba(245,240,230,.1);
-  padding:16px;
-  filter:grayscale(1) brightness(0.7);
-  transition:filter .35s;
-}
-.mkt-cs-card:hover .mkt-cs-logo-wrap{filter:grayscale(0.6) brightness(0.85);}
-.mkt-cs-logo-wrap img{width:100%;height:100%;object-fit:contain;}
-
-.mkt-cs-cat{font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:rgba(245,240,230,.4);border:1px solid rgba(245,240,230,.12);padding:3px 10px;border-radius:2px;}
-
-.mkt-cs-name{font-family:'Cormorant Garamond',Georgia,serif;font-size:1.55rem;font-weight:500;color:rgba(245,240,230,.65);line-height:1.1;}
-
-/* badge */
-.mkt-cs-badge{
-  display:inline-flex;
-  align-items:center;
-  gap:7px;
-  background:rgba(232,185,48,.08);
-  border:1px solid rgba(232,185,48,.22);
-  color:rgba(232,185,48,.75);
-  font-size:9.5px;
-  letter-spacing:.18em;
-  text-transform:uppercase;
-  padding:5px 14px;
-  border-radius:20px;
-}
-.mkt-cs-badge-dot{width:5px;height:5px;border-radius:50%;background:rgba(232,185,48,.6);animation:mkt-pulse 2s ease-in-out infinite;}
-@keyframes mkt-pulse{0%,100%{opacity:.4;transform:scale(1);}50%{opacity:1;transform:scale(1.3);}}
-
-.mkt-cs-cta{
-  font-size:10.5px;
-  letter-spacing:.14em;
-  text-transform:uppercase;
-  color:rgba(245,240,230,.35);
-  transition:color .2s;
-}
-.mkt-cs-card:hover .mkt-cs-cta{color:rgba(232,185,48,.75);}
-
-/* partner / coming-soon card — invites new vendors */
+/* coming soon / partner card */
 .mkt-card.soon{display:flex;align-items:center;justify-content:center;text-align:center;background:linear-gradient(160deg,#0c1c18,#060e0c);border-style:dashed;min-height:440px;}
 .mkt-soon-inner{padding:32px;}
 .mkt-soon-inner h3{font-family:var(--mk-display);font-size:26px;letter-spacing:.06em;color:var(--mk-cream);margin-bottom:10px;}
@@ -243,7 +129,6 @@ export default function Marketplace() {
 
 @media (max-width:860px){
   .mkt-grid{grid-template-columns:1fr;}
-  .mkt-cs-grid{grid-template-columns:1fr;}
   .mkt-nav{padding:14px 22px;}
   .mkt-wrap{padding:48px 22px 72px;}
 }
@@ -294,36 +179,13 @@ export default function Marketplace() {
               </a>
             ))}
 
-            {/* partner / coming-soon card — invites new vendors */}
+            {/* partner / coming-soon card — invites new vendors, keeps the grid full */}
             <div className="mkt-card soon">
               <div className="mkt-soon-inner">
                 <h3>Your Brand Here</h3>
                 <p>More local brands are joining OutsYde. Want to sell with us?</p>
                 <a href="/business-inquiry" className="mkt-soon-cta">Partner With Us →</a>
               </div>
-            </div>
-          </div>
-
-          {/* coming soon section */}
-          <div className="mkt-cs-section">
-            <p className="mkt-cs-label">Coming Soon</p>
-            <div className="mkt-cs-grid">
-              {COMING_SOON.map((v) => (
-                <a key={v.id} href={v.href} className="mkt-cs-card">
-                  <div className="mkt-cs-inner">
-                    <div className="mkt-cs-logo-wrap">
-                      <img src={v.logo} alt={v.name} />
-                    </div>
-                    <span className="mkt-cs-cat">{v.category}</span>
-                    <span className="mkt-cs-name">{v.name}</span>
-                    <div className="mkt-cs-badge">
-                      <span className="mkt-cs-badge-dot" />
-                      Coming Soon
-                    </div>
-                    <span className="mkt-cs-cta">Get early access →</span>
-                  </div>
-                </a>
-              ))}
             </div>
           </div>
         </main>
