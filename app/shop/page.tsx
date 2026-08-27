@@ -162,16 +162,17 @@ export default function Marketplace() {
   display:flex;
   align-items:center;
   justify-content:center;
-  padding:40px;
 }
 .mkt-cs-bg img{
-  width:70%;
-  max-width:280px;
-  object-fit:contain;
-  filter:grayscale(1) brightness(0.22);
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  object-position:center;
+  filter:grayscale(1) brightness(0.18);
+  mix-blend-mode:luminosity;
   transition:filter .5s;
 }
-.mkt-cs-card:hover .mkt-cs-bg img{filter:grayscale(0.7) brightness(0.35);}
+.mkt-cs-card:hover .mkt-cs-bg img{filter:grayscale(0.65) brightness(0.32);}
 
 /* gradient veil same as live cards */
 .mkt-cs-veil{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.96) 0%,rgba(0,0,0,.5) 55%,rgba(0,0,0,.2) 100%);}
