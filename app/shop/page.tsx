@@ -1,11 +1,14 @@
 // app/shop/page.tsx
 // OutsYde Marketplace — the multi-vendor hub.
 // Shows all vendor storefronts as cards; each "Enter Store" links into that vendor.
-// Pure front-end. Built to look full with 2 vendors and scale to many.
+// Coming soon cards link to /shop/coming-soon/[slug] with email capture.
 //
 // Vendor card images expected in /public:
 //   lifestyle-ritual.jpg (Lotus), dialux-hero-clean.jpg (Dia Lux), royal-elite-card.jpg (Royal Elite),
 //   omega-card.jpg (Omega Lifestyle)
+//
+// Coming soon logos expected in /public:
+//   xo-beauty-lashes.png (XO Beauty & Lashes)
 
 "use client";
 
@@ -19,6 +22,14 @@ type Vendor = {
   category: string;
   href: string;
   image: string;
+};
+
+type ComingSoonVendor = {
+  id: string;
+  name: string;
+  category: string;
+  logo: string;
+  href: string;
 };
 
 const VENDORS: Vendor[] = [
@@ -53,6 +64,23 @@ const VENDORS: Vendor[] = [
     category: "Fitness & Lifestyle",
     href: "/shop/omega",
     image: "/omega-card.jpg",
+  },
+];
+
+const COMING_SOON: ComingSoonVendor[] = [
+  {
+    id: "xo-beauty",
+    name: "XO Beauty & Lashes",
+    category: "Beauty & Lashes",
+    logo: "/xo-beauty-lashes.png",
+    href: "/shop/coming-soon/xo-beauty",
+  },
+  {
+    id: "braids-with-love",
+    name: "Braids With Love",
+    category: "Hair & Braiding",
+    logo: "/braids-with-love.png",
+    href: "/shop/coming-soon/braids-with-love",
   },
 ];
 
@@ -116,7 +144,88 @@ export default function Marketplace() {
 .mkt-enter{display:inline-flex;align-items:center;gap:9px;background:var(--mk-gold);color:#000;padding:12px 24px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;transition:background .2s,gap .2s;}
 .mkt-card:hover .mkt-enter{gap:14px;}
 
-/* coming soon / partner card */
+/* coming soon card — lives IN the main grid, same size as vendor cards */
+.mkt-cs-card{
+  position:relative;
+  border:1px dashed rgba(245,240,230,.15);
+  border-radius:6px;
+  overflow:hidden;
+  min-height:440px;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-end;
+  background:#080808;
+  transition:transform .3s,border-color .3s;
+  cursor:pointer;
+  text-decoration:none;
+  color:inherit;
+}
+.mkt-cs-card:hover{transform:translateY(-4px);border-color:rgba(232,185,48,.28);}
+
+/* full-bleed logo as background, heavily dimmed */
+.mkt-cs-bg{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.mkt-cs-bg img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  object-position:center;
+  filter:grayscale(1) brightness(0.18);
+  mix-blend-mode:luminosity;
+  transition:filter .5s;
+}
+.mkt-cs-card:hover .mkt-cs-bg img{filter:grayscale(0.65) brightness(0.32);}
+
+/* gradient veil same as live cards */
+.mkt-cs-veil{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.96) 0%,rgba(0,0,0,.5) 55%,rgba(0,0,0,.2) 100%);}
+
+/* body sits at the bottom like live cards */
+.mkt-cs-body{position:relative;z-index:2;padding:34px 32px;}
+
+.mkt-cs-cat{display:inline-block;font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:rgba(232,185,48,.55);border:1px solid rgba(232,185,48,.2);padding:4px 11px;border-radius:2px;margin-bottom:16px;}
+
+.mkt-cs-name{font-family:'Cormorant Garamond',Georgia,serif;font-size:2.1rem;font-weight:500;color:rgba(245,240,230,.6);line-height:1.05;margin-bottom:14px;}
+
+/* badge */
+.mkt-cs-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  background:rgba(232,185,48,.07);
+  border:1px solid rgba(232,185,48,.18);
+  color:rgba(232,185,48,.65);
+  font-size:9.5px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  padding:6px 14px;
+  border-radius:20px;
+  margin-bottom:20px;
+}
+.mkt-cs-badge-dot{width:5px;height:5px;border-radius:50%;background:rgba(232,185,48,.6);animation:mkt-pulse 2s ease-in-out infinite;}
+@keyframes mkt-pulse{0%,100%{opacity:.4;transform:scale(1);}50%{opacity:1;transform:scale(1.3);}}
+
+.mkt-cs-cta{
+  display:inline-flex;
+  align-items:center;
+  gap:9px;
+  border:1px solid rgba(245,240,230,.2);
+  color:rgba(245,240,230,.45);
+  padding:11px 22px;
+  border-radius:3px;
+  font-size:10.5px;
+  font-weight:600;
+  letter-spacing:.13em;
+  text-transform:uppercase;
+  transition:border-color .2s,color .2s,gap .2s;
+}
+.mkt-cs-card:hover .mkt-cs-cta{border-color:rgba(232,185,48,.4);color:rgba(232,185,48,.8);gap:13px;}
+
+/* partner / coming-soon card — invites new vendors */
 .mkt-card.soon{display:flex;align-items:center;justify-content:center;text-align:center;background:linear-gradient(160deg,#0c1c18,#060e0c);border-style:dashed;min-height:440px;}
 .mkt-soon-inner{padding:32px;}
 .mkt-soon-inner h3{font-family:var(--mk-display);font-size:26px;letter-spacing:.06em;color:var(--mk-cream);margin-bottom:10px;}
@@ -179,7 +288,26 @@ export default function Marketplace() {
               </a>
             ))}
 
-            {/* partner / coming-soon card — invites new vendors, keeps the grid full */}
+            {/* coming soon cards — same grid, right after live vendors */}
+            {COMING_SOON.map((v) => (
+              <a key={v.id} href={v.href} className="mkt-cs-card">
+                <div className="mkt-cs-bg">
+                  <img src={v.logo} alt={v.name} />
+                </div>
+                <div className="mkt-cs-veil" />
+                <div className="mkt-cs-body">
+                  <span className="mkt-cs-cat">{v.category}</span>
+                  <h2 className="mkt-cs-name">{v.name}</h2>
+                  <div className="mkt-cs-badge">
+                    <span className="mkt-cs-badge-dot" />
+                    Coming Soon
+                  </div>
+                  <span className="mkt-cs-cta">Get early access →</span>
+                </div>
+              </a>
+            ))}
+
+            {/* partner card — always last */}
             <div className="mkt-card soon">
               <div className="mkt-soon-inner">
                 <h3>Your Brand Here</h3>
