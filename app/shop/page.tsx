@@ -75,6 +75,13 @@ const COMING_SOON: ComingSoonVendor[] = [
     logo: "/xo-beauty-lashes.png",
     href: "/shop/coming-soon/xo-beauty",
   },
+  {
+    id: "braids-with-love",
+    name: "Braids With Love",
+    category: "Hair & Braiding",
+    logo: "/braids-with-love.png",
+    href: "/shop/coming-soon/braids-with-love",
+  },
 ];
 
 export default function Marketplace() {
