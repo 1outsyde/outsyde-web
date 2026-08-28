@@ -1,14 +1,23 @@
 // app/api/waitlist/route.ts
-// Stores coming-soon email signups.
-// Sends a confirmation to the subscriber + an admin notification via Resend.
-// Extend with a DB insert (Neon/Prisma) to persist signups long-term.
+// Vendor coming-soon waitlist signups.
+// 1. Persists the signup to outsyde-backend (best-effort).
+// 2. Sends a branded confirmation to the subscriber.
+// 3. Sends an admin notification to info@goutsyde.com.
+//
+// IMPORTANT: `from` must use the Resend-verified domain (info.goutsyde.com).
+// Using any unverified address (e.g. hello@goutsyde.com) causes Resend to
+// silently reject the send — this was the root cause of emails not arriving.
+//
+// Required env vars: RESEND_API_KEY, OUTSYDE_BACKEND_URL
 
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 
+const FROM_ADDRESS = "OutsYde <orders@info.goutsyde.com>";
+const ADMIN_EMAIL = "info@goutsyde.com";
+
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Map vendor slugs to display names for the email
 const VENDOR_NAMES: Record<string, string> = {
   "xo-beauty": "XO Beauty & Lashes",
   "braids-with-love": "Braids With Love",
@@ -22,20 +31,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid email" }, { status: 400 });
     }
 
-    const vendorName = VENDOR_NAMES[vendor] ?? vendor;
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanVendor = typeof vendor === "string" ? vendor.trim() : "";
+    const vendorName = VENDOR_NAMES[cleanVendor] ?? cleanVendor;
 
-    // ── Optional: persist to DB ──────────────────────────────────────────────
-    // import { db } from "@/lib/db";
-    // await db.insert(waitlistTable).values({ email, vendor, createdAt: new Date() })
-    //   .onConflictDoNothing();
-    // ────────────────────────────────────────────────────────────────────────
+    // ── Persist to outsyde-backend (best-effort, non-blocking) ───────────────
+    const backendUrl = process.env.OUTSYDE_BACKEND_URL;
+    if (backendUrl) {
+      fetch(`${backendUrl}/waitlist-signups`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: cleanEmail, vendor: cleanVendor }),
+      }).catch((err) => console.error("[waitlist] DB persist failed:", err));
+    } else {
+      console.warn("[waitlist] OUTSYDE_BACKEND_URL not set — signup not persisted");
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
-    // Send emails in parallel, non-blocking
-    await Promise.allSettled([
+    // Send emails in parallel, log individual failures without aborting
+    const [confirmResult, adminResult] = await Promise.allSettled([
       // Confirmation to subscriber
       resend.emails.send({
-        from: "OutsYde <hello@goutsyde.com>",
-        to: email,
+        from: FROM_ADDRESS,
+        to: cleanEmail,
         subject: `You're on the list — ${vendorName} is coming to OutsYde`,
         html: `
           <div style="background:#000;color:#F5F0E6;font-family:system-ui,sans-serif;padding:48px 32px;max-width:520px;margin:0 auto;">
@@ -55,16 +73,23 @@ export async function POST(req: NextRequest) {
 
       // Admin notification
       resend.emails.send({
-        from: "OutsYde Waitlist <hello@goutsyde.com>",
-        to: "hello@goutsyde.com",
+        from: FROM_ADDRESS,
+        to: ADMIN_EMAIL,
         subject: `New waitlist signup — ${vendorName}`,
         html: `
-          <p><strong>Vendor:</strong> ${vendorName} (${vendor})</p>
-          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Vendor:</strong> ${vendorName} (${cleanVendor})</p>
+          <p><strong>Email:</strong> ${cleanEmail}</p>
           <p><strong>Time:</strong> ${new Date().toISOString()}</p>
         `,
       }),
     ]);
+
+    if (confirmResult.status === "rejected") {
+      console.error("[waitlist] subscriber confirmation failed:", confirmResult.reason);
+    }
+    if (adminResult.status === "rejected") {
+      console.error("[waitlist] admin notification failed:", adminResult.reason);
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {

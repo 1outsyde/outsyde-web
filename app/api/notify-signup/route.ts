@@ -1,4 +1,9 @@
 // app/api/notify-signup/route.ts
+// Handles the MAIN Outsyde branded coming-soon page (/coming-soon).
+// Uses lib/emails.ts which sends from the Resend-verified domain (info.goutsyde.com).
+//
+// Vendor-specific coming-soon pages (XO Beauty, Braids With Love, etc.) use
+// /api/waitlist instead — do NOT route vendor pages here.
 import { NextResponse } from "next/server";
 import { sendNotifySignupAlert, sendNotifySignupConfirmation } from "@/lib/emails";
 
