@@ -25,6 +25,7 @@ interface PhotographerProfile {
 
 interface Booking {
   id: string;
+  bookingNumber?: number | null;
   status: string;
   date: string;
   time: string;
@@ -59,6 +60,7 @@ export default function PhotographerDashboardPage() {
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [totalEarnedCents, setTotalEarnedCents] = useState<number | null>(null);
 
   async function handleBookingAction(bookingId: string, action: "accept" | "decline") {
     setActionLoading(`${bookingId}-${action}`);
@@ -69,6 +71,9 @@ export default function PhotographerDashboardPage() {
         if (refreshed.ok) {
           const data = await refreshed.json();
           setBookings(data.bookings ?? []);
+          if (typeof data.totalEarnedCents === "number") {
+            setTotalEarnedCents(data.totalEarnedCents);
+          }
         }
       } else {
         alert(`Could not ${action} booking. Please try again.`);
@@ -118,6 +123,9 @@ export default function PhotographerDashboardPage() {
         if (res.ok) {
           const data = await res.json();
           setBookings(data.bookings ?? []);
+          if (typeof data.totalEarnedCents === "number") {
+            setTotalEarnedCents(data.totalEarnedCents);
+          }
         }
       } catch {
         // non-blocking
@@ -243,6 +251,13 @@ export default function PhotographerDashboardPage() {
           </div>
 
           <div className="stat-grid">
+            {totalEarnedCents !== null && (
+              <div className="stat-card">
+                <div className="stat-label">Earnings</div>
+                <div className="stat-value">${(totalEarnedCents / 100).toFixed(2)}</div>
+                <div className="stat-sub">Total paid out</div>
+              </div>
+            )}
             <div className="stat-card">
               <div className="stat-label">Bookings</div>
               <div className="stat-value">{confirmedBookings.length}</div>
@@ -376,13 +391,16 @@ export default function PhotographerDashboardPage() {
                 <table>
                   <thead>
                     <tr>
-                      <th>Customer</th><th>Date</th><th>Time</th><th>Service</th>
+                      <th>Booking #</th><th>Customer</th><th>Date</th><th>Time</th><th>Service</th>
                       <th>Subtotal</th><th>Fee</th><th>You earn</th><th>Status</th><th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {bookings.map((b) => (
                       <tr key={b.id}>
+                        <td style={{ color: "#555", fontFamily: "monospace", fontSize: 12 }}>
+                          {b.bookingNumber != null ? `#S${String(b.bookingNumber).padStart(4, "0")}` : "—"}
+                        </td>
                         <td style={{ color: "#f5f0e8" }}>{b.customerName}</td>
                         <td>{b.date}</td>
                         <td>{b.time}</td>
