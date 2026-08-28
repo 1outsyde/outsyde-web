@@ -25,6 +25,7 @@ interface PhotographerProfile {
 
 interface Booking {
   id: string;
+  bookingNumber?: number | null;
   status: string;
   date: string;
   time: string;
@@ -58,6 +59,31 @@ export default function PhotographerDashboardPage() {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [error, setError] = useState("");
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [totalEarnedCents, setTotalEarnedCents] = useState<number | null>(null);
+
+  async function handleBookingAction(bookingId: string, action: "accept" | "decline") {
+    setActionLoading(`${bookingId}-${action}`);
+    try {
+      const res = await fetch(`/api/photographer/me/bookings/${bookingId}/${action}`, { method: "POST" });
+      if (res.ok) {
+        const refreshed = await fetch("/api/photographer/me/bookings");
+        if (refreshed.ok) {
+          const data = await refreshed.json();
+          setBookings(data.bookings ?? []);
+          if (typeof data.totalEarnedCents === "number") {
+            setTotalEarnedCents(data.totalEarnedCents);
+          }
+        }
+      } else {
+        alert(`Could not ${action} booking. Please try again.`);
+      }
+    } catch {
+      alert("Could not reach the server. Please try again.");
+    } finally {
+      setActionLoading(null);
+    }
+  }
 
   useEffect(() => {
     (async () => {
@@ -97,6 +123,9 @@ export default function PhotographerDashboardPage() {
         if (res.ok) {
           const data = await res.json();
           setBookings(data.bookings ?? []);
+          if (typeof data.totalEarnedCents === "number") {
+            setTotalEarnedCents(data.totalEarnedCents);
+          }
         }
       } catch {
         // non-blocking
@@ -134,22 +163,12 @@ export default function PhotographerDashboardPage() {
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: #0a0a0a; }
         .page { min-height: 100vh; background: #0a0a0a; font-family: 'Hanken Grotesk', sans-serif; color: #f5f0e8; }
-        .topnav {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 0 24px; height: 56px; border-bottom: 1px solid #1e1e1e;
-          background: #0d0d0d; position: sticky; top: 0; z-index: 10;
-        }
-        .nav-logo { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 0.12em; color: #c9a84c; text-decoration: none; }
-        .nav-right { display: flex; align-items: center; gap: 16px; }
-        .nav-name { font-size: 13px; color: #888; }
-        .nav-link { font-size: 12px; color: #555; text-decoration: none; letter-spacing: 0.04em; transition: color 0.15s; }
-        .nav-link:hover { color: #c9a84c; }
-        .nav-edit { font-size: 12px; font-weight: 600; font-family: inherit; letter-spacing: 0.05em; padding: 6px 14px; border-radius: 5px; border: 1px solid #2a2a2a; background: transparent; color: #888; cursor: pointer; transition: all 0.15s; text-decoration: none; }
-        .nav-edit:hover { border-color: #555; color: #ccc; }
-        .nav-payouts { font-size: 12px; font-weight: 600; font-family: inherit; letter-spacing: 0.05em; padding: 6px 14px; border-radius: 5px; border: 1px solid #1a4a1a; background: transparent; color: #27ae60; cursor: pointer; transition: all 0.15s; }
-        .nav-payouts:hover { border-color: #27ae60; background: #0d2b0d; }
-        .stripe-banner { background: #0d1a10; border-bottom: 1px solid #1a3a1a; padding: 12px 24px; font-size: 13px; color: #27ae60; display: flex; align-items: center; gap: 8px; }
-        .stripe-warn { background: #1a1200; border-bottom: 1px solid #3a2800; padding: 12px 24px; font-size: 13px; color: #c9a84c; display: flex; align-items: center; gap: 8px; }
+        .action-btn { font-size: 11px; font-weight: 600; font-family: inherit; padding: 4px 10px; border-radius: 5px; cursor: pointer; border: 1px solid; transition: all 0.15s; }
+        .action-btn:disabled { opacity: 0.4; cursor: default; }
+        .action-accept { color: #27ae60; border-color: #1a4a1a; background: transparent; }
+        .action-accept:not(:disabled):hover { background: #0d2b0d; }
+        .action-decline { color: #c0392b; border-color: #4a1a1a; background: transparent; }
+        .action-decline:not(:disabled):hover { background: #2b0d0d; }
         .main { max-width: 960px; margin: 0 auto; padding: 32px 24px 80px; }
         .profile-header { display: flex; align-items: flex-start; gap: 20px; margin-bottom: 32px; }
         .avatar {
@@ -201,42 +220,10 @@ export default function PhotographerDashboardPage() {
           .main { padding: 20px 16px 60px; }
           .profile-header { flex-direction: column; gap: 12px; }
           .stat-grid { grid-template-columns: 1fr 1fr; }
-          .topnav { padding: 0 16px; }
         }
       `}</style>
 
       <div className="page">
-        {!profile.stripeConnected && (
-          <div className="stripe-warn">
-            ⚠️ Your profile is not yet publicly bookable — connect Stripe to start accepting payments.
-          </div>
-        )}
-
-        <nav className="topnav">
-          <Link href="/" className="nav-logo">OUTSYDE</Link>
-          <div className="nav-right">
-            <span className="nav-name">{profile.displayName}</span>
-            {profile.stripeConnected && (
-              <button className="nav-payouts" onClick={async () => {
-                try {
-                  const res = await fetch("/api/photographer/me/stripe-dashboard-link");
-                  const data = await res.json();
-                  if (data.url) window.open(data.url, "_blank", "noopener,noreferrer");
-                  else alert("Could not open Stripe dashboard. Please try again.");
-                } catch {
-                  alert("Could not reach the server. Please try again.");
-                }
-              }}>Manage Payouts</button>
-            )}
-            <Link href="/photographer-onboarding" className="nav-edit">Edit Profile</Link>
-            <Link href="/api/auth/logout" className="nav-link" onClick={async (e) => {
-              e.preventDefault();
-              await fetch("/api/auth/logout", { method: "POST" });
-              window.location.href = "/";
-            }}>Log Out</Link>
-          </div>
-        </nav>
-
         <div className="main">
           <div className="profile-header">
             <div className="avatar">
@@ -264,6 +251,13 @@ export default function PhotographerDashboardPage() {
           </div>
 
           <div className="stat-grid">
+            {totalEarnedCents !== null && (
+              <div className="stat-card">
+                <div className="stat-label">Earnings</div>
+                <div className="stat-value">${(totalEarnedCents / 100).toFixed(2)}</div>
+                <div className="stat-sub">Total paid out</div>
+              </div>
+            )}
             <div className="stat-card">
               <div className="stat-label">Bookings</div>
               <div className="stat-value">{confirmedBookings.length}</div>
@@ -397,13 +391,16 @@ export default function PhotographerDashboardPage() {
                 <table>
                   <thead>
                     <tr>
-                      <th>Customer</th><th>Date</th><th>Time</th><th>Service</th>
-                      <th>Subtotal</th><th>Fee</th><th>You earn</th><th>Status</th>
+                      <th>Booking #</th><th>Customer</th><th>Date</th><th>Time</th><th>Service</th>
+                      <th>Subtotal</th><th>Fee</th><th>You earn</th><th>Status</th><th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {bookings.map((b) => (
                       <tr key={b.id}>
+                        <td style={{ color: "#555", fontFamily: "monospace", fontSize: 12 }}>
+                          {b.bookingNumber != null ? `#S${String(b.bookingNumber).padStart(4, "0")}` : "—"}
+                        </td>
                         <td style={{ color: "#f5f0e8" }}>{b.customerName}</td>
                         <td>{b.date}</td>
                         <td>{b.time}</td>
@@ -412,6 +409,26 @@ export default function PhotographerDashboardPage() {
                         <td style={{ color: "#c0392b" }}>-${b.bookingFeeAmount?.toFixed(2)}</td>
                         <td style={{ color: "#27ae60", fontWeight: 600 }}>${b.vendorNetAmount?.toFixed(2)}</td>
                         <td><span className={statusColor(b.status)}>{b.status}</span></td>
+                        <td>
+                          {b.status === "pending_provider" && (
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button
+                                className="action-btn action-accept"
+                                disabled={actionLoading !== null}
+                                onClick={() => handleBookingAction(b.id, "accept")}
+                              >
+                                {actionLoading === `${b.id}-accept` ? "…" : "Accept"}
+                              </button>
+                              <button
+                                className="action-btn action-decline"
+                                disabled={actionLoading !== null}
+                                onClick={() => handleBookingAction(b.id, "decline")}
+                              >
+                                {actionLoading === `${b.id}-decline` ? "…" : "Decline"}
+                              </button>
+                            </div>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
