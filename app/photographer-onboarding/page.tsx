@@ -112,7 +112,7 @@ export default function PhotographerOnboardingPage() {
         if (!meRes.ok) { router.push("/login"); return; }
         const meData = await meRes.json();
         if (!meData.authenticated) { router.push("/login"); return; }
-        if (!meData.isPhotographer && !meData.photographerId) { router.push("/"); return; }
+        if (meData.user?.role !== "photographer" && !meData.user?.photographerId) { router.push("/"); return; }
 
         const profileRes = await fetch("/api/photographer/me");
         if (profileRes.ok) {

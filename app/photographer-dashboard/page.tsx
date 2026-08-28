@@ -67,7 +67,7 @@ export default function PhotographerDashboardPage() {
         if (!meRes.ok) { router.push("/login"); return; }
         const meData = await meRes.json();
         if (!meData.authenticated) { router.push("/login"); return; }
-        if (!meData.isPhotographer && !meData.photographerId) { router.push("/"); return; }
+        if (meData.user?.role !== "photographer" && !meData.user?.photographerId) { router.push("/"); return; }
 
         // Check profile completeness against actual fields
         const profileRes = await fetch("/api/photographer/me");
@@ -146,6 +146,8 @@ export default function PhotographerDashboardPage() {
         .nav-link:hover { color: #c9a84c; }
         .nav-edit { font-size: 12px; font-weight: 600; font-family: inherit; letter-spacing: 0.05em; padding: 6px 14px; border-radius: 5px; border: 1px solid #2a2a2a; background: transparent; color: #888; cursor: pointer; transition: all 0.15s; text-decoration: none; }
         .nav-edit:hover { border-color: #555; color: #ccc; }
+        .nav-payouts { font-size: 12px; font-weight: 600; font-family: inherit; letter-spacing: 0.05em; padding: 6px 14px; border-radius: 5px; border: 1px solid #1a4a1a; background: transparent; color: #27ae60; cursor: pointer; transition: all 0.15s; }
+        .nav-payouts:hover { border-color: #27ae60; background: #0d2b0d; }
         .stripe-banner { background: #0d1a10; border-bottom: 1px solid #1a3a1a; padding: 12px 24px; font-size: 13px; color: #27ae60; display: flex; align-items: center; gap: 8px; }
         .stripe-warn { background: #1a1200; border-bottom: 1px solid #3a2800; padding: 12px 24px; font-size: 13px; color: #c9a84c; display: flex; align-items: center; gap: 8px; }
         .main { max-width: 960px; margin: 0 auto; padding: 32px 24px 80px; }
@@ -214,6 +216,18 @@ export default function PhotographerDashboardPage() {
           <Link href="/" className="nav-logo">OUTSYDE</Link>
           <div className="nav-right">
             <span className="nav-name">{profile.displayName}</span>
+            {profile.stripeConnected && (
+              <button className="nav-payouts" onClick={async () => {
+                try {
+                  const res = await fetch("/api/photographer/me/stripe-dashboard-link");
+                  const data = await res.json();
+                  if (data.url) window.open(data.url, "_blank", "noopener,noreferrer");
+                  else alert("Could not open Stripe dashboard. Please try again.");
+                } catch {
+                  alert("Could not reach the server. Please try again.");
+                }
+              }}>Manage Payouts</button>
+            )}
             <Link href="/photographer-onboarding" className="nav-edit">Edit Profile</Link>
             <Link href="/api/auth/logout" className="nav-link" onClick={async (e) => {
               e.preventDefault();
