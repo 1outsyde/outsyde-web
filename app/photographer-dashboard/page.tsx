@@ -77,7 +77,7 @@ export default function PhotographerDashboardPage() {
         const meRes = await fetch("/api/auth/me");
         if (meRes.status === 401) { router.push("/login"); return; }
         const meData = await meRes.json();
-        if (meData.role !== "photographer") { router.push("/"); return; }
+        if (!meData.isPhotographer && !meData.photographerId) { router.push("/"); return; }
 
         const profileRes = await fetch("/api/photographer/me");
         if (!profileRes.ok) { router.push("/photographer-onboarding"); return; }
