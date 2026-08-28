@@ -118,8 +118,7 @@ function validateStep(step: number, form: FormData): FieldErrors {
     if (!form.hourlyRate) errors.hourlyRate = "Hourly rate is required";
     else if (isNaN(Number(form.hourlyRate)) || Number(form.hourlyRate) < 1)
       errors.hourlyRate = "Enter a valid rate (minimum $1)";
-    if (!form.portfolioUrl.trim()) errors.portfolioUrl = "Portfolio URL is required";
-    else if (!/^https?:\/\/.+/.test(form.portfolioUrl.trim()))
+    if (form.portfolioUrl.trim() && !/^https?:\/\/.+/.test(form.portfolioUrl.trim()))
       errors.portfolioUrl = "Enter a valid URL starting with http:// or https://";
   }
 
