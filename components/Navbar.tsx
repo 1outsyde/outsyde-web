@@ -9,6 +9,7 @@ interface MeUser {
   role?: string;
   businessId?: string | null;
   photographerId?: string | null;
+  isPhotographer?: boolean;
   loyaltyPoints?: number;
   profileImageUrl?: string | null;
 }
@@ -40,7 +41,7 @@ export default function Navbar() {
   const user = auth !== "loading" && auth !== false ? auth : null;
   const role = user?.role ?? null;
   const isVendor = role === "vendor" || !!(user?.businessId);
-  const isPhotographer = role === "photographer" || !!(user?.photographerId);
+  const isPhotographer = role === "photographer" || !!(user?.isPhotographer) || !!(user?.photographerId);
   const isAdmin = role === "admin";
   const isConsumer = !isVendor && !isPhotographer && !isAdmin;
 
@@ -168,6 +169,7 @@ export default function Navbar() {
 
             {user && isPhotographer && !isVendor && (
               <>
+                <a href="/account" className="on-link">My Profile</a>
                 <a href="/photographer-dashboard" className="on-link">Dashboard</a>
                 <button onClick={handleLogout} className="on-link">Log Out</button>
               </>
@@ -229,6 +231,7 @@ export default function Navbar() {
 
           {user && isPhotographer && !isVendor && (
             <>
+              <a href="/account" onClick={() => setMenuOpen(false)}>My Profile</a>
               <a href="/photographer-dashboard" onClick={() => setMenuOpen(false)}>Dashboard</a>
               <button onClick={handleLogout}>Log Out</button>
             </>
