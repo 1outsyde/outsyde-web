@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-interface OrderItem { name: string; quantity: number; price: number; }
+interface OrderItem { name: string; quantity: number; price: number; variantLabel?: string | null; }
 interface Order {
   id: string | number;
   orderNumber?: number;
@@ -190,6 +190,7 @@ export default function OrdersPage() {
                       <li key={i} className="item-row">
                         <span>
                           <span className="item-name">{item.name}</span>
+                          {item.variantLabel ? <span className="item-variant" style={{ color: "rgba(245,240,230,0.45)", fontSize: "12px", marginLeft: "4px" }}>({item.variantLabel})</span> : null}
                           <span className="item-qty">× {item.quantity}</span>
                         </span>
                         <span className="item-price">{fmt(item.price)}</span>

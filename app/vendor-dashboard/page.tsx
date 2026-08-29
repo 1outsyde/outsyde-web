@@ -35,7 +35,7 @@ interface Order {
   totalAmount: number;
   createdAt: string;
   customerName?: string;
-  items?: { name: string; quantity: number; priceCents?: number }[];
+  items?: { name: string; quantity: number; priceCents?: number; variantLabel?: string | null }[];
   shippingAddress?: string | null;
 }
 
@@ -469,6 +469,7 @@ export default function VendorDashboardPage() {
                             {o.items.map((item, idx) => (
                               <li key={idx}>
                                 {item.quantity}× {item.name}
+                                {item.variantLabel ? ` (${item.variantLabel})` : ""}
                                 {item.priceCents != null ? ` — ${formatCents(item.priceCents)}` : ""}
                               </li>
                             ))}
