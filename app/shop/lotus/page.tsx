@@ -1,35 +1,12 @@
 // app/shop/lotus/page.tsx
 // Lotus House Blends — vendor storefront page.
+// Server component: fetches live products from the backend, passes to client for cart/filter.
 
-"use client";
+import { getLotusProducts } from '@/lib/outsyde-products';
+import LotusShopClient from './LotusShopClient';
 
-import { useEffect, useState } from "react";
-import { addToCart, getCart, setQty, removeFromCart, subscribe, type CartItem } from "@/lib/cart";
-
-type Filter = "all" | "morning" | "midday" | "night" | "tea" | "herbs";
-
-export default function LotusHouseBlends() {
-  const [active, setActive] = useState<Filter>("all");
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  useEffect(() => {
-    setCart(getCart());
-    return subscribe(() => setCart(getCart()));
-  }, []);
-  const count = cart.reduce((n, i) => n + i.qty, 0);
-  const subtotal = cart.reduce((s, i) => s + (i.priceCents / 100) * i.qty, 0);
-  const addItem = (p: { id: string; name: string; priceCents: number; image: string }) => {
-    addToCart({ ...p, vendor: "Lotus House Blends", vendorId: "8523e3c5-fc07-461b-9452-087d2b4aada6", isExternalProduct: true });
-    setDrawerOpen(true);
-  };
-
-  const groupHidden = (blend: string) =>
-    (["morning", "midday", "night"] as Filter[]).includes(active) && active !== (blend as Filter);
-
-  const cardDisplay = (type: string) =>
-    (["tea", "herbs"] as Filter[]).includes(active) && active !== (type as Filter)
-      ? "none"
-      : "block";
+export default async function LotusHouseBlends() {
+  const products = await getLotusProducts();
 
   return (
     <>
@@ -212,13 +189,6 @@ html{scroll-behavior:smooth;}
       />
 
       <div className="lhb-root">
-        {/* Cart opener — shown inline since the cart drawer is page-specific */}
-        <div style={{ display: "flex", justifyContent: "flex-end", padding: "0.75rem 2.5rem" }}>
-          <button className="cart-btn" onClick={() => setDrawerOpen(true)} aria-label="Open cart">
-            Cart{count > 0 && <span className="cart-count">{count}</span>}
-          </button>
-        </div>
-
         <div className="page">
           {/* HERO */}
           <section className="hero">
@@ -303,165 +273,8 @@ html{scroll-behavior:smooth;}
               </div>
             </div>
 
-            {/* FILTER TABS */}
-            <div className="filter-row">
-              {([
-                ["all", "All Blends"],
-                ["morning", "Rise & Bloom — Morning"],
-                ["midday", "Heart Flow — Midday"],
-                ["night", "Dream Temple — Night"],
-                ["tea", "Tea Boxes"],
-                ["herbs", "Loose Herbs"],
-              ] as [Filter, string][]).map(([key, label]) => (
-                <button
-                  key={key}
-                  className={`ftab${active === key ? " active" : ""}`}
-                  onClick={() => setActive(key)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {/* DREAM TEMPLE — NIGHT */}
-            <div className={`blend-group${groupHidden("night") ? " hidden" : ""}`}>
-              <div className="blend-group-hdr">
-                <span className="time-badge badge-night">Night Blend</span>
-                <h3 className="blend-group-title">Dream Temple</h3>
-                <span className="blend-group-sub">Ease into rest · Calm the nervous system</span>
-              </div>
-              <div className="product-grid">
-                <a href="/shop/lotus/dream-temple-loose-herbs" className="pcard" style={{ display: cardDisplay("herbs") }}>
-                  <div className="pcard-img">
-                    <img src="/dream-temple-loose-herbs.jpg" alt="Dream Temple Loose Herbs" />
-                    <span className="ptype-tag">Loose Herbs</span>
-                  </div>
-                  <div className="pcard-body">
-                    <div className="pcard-name">Dream Temple Loose-Herbs</div>
-                    <div className="pcard-desc">Loose herbal blend. Eases stress and tension, promotes deep sleep, calms inflammation from stress.</div>
-                    <div className="pcard-footer">
-                      <div>
-                        <span className="pcard-price">$18.75</span>
-                        <span className="pcard-bundle">Bundle: 3 for $35</span>
-                      </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "dt-herbs", name: "Dream Temple Loose-Herbs", priceCents: 1875, image: "/dream-temple-loose-herbs.jpg" }); }}>+</button>
-                    </div>
-                  </div>
-                </a>
-
-                <a href="/shop/lotus/dream-temple-tea-box" className="pcard" style={{ display: cardDisplay("tea") }}>
-                  <div className="pcard-img">
-                    <img src="/dream-temple-tea-box.jpg" alt="Dream Temple Tea Box" />
-                    <span className="ptype-tag">Tea Box</span>
-                  </div>
-                  <div className="pcard-body">
-                    <div className="pcard-name">Dream Temple Tea Box</div>
-                    <div className="pcard-desc">5 tea bags. Promotes deep sleep, supports dream clarity, relaxes the nervous system, calms inflammation.</div>
-                    <div className="pcard-footer">
-                      <div>
-                        <span className="pcard-price">$12.50</span>
-                        <span className="pcard-bundle">Bundle: 3 for $25</span>
-                      </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "dt-tea", name: "Dream Temple Tea Box", priceCents: 1250, image: "/dream-temple-tea-box.jpg" }); }}>+</button>
-                    </div>
-                  </div>
-                </a>
-              </div>
-            </div>
-
-            {/* HEART FLOW — MIDDAY */}
-            <div className={`blend-group${groupHidden("midday") ? " hidden" : ""}`}>
-              <div className="blend-group-hdr">
-                <span className="time-badge badge-midday">Midday Blend</span>
-                <h3 className="blend-group-title">Heart Flow</h3>
-                <span className="blend-group-sub">Stay balanced &amp; grounded · Supports digestion</span>
-              </div>
-              <div className="product-grid">
-                <a href="/shop/lotus/heart-flow-loose-herbs" className="pcard" style={{ display: cardDisplay("herbs") }}>
-                  <div className="pcard-img">
-                    <img src="/heart-flow-loose-herbs.jpg" alt="Heart Flow Loose Herbs" />
-                    <span className="ptype-tag">Loose Herbs</span>
-                  </div>
-                  <div className="pcard-body">
-                    <div className="pcard-name">Heart Flow Loose-Herbs</div>
-                    <div className="pcard-desc">Balances mood, calms the nervous system, reduces hormonal inflammation, supports digestion and emotional clarity.</div>
-                    <div className="pcard-footer">
-                      <div>
-                        <span className="pcard-price">$18.75</span>
-                        <span className="pcard-bundle">Bundle: 3 for $35</span>
-                      </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "hf-herbs", name: "Heart Flow Loose-Herbs", priceCents: 1875, image: "/heart-flow-loose-herbs.jpg" }); }}>+</button>
-                    </div>
-                  </div>
-                </a>
-
-                <a href="/shop/lotus/heart-flow-tea-box" className="pcard" style={{ display: cardDisplay("tea") }}>
-                  <div className="pcard-img">
-                    <img src="/heart-flow-tea-box.jpg" alt="Heart Flow Tea Box" />
-                    <span className="ptype-tag">Tea Box</span>
-                  </div>
-                  <div className="pcard-body">
-                    <div className="pcard-name">Heart Flow Tea Box</div>
-                    <div className="pcard-desc">5 tea bags. Keeps you balanced and grounded through midday. Promotes emotional clarity and supports digestion.</div>
-                    <div className="pcard-footer">
-                      <div>
-                        <span className="pcard-price">$12.50</span>
-                        <span className="pcard-bundle">Bundle: 3 for $25</span>
-                      </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "hf-tea", name: "Heart Flow Tea Box", priceCents: 1250, image: "/heart-flow-tea-box.jpg" }); }}>+</button>
-                    </div>
-                  </div>
-                </a>
-
-              </div>
-            </div>
-
-            {/* RISE & BLOOM — MORNING */}
-            <div className={`blend-group${groupHidden("morning") ? " hidden" : ""}`}>
-              <div className="blend-group-hdr">
-                <span className="time-badge badge-morning">Morning Blend</span>
-                <h3 className="blend-group-title">Rise &amp; Bloom</h3>
-                <span className="blend-group-sub">Clear the mind · Get the day moving</span>
-              </div>
-              <div className="product-grid">
-                <a href="/shop/lotus/rise-bloom-loose-herbs" className="pcard" style={{ display: cardDisplay("herbs") }}>
-                  <div className="pcard-img">
-                    <img src="/rise-bloom-loose-herbs.jpg" alt="Rise & Bloom Loose Herbs" />
-                    <span className="ptype-tag">Loose Herbs</span>
-                  </div>
-                  <div className="pcard-body">
-                    <div className="pcard-name">Rise &amp; Bloom Loose-Herbs</div>
-                    <div className="pcard-desc">Clears brain fog, reduces inflammation, opens the lungs, supports focus and clarity. Gently boosts energy.</div>
-                    <div className="pcard-footer">
-                      <div>
-                        <span className="pcard-price">$18.75</span>
-                        <span className="pcard-bundle">Bundle: 3 for $35</span>
-                      </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "rb-herbs", name: "Rise & Bloom Loose-Herbs", priceCents: 1875, image: "/rise-bloom-loose-herbs.jpg" }); }}>+</button>
-                    </div>
-                  </div>
-                </a>
-
-                <a href="/shop/lotus/rise-bloom-tea-box" className="pcard" style={{ display: cardDisplay("tea") }}>
-                  <div className="pcard-img">
-                    <img src="/rise-bloom-tea-box.jpg" alt="Rise & Bloom Tea Box" />
-                    <span className="ptype-tag">Tea Box</span>
-                  </div>
-                  <div className="pcard-body">
-                    <div className="pcard-name">Rise &amp; Bloom Tea Box</div>
-                    <div className="pcard-desc">5 tea bags. Clears brain fog, reduces inflammation, opens the lungs, supports focus and gently boosts energy.</div>
-                    <div className="pcard-footer">
-                      <div>
-                        <span className="pcard-price">$12.50</span>
-                        <span className="pcard-bundle">Bundle: 3 for $25</span>
-                      </div>
-                      <button className="pcard-add" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ id: "rb-tea", name: "Rise & Bloom Tea Box", priceCents: 1250, image: "/rise-bloom-tea-box.jpg" }); }}>+</button>
-                    </div>
-                  </div>
-                </a>
-
-              </div>
-            </div>
+            {/* Filter tabs + product grid — client component handles interactivity */}
+            <LotusShopClient initialProducts={products} />
           </section>
 
           {/* RITUAL STEPS */}
@@ -526,50 +339,6 @@ html{scroll-behavior:smooth;}
             <a href="/">← Back to all vendors</a>
           </div>
         </div>
-
-        {/* CART DRAWER */}
-        <div className={`cart-overlay${drawerOpen ? " open" : ""}`} onClick={() => setDrawerOpen(false)} />
-        <aside className={`cart-drawer${drawerOpen ? " open" : ""}`} aria-hidden={!drawerOpen}>
-          <div className="cart-drawer-hdr">
-            <h3>Your Cart</h3>
-            <button className="cart-close" onClick={() => setDrawerOpen(false)} aria-label="Close cart">×</button>
-          </div>
-          <div className="cart-items">
-            {cart.length === 0 ? (
-              <p className="cart-empty">Your cart is empty.</p>
-            ) : (
-              <>
-                <div className="cart-vendor-label">Lotus House Blends</div>
-                {cart.map((i) => (
-                  <div className="cart-line" key={i.id}>
-                    {i.image && <img className="cart-line-img" src={i.image} alt={i.name} />}
-                    <div className="cart-line-info">
-                      <div className="cart-line-name">{i.name}</div>
-                      <div className="cart-line-price">${(i.priceCents / 100).toFixed(2)}</div>
-                      <div className="cart-qty">
-                        <button onClick={() => setQty(i.id, i.qty - 1)} aria-label="Decrease">−</button>
-                        <span>{i.qty}</span>
-                        <button onClick={() => setQty(i.id, i.qty + 1)} aria-label="Increase">+</button>
-                        <button className="cart-remove" onClick={() => removeFromCart(i.id)}>Remove</button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
-          {cart.length > 0 && (
-            <div className="cart-foot">
-              <div className="cart-subtotal">
-                <span>Subtotal</span>
-                <strong>${subtotal.toFixed(2)}</strong>
-              </div>
-              <a href="/checkout" className="cart-checkout">Checkout</a>
-              <a href="/cart" className="cart-viewcart">View full cart</a>
-            </div>
-          )}
-        </aside>
-
       </div>
     </>
   );
