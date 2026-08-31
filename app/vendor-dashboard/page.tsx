@@ -209,6 +209,21 @@ export default function VendorDashboardPage() {
     }
   }
 
+  async function handleManagePayouts() {
+    try {
+      const res = await fetch("/api/vendor/stripe-dashboard-link");
+      if (res.ok) {
+        const { url } = await res.json();
+        if (url) { window.open(url, "_blank"); }
+        else { alert("Could not open Stripe dashboard. Make sure Stripe is connected."); }
+      } else {
+        alert("Could not open Stripe dashboard. Make sure Stripe is connected.");
+      }
+    } catch {
+      alert("Network error. Please try again.");
+    }
+  }
+
   if (loadingProfile) {
     return (
       <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -324,27 +339,35 @@ export default function VendorDashboardPage() {
         )}
 
         <div className="main">
-          <div className="profile-header">
-            {business.logoImage ? (
-              <img src={business.logoImage} alt={business.name} className="biz-avatar" />
-            ) : (
-              <div className="biz-avatar">{business.name.charAt(0)}</div>
-            )}
-            <div className="biz-info">
-              <div className="biz-name">{business.name}</div>
-              <div className="biz-meta">
-                {business.category}
-                {business.city && business.state ? ` · ${business.city}, ${business.state}` : ""}
-              </div>
-              <div className="biz-badges">
-                <span className={badge.cls}>{badge.label}</span>
-                {business.reviewCount ? (
-                  <span style={{ fontSize: 12, color: "#666" }}>
-                    ⭐ {business.rating ? business.rating.toFixed(1) : "—"} ({business.reviewCount} reviews)
-                  </span>
-                ) : null}
+          <div className="profile-header" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              {business.logoImage ? (
+                <img src={business.logoImage} alt={business.name} className="biz-avatar" />
+              ) : (
+                <div className="biz-avatar">{business.name.charAt(0)}</div>
+              )}
+              <div className="biz-info">
+                <div className="biz-name">{business.name}</div>
+                <div className="biz-meta">
+                  {business.category}
+                  {business.city && business.state ? ` · ${business.city}, ${business.state}` : ""}
+                </div>
+                <div className="biz-badges">
+                  <span className={badge.cls}>{badge.label}</span>
+                  {business.reviewCount ? (
+                    <span style={{ fontSize: 12, color: "#666" }}>
+                      ⭐ {business.rating ? business.rating.toFixed(1) : "—"} ({business.reviewCount} reviews)
+                    </span>
+                  ) : null}
+                </div>
               </div>
             </div>
+            <button
+              onClick={handleManagePayouts}
+              style={{ padding: "9px 18px", background: "#1a3c34", color: "#c9a84c", border: "1px solid #2a4a3e", borderRadius: 6, fontSize: 13, fontFamily: "Hanken Grotesk, sans-serif", fontWeight: 500, cursor: "pointer", letterSpacing: "0.02em", whiteSpace: "nowrap" }}
+            >
+              Manage Payouts
+            </button>
           </div>
 
           <div className="stat-grid">
