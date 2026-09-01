@@ -580,7 +580,11 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
                         const v = e.target.value.toLowerCase();
                         setUsername(v);
                         if (usernameAvailability !== "idle") setUsernameAvailability("idle");
-                        if (usernameError) setUsernameError("");
+                        if (/[^a-z0-9_]/.test(v)) {
+                          setUsernameError("Only letters, numbers, and underscores allowed.");
+                        } else if (usernameError) {
+                          setUsernameError("");
+                        }
                       }}
                       onBlur={handleUsernameBlur}
                       placeholder="e.g. jane_smith"
@@ -604,7 +608,7 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
                       <span className="bs-field-hint ok">✓ Username available</span>
                     )}
                     {!usernameError && usernameAvailability === "idle" && (
-                      <span className="bs-hint">Lowercase letters, numbers, underscores only &middot; 3&ndash;20 characters</span>
+                      <span className="bs-hint">Only letters, numbers, and underscores allowed. 3&ndash;20 characters.</span>
                     )}
                   </div>
 
