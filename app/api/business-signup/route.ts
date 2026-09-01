@@ -165,6 +165,8 @@ export async function POST(req: Request) {
     // Signup form requires the vendor terms/subscription checkbox before this
     // route is ever called — always true by the time we get here.
     acceptedSubscription: true,
+    vendorAgreementAccepted: true,
+    vendorAgreementAcceptedAt: new Date().toISOString(),
   };
 
   let signupRes: Response;
