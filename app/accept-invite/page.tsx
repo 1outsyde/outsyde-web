@@ -72,12 +72,12 @@ function AcceptInviteInner() {
   type UsernameAvailability = "idle" | "checking" | "available" | "taken";
   const [usernameAvailability, setUsernameAvailability] = useState<UsernameAvailability>("idle");
 
-  const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+  const USERNAME_RE = /^[a-z0-9_.]{3,20}$/;
 
   function validateUsernameFormat(value: string): string {
     if (!value.trim()) return "Username is required.";
     if (!USERNAME_RE.test(value.trim())) {
-      return "3\u201320 characters: lowercase letters, numbers, or underscores only.";
+      return "3\u201320 characters: lowercase letters, numbers, underscores, or periods only.";
     }
     return "";
   }
