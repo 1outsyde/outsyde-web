@@ -182,17 +182,18 @@ export default function PointsPage() {
               <div className="balance-right">
                 <div className="dollar-eyebrow">Redeemable Value</div>
                 <div className="dollar-val">${dollarVal.toFixed(2)}</div>
-                <div className="dollar-sub">2,500 points = $5 off your next order</div>
+                <div className="dollar-sub">Points are added automatically with every purchase.</div>
               </div>
             </div>
 
             <div className="info-row">
-              <div className="info-pill"><span>★</span> Earn points on every purchase</div>
-              <div className="info-pill"><span>🎯</span> Redeem at checkout</div>
-              <div className="info-pill"><span>📷</span> Bonus points on shoot bookings</div>
+              <div className="info-pill"><span>★</span> Points are added automatically with every purchase. The more you shop, the more you save.</div>
+            </div>
+            <div className="info-row" style={{ marginTop: -24 }}>
+              <div className="info-pill"><span>🎯</span> Points accumulate with every transaction across all Outsyde-powered stores. Redeem them at checkout for a discount on your next purchase.</div>
             </div>
 
-            <div className="section-title">Redemption Tiers</div>
+            <div className="section-title">Redeem Your Points</div>
             <div className="tiers-grid">
               {([
                 { pts: 2500,  dollars: 5   },
@@ -217,6 +218,7 @@ export default function PointsPage() {
                 );
               })}
             </div>
+            <div style={{ fontSize: "12px", color: "rgba(245,240,230,0.3)", marginTop: -28, marginBottom: 36 }}>Points are applied at checkout.</div>
 
             <div className="section-title">Transaction History</div>
 
