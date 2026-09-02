@@ -98,6 +98,19 @@ export default function PointsPage() {
 
     .section-title { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 0.08em; margin-bottom: 16px; color: rgba(245,240,230,0.7); }
 
+    .tiers-grid { display: flex; flex-direction: column; gap: 6px; margin-bottom: 36px; }
+    .tier-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; border-radius: 8px;
+      background: rgba(245,240,230,0.03); border: 1px solid rgba(245,240,230,0.06);
+    }
+    .tier-row.unlocked { border-color: rgba(76,211,123,0.25); background: rgba(76,211,123,0.05); }
+    .tier-pts { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 0.04em; color: #F5F0E6; }
+    .tier-val { font-size: 13px; color: rgba(245,240,230,0.45); margin-left: 10px; }
+    .tier-status { font-size: 12px; font-weight: 600; }
+    .tier-status.available { color: #4CD37B; }
+    .tier-status.locked { color: rgba(245,240,230,0.3); }
+
     .tx-list { display: flex; flex-direction: column; gap: 2px; }
     .tx-row {
       display: flex; align-items: center; justify-content: space-between;
@@ -169,7 +182,7 @@ export default function PointsPage() {
               <div className="balance-right">
                 <div className="dollar-eyebrow">Redeemable Value</div>
                 <div className="dollar-val">${dollarVal.toFixed(2)}</div>
-                <div className="dollar-sub">100 points = $1.00</div>
+                <div className="dollar-sub">2,500 points = $5 off your next order</div>
               </div>
             </div>
 
@@ -177,6 +190,32 @@ export default function PointsPage() {
               <div className="info-pill"><span>★</span> Earn points on every purchase</div>
               <div className="info-pill"><span>🎯</span> Redeem at checkout</div>
               <div className="info-pill"><span>📷</span> Bonus points on shoot bookings</div>
+            </div>
+
+            <div className="section-title">Redemption Tiers</div>
+            <div className="tiers-grid">
+              {([
+                { pts: 2500,  dollars: 5   },
+                { pts: 5000,  dollars: 10  },
+                { pts: 12500, dollars: 25  },
+                { pts: 25000, dollars: 50  },
+                { pts: 50000, dollars: 100 },
+              ] as { pts: number; dollars: number }[]).map((tier) => {
+                const unlocked = pts >= tier.pts;
+                const needed = tier.pts - pts;
+                return (
+                  <div key={tier.pts} className={`tier-row${unlocked ? " unlocked" : ""}`}>
+                    <div style={{ display: "flex", alignItems: "baseline" }}>
+                      <span className="tier-pts">{tier.pts.toLocaleString()} pts</span>
+                      <span className="tier-val">= ${tier.dollars} off</span>
+                    </div>
+                    {unlocked
+                      ? <span className="tier-status available">✓ Available</span>
+                      : <span className="tier-status locked">{needed.toLocaleString()} more needed</span>
+                    }
+                  </div>
+                );
+              })}
             </div>
 
             <div className="section-title">Transaction History</div>
