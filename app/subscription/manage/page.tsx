@@ -135,7 +135,7 @@ function ManageContent() {
         if (tiersRes.ok && Array.isArray(tiersData.tiers)) {
           const currentTierName = sub?.tierName ?? null;
           const sorted = [...tiersData.tiers]
-            .filter(t => t.name !== 'grandfathered' || t.name === currentTierName)
+            .filter(t => t.name !== 'grandfathered' || t.name === currentTierName || t.id === tierParam)
             .sort((a, b) => a.sortOrder - b.sortOrder);
           // Validate the ?tier= param against real tier IDs from the backend.
           // If it doesn't match anything, fall back to the current subscription tier.
@@ -295,7 +295,7 @@ function ManageContent() {
                   <button
                     key={tier.id}
                     type="button"
-                    onClick={() => { if (tier.name !== 'grandfathered' || isCurrent) setSelected(tier.id) }}
+                    onClick={() => { if (tier.name !== 'grandfathered' || isCurrent || tier.id === searchParams.get('tier')) setSelected(tier.id) }}
                     className={`relative w-full rounded-2xl border p-5 text-left transition
                       ${isSelected ? (TIER_BORDER_SELECTED[tierKey] ?? "border-zinc-500") : "border-zinc-800"}
                       bg-zinc-900 hover:border-zinc-600`}
