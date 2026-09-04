@@ -82,6 +82,8 @@ export default function BraidsWithLoveComingSoon() {
   text-align:center;
   border-bottom:1px solid var(--bwl-line);
 }
+
+/* logo ring wrapper — only holds the spinning conic ring */
 .bwl-logo-wrap {
   width:180px;
   height:180px;
@@ -91,7 +93,10 @@ export default function BraidsWithLoveComingSoon() {
   justify-content:center;
   margin-bottom:32px;
   position:relative;
+  flex-shrink:0;
 }
+
+/* spinning decorative ring */
 .bwl-logo-wrap::before {
   content:'';
   position:absolute;
@@ -99,9 +104,34 @@ export default function BraidsWithLoveComingSoon() {
   border-radius:50%;
   background:conic-gradient(from 0deg, transparent 50%, rgba(43,191,191,.3) 75%, var(--bwl-gold) 85%, rgba(43,191,191,.3) 90%, transparent 100%);
   animation:bwl-spin 10s linear infinite;
+  z-index:0;
 }
 @keyframes bwl-spin { to { transform:rotate(360deg); } }
-.bwl-logo-wrap img { width:100%; height:100%; object-fit:contain; border-radius:50%; position:relative; z-index:1; }
+
+/* inner circle — clips the image perfectly and sits above the ring */
+.bwl-logo-inner {
+  position:relative;
+  z-index:1;
+  width:100%;
+  height:100%;
+  border-radius:50%;
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:var(--bwl-black);
+}
+
+/* image fills the circle; object-position centres the artwork
+   even if the PNG canvas has uneven transparent padding */
+.bwl-logo-inner img {
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  object-position:center center;
+  display:block;
+  border-radius:50%;
+}
 
 .bwl-eyebrow { font-size:10px; letter-spacing:.3em; text-transform:uppercase; color:var(--bwl-teal); margin-bottom:12px; }
 .bwl-brand-name {
@@ -246,7 +276,12 @@ export default function BraidsWithLoveComingSoon() {
         {/* hero */}
         <header className="bwl-hero">
           <div className="bwl-logo-wrap">
-            <img src="/braids-with-love.png" alt="Braids With Love" />
+            {/* Inner circle clips the image to the circle boundary,
+                ensuring the logo stays perfectly centered regardless
+                of any transparent padding in the PNG asset. */}
+            <div className="bwl-logo-inner">
+              <img src="/braids-with-love.png" alt="Braids With Love" />
+            </div>
           </div>
           <p className="bwl-eyebrow">Coming to OutsYde</p>
           <h1 className="bwl-brand-name">Braids With Love</h1>
