@@ -257,7 +257,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
       {/* ══ AUDIENCE TRIPTYCH ══ */}
       <div id="triptych" aria-label="Who is OutsYde for">
         <div className="tri-panel panel-biz">
-          <div className="tri-bg" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&q=75')" }} aria-hidden="true" />
+          <div className="tri-bg" style={{ backgroundImage: "url('/outsyde-biz.jpg')", backgroundPosition: "center top" }} aria-hidden="true" />
           <div className="tri-overlay" aria-hidden="true" />
           <span className="tri-num" aria-hidden="true">01</span>
           <div className="tri-panel-inner">
@@ -291,7 +291,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
         </div>
 
         <div className="tri-panel panel-photo">
-          <div className="tri-bg" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1554048612-b6a482bc67e5?w=800&q=75')" }} aria-hidden="true" />
+          <div className="tri-bg" style={{ backgroundImage: "url('/outsyde-photo.jpg')", backgroundPosition: "center top" }} aria-hidden="true" />
           <div className="tri-overlay" aria-hidden="true" />
           <span className="tri-num" aria-hidden="true">03</span>
           <div className="tri-panel-inner">
