@@ -83,11 +83,18 @@ export default function BraidsWithLoveComingSoon() {
   border-bottom:1px solid var(--bwl-line);
 }
 
-/* logo ring wrapper — only holds the spinning conic ring */
+/*
+  LOGO RING APPROACH:
+  - .bwl-logo-wrap is a transparent positioner only (no background, no clip)
+  - ::before is the spinning conic ring — kept very subtle so it doesn't
+    visually compete with the gold border baked into the PNG
+  - .bwl-logo-inner centers and clips the image
+  - The image uses object-fit:contain so the PNG's own gold border is
+    fully visible and not cropped
+*/
 .bwl-logo-wrap {
-  width:180px;
-  height:180px;
-  border-radius:50%;
+  width:196px;
+  height:196px;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -96,41 +103,49 @@ export default function BraidsWithLoveComingSoon() {
   flex-shrink:0;
 }
 
-/* spinning decorative ring */
+/* spinning ring — sits behind everything */
 .bwl-logo-wrap::before {
   content:'';
   position:absolute;
-  inset:-2px;
+  inset:0;
   border-radius:50%;
-  background:conic-gradient(from 0deg, transparent 50%, rgba(43,191,191,.3) 75%, var(--bwl-gold) 85%, rgba(43,191,191,.3) 90%, transparent 100%);
+  background:conic-gradient(
+    from 0deg,
+    transparent 40%,
+    rgba(43,191,191,.15) 60%,
+    rgba(232,185,48,.6) 75%,
+    rgba(43,191,191,.15) 85%,
+    transparent 100%
+  );
   animation:bwl-spin 10s linear infinite;
   z-index:0;
 }
 @keyframes bwl-spin { to { transform:rotate(360deg); } }
 
-/* inner circle — clips the image perfectly and sits above the ring */
+/* inner circle: 180px so there's an 8px gap between image edge
+   and the spinning ring — prevents the two gold rings from blurring together */
 .bwl-logo-inner {
   position:relative;
   z-index:1;
-  width:100%;
-  height:100%;
+  width:180px;
+  height:180px;
   border-radius:50%;
   overflow:hidden;
   display:flex;
   align-items:center;
   justify-content:center;
-  background:var(--bwl-black);
+  background:#000;
+  flex-shrink:0;
 }
 
-/* image fills the circle; object-position centres the artwork
-   even if the PNG canvas has uneven transparent padding */
+/* contain preserves the full PNG (including its baked-in gold border)
+   without any cropping; the image is mathematically centered by flex */
 .bwl-logo-inner img {
   width:100%;
   height:100%;
-  object-fit:cover;
+  object-fit:contain;
   object-position:center center;
   display:block;
-  border-radius:50%;
 }
 
 .bwl-eyebrow { font-size:10px; letter-spacing:.3em; text-transform:uppercase; color:var(--bwl-teal); margin-bottom:12px; }
@@ -276,9 +291,6 @@ export default function BraidsWithLoveComingSoon() {
         {/* hero */}
         <header className="bwl-hero">
           <div className="bwl-logo-wrap">
-            {/* Inner circle clips the image to the circle boundary,
-                ensuring the logo stays perfectly centered regardless
-                of any transparent padding in the PNG asset. */}
             <div className="bwl-logo-inner">
               <img src="/braids-with-love.png" alt="Braids With Love" />
             </div>
