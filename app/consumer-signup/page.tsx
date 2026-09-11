@@ -320,6 +320,7 @@ export default function ConsumerSignupPage() {
       selectedIndustries: form.selectedIndustries,
       industryNiches: {},
       industryValues: {},
+      source: 'outsyde-web',
     };
 
     try {
