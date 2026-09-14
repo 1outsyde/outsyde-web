@@ -4,11 +4,14 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+interface HoursDay { open: string; close: string; closed?: boolean; }
+
 interface Business {
   id: string;
   name: string;
   category: string;
   logoImage?: string;
+  coverImage?: string;
   approvalStatus: string;
   rating?: number;
   reviewCount?: number;
@@ -17,7 +20,53 @@ interface Business {
   city?: string;
   state?: string;
   description?: string;
+  tagline?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  websiteUrl?: string;
   subscriptionActive?: boolean;
+  showEmail?: boolean;
+  showPhone?: boolean;
+  showWebsite?: boolean;
+  showStoreHours?: boolean;
+  showAddress?: boolean;
+  responseTimeValue?: number;
+  responseTimeUnit?: string;
+  hoursOfOperation?: Record<string, HoursDay>;
+}
+
+const DAYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] as const;
+type Day = typeof DAYS[number];
+
+const DEFAULT_HOURS: Record<Day, HoursDay> = {
+  monday:    { open: '09:00', close: '17:00' },
+  tuesday:   { open: '09:00', close: '17:00' },
+  wednesday: { open: '09:00', close: '17:00' },
+  thursday:  { open: '09:00', close: '17:00' },
+  friday:    { open: '09:00', close: '17:00' },
+  saturday:  { open: '10:00', close: '15:00', closed: true },
+  sunday:    { open: '10:00', close: '15:00', closed: true },
+};
+
+interface StorefrontForm {
+  name: string;
+  tagline: string;
+  description: string;
+  contactEmail: string;
+  contactPhone: string;
+  websiteUrl: string;
+  city: string;
+  state: string;
+  logoImage: string;
+  coverImage: string;
+  showEmail: boolean;
+  showPhone: boolean;
+  showWebsite: boolean;
+  showStoreHours: boolean;
+  showAddress: boolean;
+  responseTimeValue: number;
+  responseTimeUnit: string;
+  hoursOfOperation: Record<Day, HoursDay>;
 }
 
 interface Stats {
@@ -53,7 +102,7 @@ interface Booking {
   vendorNetAmount: number;
 }
 
-type Tab = "overview" | "orders" | "bookings";
+type Tab = "overview" | "orders" | "bookings" | "storefront";
 
 function formatCents(cents: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
@@ -113,6 +162,13 @@ export default function VendorDashboardPage() {
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [error, setError] = useState("");
 
+  const [sfForm, setSfForm] = useState<StorefrontForm | null>(null);
+  const [sfSaving, setSfSaving] = useState(false);
+  const [sfError, setSfError] = useState("");
+  const [sfSuccess, setSfSuccess] = useState(false);
+  const [sfLogoUploading, setSfLogoUploading] = useState(false);
+  const [sfCoverUploading, setSfCoverUploading] = useState(false);
+
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
   const [shipFormOrderId, setShipFormOrderId] = useState<string | null>(null);
   const [shipTracking, setShipTracking] = useState("");
@@ -128,7 +184,35 @@ export default function VendorDashboardPage() {
         if (res.status === 401) { router.push("/login"); return; }
         if (res.status === 404) { router.push("/"); return; }
         const data = await res.json();
-        setBusiness(data.business);
+        const biz = data.business;
+        setBusiness(biz);
+        const hours: Record<Day, HoursDay> = { ...DEFAULT_HOURS };
+        if (biz.hoursOfOperation) {
+          for (const d of DAYS) {
+            const h = biz.hoursOfOperation[d];
+            if (h) hours[d] = { open: h.open ?? '09:00', close: h.close ?? '17:00', closed: h.closed ?? false };
+          }
+        }
+        setSfForm({
+          name: biz.name ?? '',
+          tagline: biz.tagline ?? '',
+          description: biz.description ?? '',
+          contactEmail: biz.contactEmail ?? '',
+          contactPhone: biz.contactPhone ?? '',
+          websiteUrl: biz.websiteUrl ?? '',
+          city: biz.city ?? '',
+          state: biz.state ?? '',
+          logoImage: biz.logoImage ?? '',
+          coverImage: biz.coverImage ?? '',
+          showEmail: biz.showEmail ?? true,
+          showPhone: biz.showPhone ?? true,
+          showWebsite: biz.showWebsite ?? true,
+          showStoreHours: biz.showStoreHours ?? true,
+          showAddress: biz.showAddress ?? true,
+          responseTimeValue: biz.responseTimeValue ?? 2,
+          responseTimeUnit: biz.responseTimeUnit ?? 'hours',
+          hoursOfOperation: hours,
+        });
       } catch {
         setError("Could not load your business profile.");
       } finally {
@@ -206,6 +290,65 @@ export default function VendorDashboardPage() {
       setActionErrors(e => ({ ...e, [orderId]: "Network error. Please try again." }));
     } finally {
       setActionLoading(l => ({ ...l, [orderId]: false }));
+    }
+  }
+
+  async function handleUploadImage(file: File, folder: string): Promise<string> {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('folder', folder);
+    const res = await fetch('/api/vendor-dashboard/upload-image', { method: 'POST', body: fd });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d.error ?? 'Upload failed');
+    }
+    const { url } = await res.json();
+    return url;
+  }
+
+  async function handleSaveStorefront() {
+    if (!sfForm) return;
+    setSfSaving(true);
+    setSfError('');
+    setSfSuccess(false);
+    try {
+      const res = await fetch('/api/vendor-dashboard/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: sfForm.name.trim(),
+          tagline: sfForm.tagline.trim(),
+          description: sfForm.description.trim(),
+          contactEmail: sfForm.contactEmail.trim(),
+          contactPhone: sfForm.contactPhone.trim(),
+          websiteUrl: sfForm.websiteUrl.trim(),
+          city: sfForm.city.trim(),
+          state: sfForm.state.trim(),
+          logoImage: sfForm.logoImage.trim() || null,
+          coverImage: sfForm.coverImage.trim() || null,
+          coverMediaType: sfForm.coverImage.trim() ? 'image' : null,
+          showEmail: sfForm.showEmail,
+          showPhone: sfForm.showPhone,
+          showWebsite: sfForm.showWebsite,
+          showStoreHours: sfForm.showStoreHours,
+          showAddress: sfForm.showAddress,
+          responseTimeValue: sfForm.responseTimeValue,
+          responseTimeUnit: sfForm.responseTimeUnit,
+          hoursOfOperation: sfForm.hoursOfOperation,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSfError(data.error ?? 'Failed to save. Please try again.');
+      } else {
+        setBusiness(prev => prev ? { ...prev, ...data.business } : prev);
+        setSfSuccess(true);
+        setTimeout(() => setSfSuccess(false), 3000);
+      }
+    } catch {
+      setSfError('Network error. Please try again.');
+    } finally {
+      setSfSaving(false);
     }
   }
 
@@ -323,11 +466,49 @@ export default function VendorDashboardPage() {
         .order-cancel-confirm { margin-top: 14px; padding: 14px 16px; background: #160808; border: 1px solid #4a1a1a; border-radius: 8px; }
         .order-cancel-confirm p { font-size: 13px; color: #c0392b; margin-bottom: 12px; }
         .order-action-error { font-size: 12px; color: #c0392b; margin-top: 8px; }
+        .sf-section { margin-bottom: 28px; }
+        .sf-section-title { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: #555; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid #1e1e1e; }
+        .sf-field { margin-bottom: 16px; }
+        .sf-label { display: block; font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #666; margin-bottom: 6px; }
+        .sf-input { width: 100%; padding: 9px 12px; background: #141414; border: 1px solid #2a2a2a; border-radius: 6px; color: #f5f0e8; font-size: 13px; font-family: inherit; outline: none; transition: border-color 0.15s; }
+        .sf-input:focus { border-color: #c9a84c; }
+        .sf-textarea { width: 100%; padding: 9px 12px; background: #141414; border: 1px solid #2a2a2a; border-radius: 6px; color: #f5f0e8; font-size: 13px; font-family: inherit; outline: none; resize: vertical; min-height: 90px; transition: border-color 0.15s; }
+        .sf-textarea:focus { border-color: #c9a84c; }
+        .sf-select { width: 100%; padding: 9px 12px; background: #141414; border: 1px solid #2a2a2a; border-radius: 6px; color: #f5f0e8; font-size: 13px; font-family: inherit; outline: none; cursor: pointer; }
+        .sf-select:focus { border-color: #c9a84c; }
+        .sf-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .sf-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #141414; font-size: 13px; color: #aaa; }
+        .sf-toggle-row:last-child { border-bottom: none; }
+        .sf-toggle { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
+        .sf-toggle input { opacity: 0; width: 0; height: 0; }
+        .sf-toggle-slider { position: absolute; cursor: pointer; inset: 0; background: #2a2a2a; border-radius: 22px; transition: 0.2s; }
+        .sf-toggle-slider::before { content: ''; position: absolute; width: 16px; height: 16px; left: 3px; bottom: 3px; background: #666; border-radius: 50%; transition: 0.2s; }
+        .sf-toggle input:checked + .sf-toggle-slider { background: #1a3c34; }
+        .sf-toggle input:checked + .sf-toggle-slider::before { transform: translateX(16px); background: #c9a84c; }
+        .sf-hours-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #141414; }
+        .sf-hours-row:last-child { border-bottom: none; }
+        .sf-day-label { width: 90px; font-size: 12px; color: #666; text-transform: capitalize; flex-shrink: 0; }
+        .sf-time-input { width: 100px; padding: 6px 8px; background: #141414; border: 1px solid #2a2a2a; border-radius: 5px; color: #f5f0e8; font-size: 12px; font-family: inherit; outline: none; }
+        .sf-time-input:focus { border-color: #c9a84c; }
+        .sf-time-input:disabled { opacity: 0.3; cursor: not-allowed; }
+        .sf-closed-label { font-size: 12px; color: #555; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        .sf-img-row { display: flex; align-items: center; gap: 12px; }
+        .sf-img-preview { width: 52px; height: 52px; border-radius: 7px; object-fit: cover; border: 1px solid #2a2a2a; background: #1e1e1e; flex-shrink: 0; }
+        .sf-img-placeholder { width: 52px; height: 52px; border-radius: 7px; background: #1e1e1e; border: 1px solid #2a2a2a; display: flex; align-items: center; justify-content: center; color: #333; font-size: 20px; flex-shrink: 0; }
+        .sf-upload-btn { font-size: 12px; font-weight: 500; font-family: inherit; letter-spacing: 0.04em; padding: 6px 14px; border-radius: 5px; border: 1px solid #3a3a3a; background: transparent; color: #888; cursor: pointer; transition: all 0.15s; }
+        .sf-upload-btn:hover { color: #c9a84c; border-color: #c9a84c; }
+        .sf-upload-btn:disabled { opacity: 0.4; cursor: default; }
+        .sf-save-bar { position: sticky; bottom: 0; background: #0d0d0d; border-top: 1px solid #1e1e1e; padding: 14px 0; margin: 32px 0 0; display: flex; align-items: center; gap: 14px; }
+        .sf-err { font-size: 13px; color: #c0392b; }
+        .sf-ok { font-size: 13px; color: #27ae60; }
         @media (max-width: 600px) {
           .main { padding: 20px 16px 60px; }
           .profile-header { flex-direction: column; gap: 12px; }
           .stat-grid { grid-template-columns: 1fr 1fr; }
           .topnav { padding: 0 16px; }
+          .sf-grid-2 { grid-template-columns: 1fr; }
+          .sf-hours-row { flex-wrap: wrap; gap: 6px; }
+          .sf-time-input { width: 90px; }
         }
       `}</style>
 
@@ -394,9 +575,9 @@ export default function VendorDashboardPage() {
           </div>
 
           <div className="tabs">
-            {(["overview", "orders", "bookings"] as Tab[]).map((t) => (
+            {(["overview", "orders", "bookings", "storefront"] as Tab[]).map((t) => (
               <button key={t} className={`tab-btn${tab === t ? " active" : ""}`} onClick={() => setTab(t)}>
-                {t.charAt(0).toUpperCase() + t.slice(1)}
+                {t === "storefront" ? "Edit Storefront" : t.charAt(0).toUpperCase() + t.slice(1)}
                 {t === "orders" && orders.length > 0 && ` (${orders.length})`}
                 {t === "bookings" && bookings.length > 0 && ` (${bookings.length})`}
               </button>
@@ -593,6 +774,257 @@ export default function VendorDashboardPage() {
               </div>
             );
           })()}
+
+          {tab === "storefront" && sfForm && (
+            <div>
+              {/* Basic Info */}
+              <div className="sf-section">
+                <div className="sf-section-title">Basic Info</div>
+                <div className="sf-field">
+                  <label className="sf-label">Business Name</label>
+                  <input className="sf-input" value={sfForm.name} onChange={e => setSfForm(f => f && ({ ...f, name: e.target.value }))} />
+                </div>
+                <div className="sf-field">
+                  <label className="sf-label">Tagline</label>
+                  <input className="sf-input" placeholder="A short catchy line about your business" value={sfForm.tagline} onChange={e => setSfForm(f => f && ({ ...f, tagline: e.target.value }))} />
+                </div>
+                <div className="sf-field">
+                  <label className="sf-label">Description</label>
+                  <textarea className="sf-textarea" placeholder="Tell customers about your business" value={sfForm.description} onChange={e => setSfForm(f => f && ({ ...f, description: e.target.value }))} />
+                </div>
+              </div>
+
+              {/* Contact */}
+              <div className="sf-section">
+                <div className="sf-section-title">Contact</div>
+                <div className="sf-grid-2">
+                  <div className="sf-field">
+                    <label className="sf-label">Email</label>
+                    <input className="sf-input" type="email" value={sfForm.contactEmail} onChange={e => setSfForm(f => f && ({ ...f, contactEmail: e.target.value }))} />
+                  </div>
+                  <div className="sf-field">
+                    <label className="sf-label">Phone</label>
+                    <input className="sf-input" type="tel" value={sfForm.contactPhone} onChange={e => setSfForm(f => f && ({ ...f, contactPhone: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="sf-field">
+                  <label className="sf-label">Website URL</label>
+                  <input className="sf-input" type="url" placeholder="https://yoursite.com" value={sfForm.websiteUrl} onChange={e => setSfForm(f => f && ({ ...f, websiteUrl: e.target.value }))} />
+                </div>
+                <div className="sf-grid-2">
+                  <div className="sf-field">
+                    <label className="sf-label">City</label>
+                    <input className="sf-input" value={sfForm.city} onChange={e => setSfForm(f => f && ({ ...f, city: e.target.value }))} />
+                  </div>
+                  <div className="sf-field">
+                    <label className="sf-label">State</label>
+                    <input className="sf-input" placeholder="e.g. VA" maxLength={2} value={sfForm.state} onChange={e => setSfForm(f => f && ({ ...f, state: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Images */}
+              <div className="sf-section">
+                <div className="sf-section-title">Images</div>
+                <div className="sf-field">
+                  <label className="sf-label">Logo</label>
+                  <div className="sf-img-row">
+                    {sfForm.logoImage
+                      ? <img src={sfForm.logoImage} alt="logo" className="sf-img-preview" />
+                      : <div className="sf-img-placeholder">🖼</div>
+                    }
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <label>
+                        <button
+                          className="sf-upload-btn"
+                          disabled={sfLogoUploading}
+                          onClick={() => document.getElementById('sf-logo-input')?.click()}
+                          type="button"
+                        >
+                          {sfLogoUploading ? 'Uploading…' : 'Upload Logo'}
+                        </button>
+                        <input
+                          id="sf-logo-input"
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={async e => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setSfLogoUploading(true);
+                            try {
+                              const url = await handleUploadImage(file, 'logos');
+                              setSfForm(f => f && ({ ...f, logoImage: url }));
+                            } catch (err) {
+                              setSfError(err instanceof Error ? err.message : 'Logo upload failed');
+                            } finally {
+                              setSfLogoUploading(false);
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                      </label>
+                      {sfForm.logoImage && (
+                        <button className="sf-upload-btn" type="button" style={{ color: '#c0392b', borderColor: '#4a1a1a' }} onClick={() => setSfForm(f => f && ({ ...f, logoImage: '' }))}>
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="sf-field">
+                  <label className="sf-label">Cover Image</label>
+                  <div className="sf-img-row">
+                    {sfForm.coverImage
+                      ? <img src={sfForm.coverImage} alt="cover" className="sf-img-preview" style={{ width: 88 }} />
+                      : <div className="sf-img-placeholder" style={{ width: 88 }}>🖼</div>
+                    }
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <label>
+                        <button
+                          className="sf-upload-btn"
+                          disabled={sfCoverUploading}
+                          onClick={() => document.getElementById('sf-cover-input')?.click()}
+                          type="button"
+                        >
+                          {sfCoverUploading ? 'Uploading…' : 'Upload Cover'}
+                        </button>
+                        <input
+                          id="sf-cover-input"
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={async e => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setSfCoverUploading(true);
+                            try {
+                              const url = await handleUploadImage(file, 'covers');
+                              setSfForm(f => f && ({ ...f, coverImage: url }));
+                            } catch (err) {
+                              setSfError(err instanceof Error ? err.message : 'Cover upload failed');
+                            } finally {
+                              setSfCoverUploading(false);
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                      </label>
+                      {sfForm.coverImage && (
+                        <button className="sf-upload-btn" type="button" style={{ color: '#c0392b', borderColor: '#4a1a1a' }} onClick={() => setSfForm(f => f && ({ ...f, coverImage: '' }))}>
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Display Settings */}
+              <div className="sf-section">
+                <div className="sf-section-title">What to Show on Your Storefront</div>
+                {([
+                  ['showEmail',      'Contact email'],
+                  ['showPhone',      'Phone number'],
+                  ['showWebsite',    'Website link'],
+                  ['showStoreHours', 'Store hours'],
+                  ['showAddress',    'Address'],
+                ] as [keyof StorefrontForm, string][]).map(([key, label]) => (
+                  <div key={key} className="sf-toggle-row">
+                    <span>{label}</span>
+                    <label className="sf-toggle">
+                      <input
+                        type="checkbox"
+                        checked={sfForm[key] as boolean}
+                        onChange={e => setSfForm(f => f && ({ ...f, [key]: e.target.checked }))}
+                      />
+                      <span className="sf-toggle-slider" />
+                    </label>
+                  </div>
+                ))}
+              </div>
+
+              {/* Response Time */}
+              <div className="sf-section">
+                <div className="sf-section-title">Typical Response Time</div>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <input
+                    className="sf-input"
+                    type="number"
+                    min={1}
+                    style={{ width: 80 }}
+                    value={sfForm.responseTimeValue}
+                    onChange={e => setSfForm(f => f && ({ ...f, responseTimeValue: parseInt(e.target.value) || 1 }))}
+                  />
+                  <select
+                    className="sf-select"
+                    value={sfForm.responseTimeUnit}
+                    onChange={e => setSfForm(f => f && ({ ...f, responseTimeUnit: e.target.value }))}
+                    style={{ flex: 1 }}
+                  >
+                    <option value="minutes">Minutes</option>
+                    <option value="hours">Hours</option>
+                    <option value="business_days">Business days</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Hours of Operation */}
+              <div className="sf-section">
+                <div className="sf-section-title">Hours of Operation</div>
+                {DAYS.map(day => {
+                  const h = sfForm.hoursOfOperation[day];
+                  return (
+                    <div key={day} className="sf-hours-row">
+                      <span className="sf-day-label">{day}</span>
+                      <input
+                        className="sf-time-input"
+                        type="time"
+                        value={h.open}
+                        disabled={h.closed}
+                        onChange={e => setSfForm(f => {
+                          if (!f) return f;
+                          return { ...f, hoursOfOperation: { ...f.hoursOfOperation, [day]: { ...h, open: e.target.value } } };
+                        })}
+                      />
+                      <span style={{ color: '#444', fontSize: 12 }}>–</span>
+                      <input
+                        className="sf-time-input"
+                        type="time"
+                        value={h.close}
+                        disabled={h.closed}
+                        onChange={e => setSfForm(f => {
+                          if (!f) return f;
+                          return { ...f, hoursOfOperation: { ...f.hoursOfOperation, [day]: { ...h, close: e.target.value } } };
+                        })}
+                      />
+                      <label className="sf-closed-label">
+                        <input
+                          type="checkbox"
+                          checked={h.closed ?? false}
+                          onChange={e => setSfForm(f => {
+                            if (!f) return f;
+                            return { ...f, hoursOfOperation: { ...f.hoursOfOperation, [day]: { ...h, closed: e.target.checked } } };
+                          })}
+                          style={{ accentColor: '#c9a84c' }}
+                        />
+                        Closed
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Save Bar */}
+              <div className="sf-save-bar">
+                <button className="btn-gold" onClick={handleSaveStorefront} disabled={sfSaving}>
+                  {sfSaving ? 'Saving…' : 'Save Changes'}
+                </button>
+                {sfError && <span className="sf-err">{sfError}</span>}
+                {sfSuccess && <span className="sf-ok">Saved!</span>}
+              </div>
+            </div>
+          )}
 
           {tab === "bookings" && (
             <div className="table-wrap">
