@@ -345,18 +345,22 @@ function ManageContent() {
           )}
         </button>
 
-        <button
-          type="button"
-          onClick={handleBillingPortal}
-          disabled={portalLoading}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-zinc-800 py-3.5 font-medium text-amber-400 hover:bg-zinc-900 disabled:opacity-50 transition-colors"
-        >
-          {portalLoading ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
-          Manage Billing &amp; Payment
-        </button>
-        <p className="mt-2 text-center text-xs text-zinc-500">
-          Update payment method, download invoices, or cancel your plan.
-        </p>
+        {current && (
+          <>
+            <button
+              type="button"
+              onClick={handleBillingPortal}
+              disabled={portalLoading}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-zinc-800 py-3.5 font-medium text-amber-400 hover:bg-zinc-900 disabled:opacity-50 transition-colors"
+            >
+              {portalLoading ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+              Manage Billing &amp; Payment
+            </button>
+            <p className="mt-2 text-center text-xs text-zinc-500">
+              Update payment method, download invoices, or cancel your plan.
+            </p>
+          </>
+        )}
       </div>
     </div>
   );
