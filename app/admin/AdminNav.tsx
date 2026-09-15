@@ -11,6 +11,7 @@ const NAV_LINKS: { label: string; href: string }[] = [
   { label: "Refunds", href: "/admin/refunds" },
   { label: "Users", href: "/admin/users" },
   { label: "Photographers", href: "/admin/photographers" },
+  { label: "Vendors", href: "/admin/vendors" },
 ];
 
 // "/admin" must match only itself, otherwise it would light up on every
