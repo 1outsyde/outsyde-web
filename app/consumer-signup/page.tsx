@@ -93,8 +93,8 @@ function validateStep(step: number, form: FormData): FieldErrors {
     if (!form.lastName.trim()) errors.lastName = "Last name is required";
 
     if (!form.username.trim()) errors.username = "Username is required";
-    else if (!/^[a-zA-Z0-9_]{3,30}$/.test(form.username))
-      errors.username = "3–30 characters: letters, numbers, and underscores only";
+    else if (!/^[a-z0-9_.]{3,20}$/.test(form.username))
+      errors.username = "3–20 characters: letters, numbers, underscores, and periods only";
 
     if (!form.phone.trim()) errors.phone = "Phone number is required";
   }

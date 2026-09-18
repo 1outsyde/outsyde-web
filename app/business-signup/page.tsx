@@ -19,7 +19,7 @@ import { useState } from "react";
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+const USERNAME_RE = /^[a-z0-9_.]{3,20}$/;
 
 const BUSINESS_CATEGORIES = [
   "Food & Drinks",
@@ -66,7 +66,7 @@ type UsernameAvailability = "idle" | "checking" | "available" | "taken";
 function validateUsernameFormat(value: string): string {
   if (!value.trim()) return "Username is required.";
   if (!USERNAME_RE.test(value.trim())) {
-    return "3\u201320 characters: lowercase letters, numbers, or underscores only.";
+    return "3\u201320 characters: lowercase letters, numbers, underscores, or periods only.";
   }
   return "";
 }
@@ -580,8 +580,8 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
                         const v = e.target.value.toLowerCase();
                         setUsername(v);
                         if (usernameAvailability !== "idle") setUsernameAvailability("idle");
-                        if (/[^a-z0-9_]/.test(v)) {
-                          setUsernameError("Only letters, numbers, and underscores allowed.");
+                        if (/[^a-z0-9_.]/.test(v)) {
+                          setUsernameError("Only letters, numbers, underscores, and periods allowed.");
                         } else if (usernameError) {
                           setUsernameError("");
                         }
@@ -608,7 +608,7 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
                       <span className="bs-field-hint ok">✓ Username available</span>
                     )}
                     {!usernameError && usernameAvailability === "idle" && (
-                      <span className="bs-hint">Only letters, numbers, and underscores allowed. 3&ndash;20 characters.</span>
+                      <span className="bs-hint">Only letters, numbers, underscores, and periods allowed. 3&ndash;20 characters.</span>
                     )}
                   </div>
 
