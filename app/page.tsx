@@ -299,10 +299,10 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
             <h2 className="tri-heading">Turn Your Lens Into Bookings</h2>
             <p className="tri-desc">Join OutsYde&apos;s collective of neighborhood photographers. Get discovered, get booked, and grow your client base — no middleman.</p>
             <div className="tri-btns">
-              <a href="/coming-soon" className="tri-btn btn-tri-gold">
+              <a href="https://www.goutsyde.com/photographer-signup" target="_blank" rel="noopener noreferrer" className="tri-btn btn-tri-gold">
                 Join as a Photographer <span className="tri-btn-arrow">→</span>
               </a>
-              <a href="/coming-soon" className="tri-btn btn-tri-outline-cream">Learn More</a>
+              <a href="/photographers/why-outsyde" className="tri-btn btn-tri-outline-cream">Learn More</a>
             </div>
           </div>
         </div>

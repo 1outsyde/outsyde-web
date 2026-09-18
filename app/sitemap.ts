@@ -36,6 +36,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/shop/dialux",           // Dia Lux storefront
     "/shop/royalelite",       // Royal Elite
     "/coming-soon",
+    "/photographers/why-outsyde",
     ...DIALUX_SLUGS.map((s) => `/shop/dialux/${s}`),
   ];
 
