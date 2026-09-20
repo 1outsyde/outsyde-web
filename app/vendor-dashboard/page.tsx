@@ -102,6 +102,13 @@ interface Booking {
   vendorNetAmount: number;
 }
 
+interface StripeStatus {
+  hasStripeAccount?: boolean;
+  onboardingComplete?: boolean;
+  chargesEnabled?: boolean;
+  payoutsEnabled?: boolean;
+}
+
 type Tab = "overview" | "orders" | "bookings" | "storefront";
 
 function formatCents(cents: number): string {
@@ -177,6 +184,11 @@ export default function VendorDashboardPage() {
   const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
 
+  const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null);
+  const [loadingStripe, setLoadingStripe] = useState(true);
+  const [stripeError, setStripeError] = useState("");
+  const [stripeActionLoading, setStripeActionLoading] = useState(false);
+
   useEffect(() => {
     (async () => {
       try {
@@ -243,7 +255,68 @@ export default function VendorDashboardPage() {
       } catch { /* non-blocking */ }
       finally { setLoadingBookings(false); }
     })();
+
+    (async () => {
+      await loadStripeStatus();
+    })();
   }, [router]);
+
+  async function loadStripeStatus() {
+    setLoadingStripe(true);
+    setStripeError("");
+    try {
+      const res = await fetch("/api/vendor-dashboard/stripe/status");
+      if (res.status === 401) { router.push("/login"); return; }
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setStripeError(d.error || "Could not load Stripe status.");
+        setStripeStatus(null);
+        return;
+      }
+      setStripeStatus(await res.json());
+    } catch {
+      setStripeError("Could not load Stripe status.");
+      setStripeStatus(null);
+    } finally {
+      setLoadingStripe(false);
+    }
+  }
+
+  async function handleConnectStripe() {
+    setStripeActionLoading(true);
+    setStripeError("");
+    try {
+      const res = await fetch("/api/vendor-dashboard/stripe/create-link", { method: "POST" });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      setStripeError(data.error || "Could not start Stripe onboarding.");
+    } catch {
+      setStripeError("Could not start Stripe onboarding.");
+    } finally {
+      setStripeActionLoading(false);
+    }
+  }
+
+  async function handleStripeManagePayouts() {
+    setStripeActionLoading(true);
+    setStripeError("");
+    try {
+      const res = await fetch("/api/vendor-dashboard/stripe/dashboard-link");
+      const data = await res.json();
+      if (res.ok && data.url) {
+        window.open(data.url, "_blank");
+      } else {
+        setStripeError(data.error || "Could not open Stripe dashboard.");
+      }
+    } catch {
+      setStripeError("Could not open Stripe dashboard.");
+    } finally {
+      setStripeActionLoading(false);
+    }
+  }
 
   async function handleMarkShipped(orderId: string) {
     setActionLoading(l => ({ ...l, [orderId]: true }));
@@ -501,6 +574,15 @@ export default function VendorDashboardPage() {
         .sf-save-bar { position: sticky; bottom: 0; background: #0d0d0d; border-top: 1px solid #1e1e1e; padding: 14px 0; margin: 32px 0 0; display: flex; align-items: center; gap: 14px; }
         .sf-err { font-size: 13px; color: #c0392b; }
         .sf-ok { font-size: 13px; color: #27ae60; }
+        .stripe-cta { background: #141414; border: 1px solid #2a2a2a; border-radius: 10px; padding: 20px 22px; margin-bottom: 24px; }
+        .stripe-cta.connected { background: #0d2b0d; border-color: #1a4a1a; }
+        .stripe-cta.pending { background: #1a1200; border-color: #3a2800; }
+        .stripe-cta-title { font-size: 14px; font-weight: 600; color: #f5f0e8; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+        .stripe-cta-body { font-size: 13px; color: #888; line-height: 1.6; margin-bottom: 14px; }
+        .stripe-cta-error { font-size: 13px; color: #c0392b; margin-bottom: 12px; }
+        .stripe-skeleton { height: 14px; background: #1e1e1e; border-radius: 4px; margin-bottom: 10px; }
+        .stripe-skeleton.short { width: 40%; }
+        .stripe-skeleton.long { width: 80%; }
         @media (max-width: 600px) {
           .main { padding: 20px 16px 60px; }
           .profile-header { flex-direction: column; gap: 12px; }
@@ -573,6 +655,50 @@ export default function VendorDashboardPage() {
               <div className="stat-sub">{stats?.averageRating ? `Avg ${stats.averageRating.toFixed(1)} ⭐` : "No reviews yet"}</div>
             </div>
           </div>
+
+          {loadingStripe ? (
+            <div className="stripe-cta">
+              <div className="stripe-skeleton short" />
+              <div className="stripe-skeleton long" />
+              <div className="stripe-skeleton" style={{ width: "30%", height: 32, marginTop: 8 }} />
+            </div>
+          ) : stripeError && !stripeStatus ? (
+            <div className="stripe-cta">
+              <div className="stripe-cta-title">Stripe</div>
+              <div className="stripe-cta-error">{stripeError}</div>
+              <button className="btn-gold" onClick={loadStripeStatus}>Retry</button>
+            </div>
+          ) : stripeStatus?.onboardingComplete ? (
+            <div className="stripe-cta connected">
+              <div className="stripe-cta-title">
+                Stripe Connected
+                <span className="status-green">Connected</span>
+              </div>
+              <div className="stripe-cta-body">Your Stripe account is connected and ready for payouts.</div>
+              {stripeError && <div className="stripe-cta-error">{stripeError}</div>}
+              <button className="btn-gold" disabled={stripeActionLoading} onClick={handleStripeManagePayouts}>
+                {stripeActionLoading ? "Opening…" : "Manage Payouts"}
+              </button>
+            </div>
+          ) : stripeStatus?.hasStripeAccount ? (
+            <div className="stripe-cta pending">
+              <div className="stripe-cta-title">Finish Stripe Setup</div>
+              <div className="stripe-cta-body">You started connecting Stripe but didn&apos;t finish. Resume to start receiving payouts.</div>
+              {stripeError && <div className="stripe-cta-error">{stripeError}</div>}
+              <button className="btn-gold" disabled={stripeActionLoading} onClick={handleConnectStripe}>
+                {stripeActionLoading ? "Loading…" : "Continue Setup"}
+              </button>
+            </div>
+          ) : (
+            <div className="stripe-cta">
+              <div className="stripe-cta-title">Connect Stripe</div>
+              <div className="stripe-cta-body">Connect your Stripe account to receive payouts for bookings and orders.</div>
+              {stripeError && <div className="stripe-cta-error">{stripeError}</div>}
+              <button className="btn-gold" disabled={stripeActionLoading} onClick={handleConnectStripe}>
+                {stripeActionLoading ? "Loading…" : "Connect Stripe Account"}
+              </button>
+            </div>
+          )}
 
           <div className="tabs">
             {(["overview", "orders", "bookings", "storefront"] as Tab[]).map((t) => (
