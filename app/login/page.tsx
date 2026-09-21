@@ -9,6 +9,7 @@
 "use client";
 
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 
 type SubmitState = "idle" | "submitting" | "error";
 
@@ -17,6 +18,7 @@ export default function BusinessLoginPage() {
   const [password, setPassword] = useState("");
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [submitError, setSubmitError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -108,6 +110,10 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
 .bs-signup-link{display:block;margin-top:18px;font-size:12px;color:rgba(245,240,230,.5);}
 .bs-signup-link a{color:var(--gold);text-decoration:none;}
 .bs-signup-link a:hover{text-decoration:underline;}
+.pw-wrap{position:relative;}
+.pw-wrap input{padding-right:42px;}
+.pw-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:rgba(245,240,230,.45);padding:0;display:flex;align-items:center;line-height:1;}
+.pw-toggle:hover{color:rgba(245,240,230,.8);}
 `,
         }}
       />
@@ -144,15 +150,20 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
               </div>
               <div className="bs-field">
                 <label htmlFor="bl-password">Password</label>
-                <input
-                  id="bl-password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Your password"
-                  autoComplete="current-password"
-                  required
-                />
+                <div className="pw-wrap">
+                  <input
+                    id="bl-password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Your password"
+                    autoComplete="current-password"
+                    required
+                  />
+                  <button type="button" className="pw-toggle" onClick={() => setShowPassword(v => !v)} aria-label={showPassword ? "Hide password" : "Show password"}>
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
 
               <a href="/forgot-password" className="bs-forgot">Forgot password?</a>

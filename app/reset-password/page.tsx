@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
@@ -15,6 +16,8 @@ function ResetPasswordForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [state, setState] = useState<State>(token && email ? "idle" : "invalid-link");
   const [errorMsg, setErrorMsg] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -109,6 +112,10 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
 
 .bs-back{display:inline-block;margin-top:32px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(245,240,230,.45);text-decoration:none;transition:color .2s;}
 .bs-back:hover{color:var(--gold);}
+.pw-wrap{position:relative;}
+.pw-wrap input{padding-right:42px;}
+.pw-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:rgba(245,240,230,.45);padding:0;display:flex;align-items:center;line-height:1;}
+.pw-toggle:hover{color:rgba(245,240,230,.8);}
 `,
         }}
       />
@@ -150,27 +157,37 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
                   <form onSubmit={handleSubmit} noValidate>
                     <div className="bs-field">
                       <label htmlFor="rp-new">New password</label>
-                      <input
-                        id="rp-new"
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="At least 6 characters"
-                        autoComplete="new-password"
-                        required
-                      />
+                      <div className="pw-wrap">
+                        <input
+                          id="rp-new"
+                          type={showNewPassword ? "text" : "password"}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="At least 6 characters"
+                          autoComplete="new-password"
+                          required
+                        />
+                        <button type="button" className="pw-toggle" onClick={() => setShowNewPassword(v => !v)} aria-label={showNewPassword ? "Hide password" : "Show password"}>
+                          {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
                     </div>
                     <div className="bs-field">
                       <label htmlFor="rp-confirm">Confirm new password</label>
-                      <input
-                        id="rp-confirm"
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Repeat your new password"
-                        autoComplete="new-password"
-                        required
-                      />
+                      <div className="pw-wrap">
+                        <input
+                          id="rp-confirm"
+                          type={showConfirmPassword ? "text" : "password"}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Repeat your new password"
+                          autoComplete="new-password"
+                          required
+                        />
+                        <button type="button" className="pw-toggle" onClick={() => setShowConfirmPassword(v => !v)} aria-label={showConfirmPassword ? "Hide password" : "Show password"}>
+                          {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
                     </div>
 
                     {state === "error" && errorMsg && (
