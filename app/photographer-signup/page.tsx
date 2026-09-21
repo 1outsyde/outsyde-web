@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Eye, EyeOff } from "lucide-react";
 
 declare global {
   interface Window {
@@ -133,6 +134,8 @@ export default function PhotographerSignupPage() {
 
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [loading, setLoading] = useState(false);
   const [usernameChecking, setUsernameChecking] = useState(false);
@@ -416,6 +419,10 @@ export default function PhotographerSignupPage() {
         .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .row-3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
         .error-msg { font-size: 12px; color: #c0392b; margin-top: 5px; }
+        .pw-wrap { position: relative; }
+        .pw-wrap input { padding-right: 42px; }
+        .pw-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #666; padding: 0; display: flex; align-items: center; line-height: 1; }
+        .pw-toggle:hover { color: #aaa; }
         .username-hint { font-size: 12px; margin-top: 5px; }
         .username-hint.checking { color: #888; }
         .username-hint.available { color: #27ae60; }
@@ -512,14 +519,24 @@ export default function PhotographerSignupPage() {
               <div className="row-2">
                 <div className="field-group" data-field="password">
                   <label>Password <span className="req">*</span></label>
-                  <input className={fieldClass("password")} type="password" placeholder="Min. 6 characters"
-                    value={form.password} onChange={(e) => set("password", e.target.value)} autoComplete="new-password" />
+                  <div className="pw-wrap">
+                    <input className={fieldClass("password")} type={showPassword ? "text" : "password"} placeholder="Min. 6 characters"
+                      value={form.password} onChange={(e) => set("password", e.target.value)} autoComplete="new-password" />
+                    <button type="button" className="pw-toggle" onClick={() => setShowPassword(v => !v)} aria-label={showPassword ? "Hide password" : "Show password"}>
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
                   {errors.password && <div className="error-msg">{errors.password}</div>}
                 </div>
                 <div className="field-group" data-field="confirmPassword">
                   <label>Confirm password <span className="req">*</span></label>
-                  <input className={fieldClass("confirmPassword")} type="password" placeholder="Repeat password"
-                    value={form.confirmPassword} onChange={(e) => set("confirmPassword", e.target.value)} autoComplete="new-password" />
+                  <div className="pw-wrap">
+                    <input className={fieldClass("confirmPassword")} type={showConfirmPassword ? "text" : "password"} placeholder="Repeat password"
+                      value={form.confirmPassword} onChange={(e) => set("confirmPassword", e.target.value)} autoComplete="new-password" />
+                    <button type="button" className="pw-toggle" onClick={() => setShowConfirmPassword(v => !v)} aria-label={showConfirmPassword ? "Hide password" : "Show password"}>
+                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
                   {errors.confirmPassword && <div className="error-msg">{errors.confirmPassword}</div>}
                 </div>
               </div>
