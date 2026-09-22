@@ -10,7 +10,7 @@
 
 import { NextResponse } from "next/server";
 
-const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+const USERNAME_RE = /^[a-z0-9_.]{3,20}$/;
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
