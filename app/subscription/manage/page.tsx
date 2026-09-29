@@ -99,10 +99,16 @@ function ManageContent() {
       setLoadError(null);
       const urlToken = searchParams.get("token");
       const authHeaders: HeadersInit = urlToken ? { "x-auth-token": urlToken } : {};
+      // A grant link lands here with ?grant=<signed token>; pass it on so the backend can
+      // include the granted tier in the list.
+      const grant = searchParams.get("grant");
+      const tiersUrl = grant
+        ? `/api/subscription/tiers?grant=${encodeURIComponent(grant)}`
+        : "/api/subscription/tiers";
       try {
         const [statusRes, tiersRes] = await Promise.all([
           fetch("/api/subscription/status", { headers: authHeaders }),
-          fetch("/api/subscription/tiers"),
+          fetch(tiersUrl, { headers: authHeaders }),
         ]);
 
         if (statusRes.status === 401) {
