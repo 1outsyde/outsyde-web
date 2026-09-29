@@ -47,7 +47,7 @@ export default function GrantRedemptionPage() {
       }
 
       setState({ status: "redirecting" });
-      router.replace(`/subscription/manage?tier=${data.tierId}`);
+      router.replace(`/subscription/manage?tier=${data.tierId}&grant=${encodeURIComponent(token)}`);
     }
 
     redeem();
