@@ -29,6 +29,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async headers() {
+    return [
+      {
+        // Free-plan claim links carry a secret token in the path: never send it in a Referer.
+        source: "/subscribe/free/:token",
+        headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

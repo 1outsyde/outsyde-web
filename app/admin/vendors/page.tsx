@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import FreePlanPanel from "./FreePlanPanel";
+import { planLabel, type AdminSubscriptionSummary } from "@/lib/free-plan";
 
 interface AdminBusiness {
   id: string;
@@ -10,6 +12,10 @@ interface AdminBusiness {
   category?: string | null;
   approvalStatus?: string | null;
   createdAt?: string;
+  // Additive fields from GET /api/admin/businesses (free-plan controls).
+  subscription?: AdminSubscriptionSummary | null;
+  hasConnectAccount?: boolean;
+  stripeOnboardingComplete?: boolean | null;
 }
 
 interface Tier {
@@ -41,6 +47,9 @@ export default function AdminVendorsPage() {
   const [grantState, setGrantState] = useState<
     Record<string, { loading?: boolean; url?: string; error?: string; copied?: boolean }>
   >({});
+
+  // Per-row free-plan panel state: businessId → { open }. Separate from grantState.
+  const [freeState, setFreeState] = useState<Record<string, { open?: boolean }>>({});
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -128,6 +137,14 @@ export default function AdminVendorsPage() {
     }
   }
 
+  function toggleFreePanel(businessId: string) {
+    setFreeState((prev) => ({ ...prev, [businessId]: { open: !prev[businessId]?.open } }));
+  }
+
+  function updateSubscription(businessId: string, subscription: AdminSubscriptionSummary) {
+    setBusinesses((prev) => prev.map((b) => (b.id === businessId ? { ...b, subscription } : b)));
+  }
+
   const css = `
     *, *::before, *::after { box-sizing: border-box; }
     .vp { font-family: 'Hanken Grotesk', 'Inter', sans-serif; }
@@ -208,8 +225,53 @@ export default function AdminVendorsPage() {
     .state-msg-title { font-family: 'Bebas Neue', sans-serif; font-size: 22px; color: #F5F0E6; }
     .state-msg-sub { color: rgba(245,240,230,0.5); font-size: 14px; max-width: 400px; }
 
+    /* ── Free plan (complimentary) controls ───────────────────────────────── */
+    .vp-plan { display: block; font-size: 12px; margin-top: 4px; color: #34d399; font-weight: 600; }
+    .vp-plan-paid { color: rgba(245,240,230,0.6); font-weight: 500; }
+    .vp-plan-ended { color: rgba(245,240,230,0.45); }
+    .vp-chip-warn {
+      display: inline-block; margin-top: 4px; font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 999px; font-weight: 600;
+      background: rgba(232,185,48,0.12); color: #E8B930;
+    }
+    .vp-free-btn { display: block; margin-top: 8px; font-size: 11.5px; padding: 5px 10px; }
+    .vp-panel-td { padding: 0 12px 16px; border-bottom: 1px solid rgba(245,240,230,0.04); }
+    .fp { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .fp-card {
+      background: rgba(245,240,230,0.03); border: 1px solid rgba(245,240,230,0.08);
+      border-radius: 10px; padding: 16px; min-width: 0;
+    }
+    .fp-title { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(245,240,230,0.4); margin-bottom: 10px; font-weight: 600; }
+    .fp-subtitle { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(245,240,230,0.4); margin: 16px 0 8px; font-weight: 600; }
+    .fp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 6px; }
+    .fp-date {
+      background: rgba(245,240,230,0.05); border: 1px solid rgba(245,240,230,0.1); border-radius: 6px;
+      color: #F5F0E6; font-family: inherit; font-size: 14px; padding: 7px 10px; outline: none; color-scheme: dark;
+    }
+    .fp-date:focus { border-color: rgba(232,185,48,0.4); }
+    .fp-date:disabled { opacity: 0.4; }
+    .fp-check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(245,240,230,0.75); cursor: pointer; }
+    .fp-revoke { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(245,240,230,0.06); }
+    .fp-confirm {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+      background: rgba(232,185,48,0.1); border: 1px solid rgba(232,185,48,0.3); border-radius: 6px;
+      padding: 10px 12px; font-size: 12.5px; color: #E8B930; line-height: 1.45;
+    }
+    .fp-confirm-actions { display: flex; gap: 8px; }
+    .fp-links { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .fp-link { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+    .fp-link-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .fp-pill {
+      display: inline-block; align-self: flex-start; font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 999px; font-weight: 600;
+    }
+    .fp-pill-pending { background: rgba(232,185,48,0.12); color: #E8B930; }
+    .fp-pill-claimed { background: rgba(16,185,129,0.12); color: #34d399; }
+    .fp-pill-revoked, .fp-pill-expired { background: rgba(245,240,230,0.07); color: rgba(245,240,230,0.5); }
+
     @media (max-width: 700px) {
       .vp-th-hide, .vp-td-hide { display: none; }
+      .fp { grid-template-columns: 1fr; }
     }
   `;
 
@@ -258,7 +320,7 @@ export default function AdminVendorsPage() {
       <div className="vp">
         <div className="vp-h1">Vendors</div>
         <div className="vp-sub">
-          Generate grandfathered plan links for existing vendors.
+          Generate grandfathered plan links for existing vendors, or give a free plan / free-plan link from each row.
           {!grandfatheredTierId && (
             <span style={{ color: "#ff6b6b", marginLeft: 8 }}>
               ⚠ Grandfathered tier not found — grant links unavailable.
@@ -303,11 +365,28 @@ export default function AdminVendorsPage() {
                   : statusKey === "rejected" ? "vp-status-rejected"
                   : "vp-status-default";
 
+                const pl = planLabel(biz);
+                const freeOpen = !!freeState[biz.id]?.open;
+
                 return (
-                  <tr key={biz.id} className="vp-tr">
+                  <Fragment key={biz.id}>
+                  <tr className="vp-tr">
                     <td className="vp-td">
                       <span style={{ fontWeight: 500 }}>{biz.name}</span>
                       <span className="vp-td-sub">{biz.id}</span>
+                      {pl.text && (
+                        <span className={`vp-plan${pl.kind === "paid" ? " vp-plan-paid" : ""}${pl.end === "ended" ? " vp-plan-ended" : ""}`}>
+                          {pl.text}
+                        </span>
+                      )}
+                      {pl.needsStripeConnect && <span className="vp-chip-warn">Needs Stripe Connect</span>}
+                      <button
+                        className="btn btn-ghost vp-free-btn"
+                        aria-expanded={freeOpen}
+                        onClick={() => toggleFreePanel(biz.id)}
+                      >
+                        {freeOpen ? "Hide free plan" : "Free plan"}
+                      </button>
                     </td>
                     <td className="vp-td vp-td-hide">
                       {biz.ownerName && <span>{biz.ownerName}</span>}
@@ -364,6 +443,14 @@ export default function AdminVendorsPage() {
                       {gs.error && <p className="grant-err">{gs.error}</p>}
                     </td>
                   </tr>
+                  {freeOpen && (
+                    <tr className="vp-tr">
+                      <td className="vp-panel-td" colSpan={4}>
+                        <FreePlanPanel biz={biz} onSubscriptionChange={updateSubscription} />
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 );
               })}
             </tbody>

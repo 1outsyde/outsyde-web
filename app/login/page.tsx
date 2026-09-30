@@ -10,6 +10,7 @@
 
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { safeReturn } from "@/lib/safe-return";
 
 type SubmitState = "idle" | "submitting" | "error";
 
@@ -49,10 +50,11 @@ export default function BusinessLoginPage() {
         return;
       }
 
-      // Redirect to the ?return= param if present (e.g. /subscription),
-      // otherwise fall back to home.
+      // Redirect to the ?return= param if present (e.g. /subscription), otherwise fall back to
+      // home. Only a same-origin path is honoured: "//evil.com", "/\evil.com", "/\t/evil.com",
+      // "https://…" and "javascript:…" all land on "/".
       const params = new URLSearchParams(window.location.search);
-      window.location.href = params.get("return") || "/";
+      window.location.href = safeReturn(params.get("return"), window.location.origin);
     } catch {
       setSubmitState("error");
       setSubmitError("Couldn\u2019t reach the server. Please try again.");
