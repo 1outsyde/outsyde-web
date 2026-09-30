@@ -12,6 +12,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { describeFreePlanEnd, isComplimentarySubscription } from "@/lib/free-plan";
+import { buildCheckoutBody, tierNotAvailableMessage } from "@/lib/checkout-grant";
 
 interface Tier {
   id: string;
@@ -187,16 +188,22 @@ function ManageContent() {
     setCheckingOut(true);
     try {
       const urlToken = searchParams.get("token");
+      // A grandfathered grant link carries ?grant=<signed token>; send it with the checkout so the
+      // backend can allow that hidden plan for this business. Never logged.
+      const grant = searchParams.get("grant");
       const res = await fetch("/api/subscription/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(urlToken ? { "x-auth-token": urlToken } : {}),
         },
-        body: JSON.stringify({ tierId: selected }),
+        body: JSON.stringify(buildCheckoutBody(selected, grant)),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Something went wrong.");
+      if (!res.ok) {
+        const unavailable = tierNotAvailableMessage({ status: res.status, code: data.code }, !!grant);
+        throw new Error(unavailable ?? (data.error || "Something went wrong."));
+      }
 
       if (data.url) {
         window.location.href = data.url;
