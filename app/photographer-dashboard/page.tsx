@@ -243,7 +243,7 @@ export default function PhotographerDashboardPage() {
                   : <span className="badge-pending">Stripe not connected</span>}
                 {profile.rating && profile.reviewCount ? (
                   <span style={{ fontSize: 12, color: "#666" }}>
-                    ⭐ {profile.rating.toFixed(1)} ({profile.reviewCount} reviews)
+                    ⭐ {(profile.rating / 10).toFixed(1)} ({profile.reviewCount} reviews)
                   </span>
                 ) : null}
               </div>
