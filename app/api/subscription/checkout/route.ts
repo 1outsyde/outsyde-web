@@ -4,7 +4,8 @@
 // forwarded as a Bearer token (stateless — not dependent on backend session
 // store staying warm).
 //
-// POST /api/subscription/checkout   Body: { tierId }
+// POST /api/subscription/checkout   Body: { tierId, grant? }   (grant = the ?grant= token of a
+//   grandfathered grant link; forwarded only when it is a non-empty string, never logged)
 // → proxies POST ${OUTSYDE_BACKEND_URL}/api/stripe/checkout/tier-subscription
 // → omits `native`/`x-platform: mobile`, so the backend takes the web branch
 //   and returns a Stripe Checkout `url` to redirect to.
@@ -15,18 +16,20 @@
 // that redirect needs to become a parameter on the backend route.
 
 import { NextRequest, NextResponse } from "next/server";
+import { buildCheckoutBody } from "@/lib/checkout-grant";
+import { readJsonSafe, UNEXPECTED_RESPONSE_MESSAGE } from "@/lib/read-json-safe";
 
 const TOKEN_COOKIE = "outsyde_access_token";
 
 export async function POST(req: NextRequest) {
-  let body: { tierId?: unknown };
+  let body: { tierId?: unknown; grant?: unknown };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { tierId } = body;
+  const { tierId, grant } = body;
   if (typeof tierId !== "string" || !tierId.trim()) {
     return NextResponse.json({ error: "tierId is required." }, { status: 400 });
   }
@@ -54,14 +57,19 @@ if (!token) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ tierId }),
+      body: JSON.stringify(buildCheckoutBody(tierId, grant)),
     });
 
-    const data = await checkoutRes.json();
+    // readJsonSafe never throws; it turns { error: { code, message } } into { error: "<message>", code }.
+    const { status, data } = await readJsonSafe(checkoutRes);
 
     if (!checkoutRes.ok || !data.success) {
-      const msg = data?.error?.message || "Could not start checkout. Please try again.";
-      return NextResponse.json({ error: msg }, { status: checkoutRes.status || 500 });
+      const upstream = typeof data.error === "string" && data.error !== UNEXPECTED_RESPONSE_MESSAGE ? data.error : "";
+      const msg = upstream || "Could not start checkout. Please try again.";
+      return NextResponse.json(
+        { error: msg, ...(typeof data.code === "string" ? { code: data.code } : {}) },
+        { status: status || 500 },
+      );
     }
 
     if (data.tierChanged) {
