@@ -11,6 +11,7 @@ import {
   CalendarClock,
   ChevronRight,
 } from "lucide-react";
+import { describeFreePlanEnd, isComplimentarySubscription } from "@/lib/free-plan";
 
 interface Tier {
   id: string;
@@ -31,6 +32,8 @@ interface CurrentSubscription {
   status: string;
   currentPeriodEnd?: string;
   cancelAtPeriodEnd?: boolean;
+  // Present on /api/vendor/subscription rows; null/absent for complimentary (free) plans.
+  stripeSubscriptionId?: string | null;
 }
 
 const TIER_ACCENT: Record<string, string> = {
@@ -244,6 +247,11 @@ function ManageContent() {
     );
   }
 
+  // A free (complimentary) plan: priced 0 with no Stripe subscription. Paid rows never match, so
+  // everything below is unchanged for them.
+  const isFree = current ? isComplimentarySubscription(current) : false;
+  const freeEnd = isFree && current ? describeFreePlanEnd(current) : null;
+
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <div className="mx-auto max-w-2xl px-5 py-10">
@@ -263,20 +271,32 @@ function ManageContent() {
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-1">Current Plan</p>
                 <p className="text-xl font-semibold">{current.tierDisplayName || current.tierName}</p>
-                <p className={`text-lg font-semibold mt-0.5 ${TIER_ACCENT[current.tierName?.toLowerCase()] ?? "text-white"}`}>
-                  ${(current.priceInCents / 100).toFixed(0)}
-                  <span className="text-sm font-normal text-zinc-400">/mo</span>
-                </p>
+                {isFree ? (
+                  <p className="text-lg font-semibold mt-0.5 text-white">Free plan — no charge</p>
+                ) : (
+                  <p className={`text-lg font-semibold mt-0.5 ${TIER_ACCENT[current.tierName?.toLowerCase()] ?? "text-white"}`}>
+                    ${(current.priceInCents / 100).toFixed(0)}
+                    <span className="text-sm font-normal text-zinc-400">/mo</span>
+                  </p>
+                )}
               </div>
-              <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
-                current.status === "active" ? "bg-emerald-500/15 text-emerald-400"
-                : current.status === "past_due" ? "bg-amber-400/15 text-amber-400"
-                : "bg-zinc-700 text-zinc-400"
-              }`}>
-                {current.status === "active" ? "Active" : current.status === "past_due" ? "Past Due" : current.status}
-              </span>
+              {!isFree && (
+                <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+                  current.status === "active" ? "bg-emerald-500/15 text-emerald-400"
+                  : current.status === "past_due" ? "bg-amber-400/15 text-amber-400"
+                  : "bg-zinc-700 text-zinc-400"
+                }`}>
+                  {current.status === "active" ? "Active" : current.status === "past_due" ? "Past Due" : current.status}
+                </span>
+              )}
             </div>
-            {current.currentPeriodEnd && (
+            {isFree && freeEnd && (
+              <div className="mt-4 flex items-center gap-2 text-sm text-zinc-400">
+                <CalendarClock size={14} className="shrink-0" />
+                <span className={freeEnd.kind === "ended" ? "text-zinc-400" : "text-white"}>{freeEnd.label}</span>
+              </div>
+            )}
+            {!isFree && current.currentPeriodEnd && (
               <div className="mt-4 flex items-center gap-2 text-sm text-zinc-400">
                 <CalendarClock size={14} className="shrink-0" />
                 {current.cancelAtPeriodEnd ? (
@@ -293,7 +313,10 @@ function ManageContent() {
           <>
             <p className="text-sm text-zinc-400 mb-4">Select a plan to switch to:</p>
             <div className="space-y-3">
-              {tiers.map((tier) => {
+              {tiers
+                // An ended free plan is not something to switch "to" or stay on.
+                .filter((tier) => !(freeEnd?.kind === "ended" && tier.priceInCents === 0 && tier.id === current?.tierId))
+                .map((tier) => {
                 const tierKey = tier.name.toLowerCase();
                 const isSelected = tier.id === selected;
                 const isCurrent = tier.id === current?.tierId;
@@ -312,10 +335,14 @@ function ManageContent() {
                       </span>
                     )}
                     <h2 className="text-base font-semibold">{tier.displayName}</h2>
-                    <p className={`mt-0.5 text-base font-semibold ${TIER_ACCENT[tierKey] ?? "text-white"}`}>
-                      ${(tier.priceInCents / 100).toFixed(0)}
-                      <span className="text-sm font-normal text-zinc-400">/mo</span>
-                    </p>
+                    {tier.priceInCents === 0 ? (
+                      <p className="mt-0.5 text-base font-semibold text-white">Free plan</p>
+                    ) : (
+                      <p className={`mt-0.5 text-base font-semibold ${TIER_ACCENT[tierKey] ?? "text-white"}`}>
+                        ${(tier.priceInCents / 100).toFixed(0)}
+                        <span className="text-sm font-normal text-zinc-400">/mo</span>
+                      </p>
+                    )}
                     <ul className="mt-3 space-y-1">
                       {tier.features.slice(0, 3).map((f) => (
                         <li key={f} className="flex items-start gap-2 text-sm text-zinc-300">
@@ -351,7 +378,7 @@ function ManageContent() {
           )}
         </button>
 
-        {current && (
+        {current && !isFree && (
           <>
             <button
               type="button"

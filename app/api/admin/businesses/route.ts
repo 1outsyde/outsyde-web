@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { backendAuthHeaders } from "@/lib/admin-auth";
+import { readJsonSafe } from "@/lib/read-json-safe";
 
 export async function GET(req: NextRequest) {
   const incoming = req.nextUrl.searchParams;
@@ -15,6 +16,6 @@ export async function GET(req: NextRequest) {
     `${process.env.OUTSYDE_BACKEND_URL}/api/admin/businesses?${params.toString()}`,
     { headers: backendAuthHeaders(req) }
   );
-  const data = await res.json();
-  return NextResponse.json(data, { status: res.status });
+  const { status, data } = await readJsonSafe(res);
+  return NextResponse.json(data, { status });
 }
