@@ -61,7 +61,7 @@ function buildMeta(p: AdminPhotographer): string {
   const rate = `$${p.hourlyRate}/hr`;
   const rating =
     typeof p.rating === "number" && p.rating > 0
-      ? `${p.rating}★${p.reviewCount ? ` (${p.reviewCount})` : ""}`
+      ? `${(p.rating / 10).toFixed(1)}★${p.reviewCount ? ` (${p.reviewCount})` : ""}`
       : "";
   const stripe = p.stripeOnboardingComplete ? "Payouts ready" : "Stripe not connected";
   return [location, rate, rating, formatDate(p.createdAt), stripe]
