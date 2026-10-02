@@ -16,6 +16,7 @@
 
 import { useEffect, useState } from "react";
 import { getCart, subscribe, type CartItem } from "@/lib/cart";
+import FreeConsultSection from "@/components/royalelite/FreeConsultSection";
 
 type FormState = {
   name: string;
@@ -45,6 +46,7 @@ export default function RoyalEliteStore() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [status, setStatus] = useState<"idle" | "sending" | "ok" | "error">("idle");
+  const [consultAvailable, setConsultAvailable] = useState(false);
 
   useEffect(() => {
     setCart(getCart());
@@ -250,6 +252,7 @@ export default function RoyalEliteStore() {
           </p>
           <div className="re-hero-cta">
             <a href="#book" className="re-btn-gold">Get a Free Estimate</a>
+            {consultAvailable && <a href="#consult" className="re-btn-ghost">Book a Free Consultation</a>}
             <a href="tel:+17579444925" className="re-btn-ghost">Call 757-944-4925</a>
           </div>
         </section>
@@ -478,6 +481,11 @@ export default function RoyalEliteStore() {
               </p>
             </form>
           </div>
+        </section>
+
+        {/* free consultation — always rendered so /shop/royalelite#consult has a target */}
+        <section id="consult" style={{ scrollMarginTop: 80 }}>
+          <FreeConsultSection onAvailabilityChange={setConsultAvailable} />
         </section>
 
         {/* policies */}
