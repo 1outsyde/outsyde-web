@@ -23,6 +23,7 @@ interface Booking {
   staffDisplayName?: string;
   cancellationFeeType?: string;
   cancellationFeeAmount?: number;
+  isFreeConsultation?: boolean;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -252,7 +253,7 @@ export default function BookingsPage() {
                     </div>
                     <div className="booking-right">
                       <StatusBadge status={b.status} />
-                      <div className="booking-price">{fmtPrice(b.totalPrice)}</div>
+                      <div className="booking-price">{b.isFreeConsultation === true ? "Free" : fmtPrice(b.totalPrice)}</div>
                       <div className="expand-icon">{isOpen ? "▲ Less" : "▼ Details"}</div>
                     </div>
                   </div>
@@ -276,7 +277,7 @@ export default function BookingsPage() {
                         <div className="detail-value">👤 {b.staffDisplayName}</div>
                       </div>
                     )}
-                    {cancelFee && (
+                    {cancelFee && b.isFreeConsultation !== true && (
                       <div className="detail-item">
                         <div className="detail-label">Cancellation Fee</div>
                         <div className="detail-value warning">⚠️ {cancelFee}</div>

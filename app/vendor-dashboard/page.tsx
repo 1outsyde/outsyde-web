@@ -100,6 +100,7 @@ interface Booking {
   subtotalAmount: number;
   bookingFeeAmount: number;
   vendorNetAmount: number;
+  isFreeConsultation?: boolean;
 }
 
 interface StripeStatus {
@@ -1173,9 +1174,9 @@ export default function VendorDashboardPage() {
                         <td>{b.date}</td>
                         <td>{b.time}</td>
                         <td>{b.serviceName ?? "—"}</td>
-                        <td className="amount">${b.subtotalAmount.toFixed(2)}</td>
-                        <td style={{ color: "#c0392b" }}>-${b.bookingFeeAmount.toFixed(2)}</td>
-                        <td style={{ color: "#27ae60", fontWeight: 600 }}>${b.vendorNetAmount.toFixed(2)}</td>
+                        <td className="amount">{b.isFreeConsultation === true ? "Free" : <>${b.subtotalAmount.toFixed(2)}</>}</td>
+                        <td style={{ color: "#c0392b" }}>{b.isFreeConsultation === true ? "Free" : <>-${b.bookingFeeAmount.toFixed(2)}</>}</td>
+                        <td style={{ color: "#27ae60", fontWeight: 600 }}>{b.isFreeConsultation === true ? "Free" : <>${b.vendorNetAmount.toFixed(2)}</>}</td>
                         <td><span className={statusColor(b.status)}>{b.status}</span></td>
                       </tr>
                     ))}
