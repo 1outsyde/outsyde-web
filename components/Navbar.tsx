@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import StripeConnectModal from "./StripeConnectModal";
 
 interface MeUser {
   id: string;
@@ -11,6 +12,7 @@ interface MeUser {
   photographerId?: string | null;
   loyaltyPoints?: number;
   profileImageUrl?: string | null;
+  stripeConnectComplete?: boolean;
 }
 
 type AuthState = "loading" | false | MeUser;
@@ -18,6 +20,9 @@ type AuthState = "loading" | false | MeUser;
 export default function Navbar() {
   const [auth, setAuth] = useState<AuthState>("loading");
   const [menuOpen, setMenuOpen] = useState(false);
+  // dismissed resets on every page load (useState), so the modal re-appears on every
+  // new sign-in (which triggers a full navigation) and on every fresh app load.
+  const [connectModalDismissed, setConnectModalDismissed] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -37,12 +42,24 @@ export default function Navbar() {
     window.location.href = '/';
   }
 
+  function handleDismissConnectModal() {
+    setConnectModalDismissed(true);
+  }
+
   const user = auth !== "loading" && auth !== false ? auth : null;
   const role = user?.role ?? null;
   const isVendor = role === "vendor" || !!(user?.businessId);
   const isPhotographer = role === "photographer" || !!(user?.photographerId);
   const isAdmin = role === "admin";
   const isConsumer = !isVendor && !isPhotographer && !isAdmin;
+
+  // Show Connect modal when: user is vendor or photographer, Connect is incomplete, and not dismissed
+  const showConnectModal =
+    !isConsumer &&
+    !isAdmin &&
+    (isVendor || isPhotographer) &&
+    user?.stripeConnectComplete === false &&
+    !connectModalDismissed;
 
   return (
     <>
@@ -241,6 +258,14 @@ export default function Navbar() {
             </>
           )}
         </div>
+      )}
+
+      {showConnectModal && (
+        <StripeConnectModal
+          isVendor={isVendor}
+          isPhotographer={isPhotographer}
+          onDismiss={handleDismissConnectModal}
+        />
       )}
     </>
   );
