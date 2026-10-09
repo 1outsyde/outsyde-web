@@ -22,6 +22,8 @@ type Vendor = {
   category: string;
   href: string;
   image: string;
+  externalUrl?: string;
+logoCard?: boolean;
 };
 
 type ComingSoonVendor = {
