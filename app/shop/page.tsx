@@ -22,6 +22,8 @@ type Vendor = {
   category: string;
   href: string;
   image: string;
+  externalUrl?: string;
+logoCard?: boolean;
 };
 
 type ComingSoonVendor = {
@@ -65,6 +67,16 @@ const VENDORS: Vendor[] = [
     href: "/shop/omega",
     image: "/omega-card.jpg",
   },
+    {
+    id: "braids-with-love",
+    name: "Braids With Love",
+    tagline: "Precision braiding, rooted in care.",
+    category: "Hair & Braiding",
+    href: "/shop/coming-soon/braids-with-love",
+    image: "/braids-with-love.png",
+    externalUrl: "https://www.braidswithlove.com/",
+    logoCard: true,
+  },
 ];
 
 const COMING_SOON: ComingSoonVendor[] = [
@@ -75,13 +87,7 @@ const COMING_SOON: ComingSoonVendor[] = [
     logo: "/xo-beauty-lashes.png",
     href: "/shop/coming-soon/xo-beauty",
   },
-  {
-    id: "braids-with-love",
-    name: "Braids With Love",
-    category: "Hair & Braiding",
-    logo: "/braids-with-love.png",
-    href: "/shop/coming-soon/braids-with-love",
-  },
+
 ];
 
 export default function Marketplace() {
@@ -143,6 +149,9 @@ export default function Marketplace() {
 .mkt-card-tag{font-size:13px;font-weight:300;line-height:1.6;color:rgba(245,240,230,.78);margin-bottom:22px;max-width:340px;}
 .mkt-enter{display:inline-flex;align-items:center;gap:9px;background:var(--mk-gold);color:#000;padding:12px 24px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;transition:background .2s,gap .2s;}
 .mkt-card:hover .mkt-enter{gap:14px;}
+.mkt-card-logo{background:#0a0a0a;}
+.mkt-card-logo .mkt-card-bg{inset:28px 28px 210px 28px;background-size:contain;background-repeat:no-repeat;background-position:center;}
+.mkt-card-logo .mkt-card-veil{background:linear-gradient(to top,rgba(0,0,0,.9) 0%,rgba(0,0,0,.4) 30%,rgba(0,0,0,0) 55%);}
 
 /* coming soon card — lives IN the main grid, same size as vendor cards */
 .mkt-cs-card{
@@ -275,15 +284,20 @@ export default function Marketplace() {
         <main className="mkt-wrap">
           <p className="mkt-sec-label">Our Brands</p>
           <div className="mkt-grid">
-            {VENDORS.map((v) => (
-              <a className="mkt-card" key={v.id} href={v.href}>
+           {VENDORS.map((v) => (
+              <a
+                className={`mkt-card${v.logoCard ? " mkt-card-logo" : ""}`}
+                key={v.id}
+                href={v.externalUrl ?? v.href}
+                {...(v.externalUrl ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+              >
                 <div className="mkt-card-bg" style={{ backgroundImage: `url('${v.image}')` }} />
                 <div className="mkt-card-veil" />
                 <div className="mkt-card-body">
                   <span className="mkt-card-cat">{v.category}</span>
                   <h2 className="mkt-card-name">{v.name}</h2>
                   <p className="mkt-card-tag">{v.tagline}</p>
-                  <span className="mkt-enter">Enter Store →</span>
+                  <span className="mkt-enter">{v.externalUrl ? "Visit Site ↗" : "Enter Store →"}</span>
                 </div>
               </a>
             ))}
