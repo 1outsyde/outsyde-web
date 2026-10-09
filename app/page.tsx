@@ -348,7 +348,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
                 <p className="slide-brand-label">Lotus House Blends</p>
                 <h3 className="slide-title">Elegance<br /><em>&amp;</em><br />Serenity</h3>
                 <div className="slide-btns">
-                  <a href="/shop/lotus" className="slide-cta">Discover Lotus →</a>
+                  <a href="https://www.lotushouseblends.com/" target="_blank" rel="noopener noreferrer" className="slide-cta">Discover Lotus →</a>
                   <a href="/shop" className="slide-cta-secondary">View All Brands</a>
                 </div>
               </div>
