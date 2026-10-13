@@ -30,7 +30,7 @@
 import { NextResponse } from "next/server";
 import { sendBusinessSignupAlert, sendBusinessSignupConfirmation } from "@/lib/emails";
 
-const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+const USERNAME_RE = /^[a-z0-9_.]{3,20}$/;
 const OFFER_TYPES = new Set(["products", "services", "both"]);
 
 interface BusinessSignupBody {
@@ -107,7 +107,7 @@ export async function POST(req: Request) {
   }
   if (typeof username !== "string" || !USERNAME_RE.test(username.trim())) {
     return NextResponse.json(
-      { error: "Username must be 3\u201320 lowercase letters, numbers, or underscores.", field: "username" },
+      { error: "Username must be 3\u201320 lowercase letters, numbers, underscores, or periods.", field: "username" },
       { status: 400 },
     );
   }
