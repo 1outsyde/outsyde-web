@@ -21,10 +21,20 @@ export async function POST(req: NextRequest) {
       "Content-Type": "application/json",
     };
 
+    // Optional { returnTo: "finish" } from goutsyde.com/finish: Stripe sends them back to the
+    // setup checklist instead of the vendor dashboard. No body (vendor dashboard) = unchanged.
+    let returnTo: string | undefined;
+    try {
+      const body = await req.json();
+      if (body?.returnTo === "finish") returnTo = "finish";
+    } catch {
+      // no body
+    }
+
     const backendRes = await fetch(`${BACKEND}/api/vendor/stripe-onboarding/create-link`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ webRedirect: true }),
+      body: JSON.stringify({ webRedirect: true, ...(returnTo ? { returnTo } : {}) }),
     });
     const data = await backendRes.json();
     return NextResponse.json(data, { status: backendRes.status });
