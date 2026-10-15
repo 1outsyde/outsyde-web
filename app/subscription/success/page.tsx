@@ -14,6 +14,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { CheckCircle2, Loader2, Smartphone } from "lucide-react";
 
 interface CurrentSubscription {
@@ -127,12 +128,21 @@ function SuccessContent() {
               </p>
             </div>
 
+            {/* Next setup step on the web (payouts, username). Primary, so a desktop visitor is never
+                left with only an app button. */}
+            <Link
+              href="/finish"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#22c55e] py-3.5 font-medium text-black hover:opacity-90 transition-opacity"
+            >
+              Continue setup
+            </Link>
+
             {/* Return to app area */}
             {deepLinkState === "idle" && (
               <button
                 type="button"
                 onClick={handleReturnToApp}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#22c55e] py-3.5 font-medium text-black hover:opacity-90 transition-opacity"
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-zinc-700 py-3.5 font-medium text-zinc-200 hover:bg-zinc-800 transition-colors"
               >
                 <Smartphone size={16} />
                 Return to Outsyde App
