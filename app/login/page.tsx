@@ -45,6 +45,16 @@ export default function BusinessLoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
+        // Account exists but has no password yet (e.g. an imported signup). The backend has
+        // already emailed a 6-digit code, so go straight to /claim to finish setting it up.
+        if (data.code === "ACCOUNT_NEEDS_SETUP") {
+          const claim = new URLSearchParams({ sent: "1" });
+          if (typeof data.email === "string" && data.email) claim.set("email", data.email);
+          const ret = new URLSearchParams(window.location.search).get("return");
+          if (ret) claim.set("return", ret);
+          window.location.href = `/claim?${claim.toString()}`;
+          return;
+        }
         setSubmitState("error");
         setSubmitError(data.error || "Invalid email/username or password.");
         return;
