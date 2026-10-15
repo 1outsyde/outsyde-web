@@ -36,6 +36,11 @@ const nextConfig: NextConfig = {
         source: "/subscribe/free/:token",
         headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
       },
+      {
+        // iOS universal links: Apple fetches this file (no extension) and needs it as JSON.
+        source: "/.well-known/apple-app-site-association",
+        headers: [{ key: "Content-Type", value: "application/json" }],
+      },
     ];
   },
 };
