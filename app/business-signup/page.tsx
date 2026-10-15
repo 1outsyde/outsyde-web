@@ -16,6 +16,7 @@
 
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import ExistingAccountHint, { isAlreadyRegistered } from "@/components/ExistingAccountHint";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -472,7 +473,7 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
                 </label>
 
                 {submitState === "error" && submitError && (
-                  <p className="bs-err" role="alert">{submitError}</p>
+                  <><p className="bs-err" role="alert">{submitError}</p>{isAlreadyRegistered(submitError) && <ExistingAccountHint email={email} />}</>
                 )}
 
                 <div className="bs-ag-actions">
@@ -874,7 +875,7 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
                   </label>
 
                   {submitState === "error" && submitError && (
-                    <p className="bs-err" role="alert">{submitError}</p>
+                    <><p className="bs-err" role="alert">{submitError}</p>{isAlreadyRegistered(submitError) && <ExistingAccountHint email={email} />}</>
                   )}
 
                   <button type="submit" className="bs-submit" disabled={submitState === "submitting"}>

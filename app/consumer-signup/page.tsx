@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
+import ExistingAccountHint, { isAlreadyRegistered } from "@/components/ExistingAccountHint";
 
 declare global {
   interface Window {
@@ -800,6 +801,7 @@ export default function ConsumerSignupPage() {
           )}
 
           {submitError && <div className="submit-error">{submitError}</div>}
+          {isAlreadyRegistered(submitError) && <ExistingAccountHint email={form.email} />}
 
           <div className="actions">
             {step > 0 && <button className="btn-back" onClick={handleBack}>← Back</button>}

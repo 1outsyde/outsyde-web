@@ -51,11 +51,20 @@ export async function POST(req: Request) {
   }
 
   if (!loginRes.ok) {
-    const errorObj = loginData?.error as { message?: string } | undefined;
+    const errorObj = loginData?.error as { message?: string; code?: string } | undefined;
     const msg =
       (typeof errorObj?.message === "string" && errorObj.message) ||
       "Invalid email/username or password.";
-    return NextResponse.json({ error: msg }, { status: loginRes.status });
+    // Additive: `error` stays the same string; `code` lets the login page tell a passwordless
+    // account (ACCOUNT_NEEDS_SETUP → /claim) apart from a wrong password.
+    const payload: Record<string, unknown> = { error: msg };
+    if (typeof errorObj?.code === "string") payload.code = errorObj.code;
+    // Echo back only an email the person typed. Never forward an address the backend looked up
+    // from a username, so a username can't be used to discover someone's email.
+    if (errorObj?.code === "ACCOUNT_NEEDS_SETUP" && identifier.includes("@")) {
+      payload.email = identifier.trim().toLowerCase();
+    }
+    return NextResponse.json(payload, { status: loginRes.status });
   }
 
   const user = (loginData?.user ?? null) as Record<string, unknown> | null;
