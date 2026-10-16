@@ -22,12 +22,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Message is required." }, { status: 400 });
 
   try {
-    await sendContactInquiry({
+    // sendEmail returns false (it does not throw) when Resend rejects the email or the key is missing.
+    const sent = await sendContactInquiry({
       name: name.trim(),
       email: email.trim().toLowerCase(),
       inquiryType: inquiryType.trim(),
       message: message.trim(),
     });
+    if (!sent) {
+      console.error("contact: email not sent");
+      return NextResponse.json({ error: "Couldn't send your message. Please try again." }, { status: 500 });
+    }
   } catch (err) {
     console.error("contact: email failed", err);
     return NextResponse.json({ error: "Couldn't send your message. Please try again." }, { status: 500 });

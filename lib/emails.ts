@@ -539,6 +539,7 @@ export async function sendContactInquiry(p: {
     business: "Business Partnership / Vendor Interest",
     photographer: "Photographer Inquiry",
     support: "Support / Order Issue",
+    account_deletion: "Account Deletion Request",
   };
   const label = labelMap[p.inquiryType] ?? p.inquiryType;
 
