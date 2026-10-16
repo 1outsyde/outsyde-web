@@ -15,13 +15,14 @@ export default function DeleteAccountRequestPage() {
     setBusy(true);
     setError("");
     try {
-      // Sends to the existing /api/contact endpoint (or falls back to mailto)
+      // Sends to the existing /api/contact endpoint, which emails info@goutsyde.com
       const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: "Account Deletion Request",
           email: form.email.trim(),
+          inquiryType: "account_deletion",
           message: `ACCOUNT DELETION REQUEST\n\nEmail: ${form.email.trim()}\n\nReason: ${form.reason.trim() || "Not provided"}\n\nPlease process this deletion request and confirm via reply.`,
           subject: "Account Deletion Request",
         }),
