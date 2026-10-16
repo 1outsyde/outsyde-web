@@ -20,6 +20,7 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/app-stores";
 
 type StepKey = "password" | "username" | "approval" | "plan" | "payouts";
 type StepState = "done" | "todo" | "waiting";
@@ -29,7 +30,6 @@ type Status = { role: Role; complete: boolean; next: StepKey | null; steps: Step
 type StaffBusiness = { businessId: string; displayName?: string | null };
 type UsernameCheck = "idle" | "checking" | "available" | "taken" | "invalid" | "error";
 
-const APP_STORE_URL = "https://apps.apple.com/app/outsyde/id6738926870";
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 
 const DONE_LABEL: Record<StepKey, string> = {
@@ -302,7 +302,10 @@ function FinishFlow() {
             <div className="bs-card">
               <p className="fs-text">Everything&rsquo;s done. You can sign in on the app with your email or username.</p>
               <Link className="bs-submit fs-btn-link" href={DASHBOARD[status.role].href}>{DASHBOARD[status.role].label}</Link>
-              <a className="fs-ghost" href={APP_STORE_URL} target="_blank" rel="noopener noreferrer">Get the app</a>
+              <div className="fs-stores">
+                <a className="fs-ghost" href={APP_STORE_URL} target="_blank" rel="noopener noreferrer">Get the app on iPhone</a>
+                <a className="fs-ghost" href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer">Get the app on Android</a>
+              </div>
             </div>
           )}
 
@@ -501,6 +504,7 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
 .bs-submit:hover:not(:disabled){background:#f2c835;}
 .bs-submit:disabled{opacity:.55;cursor:not-allowed;}
 .fs-btn-link{line-height:20px;}
+.fs-stores{display:flex;flex-direction:column;gap:10px;}
 .fs-ghost{display:block;width:100%;text-align:center;background:transparent;border:1px solid rgba(245,240,230,.3);color:var(--cream);text-decoration:none;padding:13px;border-radius:4px;font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;min-height:46px;cursor:pointer;}
 .fs-ghost:hover:not(:disabled){border-color:var(--gold);color:var(--gold);}
 .fs-ghost:disabled{opacity:.55;cursor:not-allowed;}

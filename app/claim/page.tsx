@@ -21,8 +21,8 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { safeReturn } from "@/lib/safe-return";
+import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/app-stores";
 
-const APP_STORE_URL = "https://apps.apple.com/app/outsyde/id6738926870";
 const RESEND_SECONDS = 60;
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 
@@ -426,7 +426,10 @@ function ClaimFlow() {
               <p className="bs-sub">Your account is complete. You&rsquo;re signed in here, and you can sign in on the app with your email or username.</p>
               <div className="bs-card">
                 <p className="cl-kicker">Best on the app</p>
-                <a className="cl-store" href={APP_STORE_URL} target="_blank" rel="noopener noreferrer">Download on the App Store</a>
+                <div className="cl-stores">
+                  <a className="cl-store" href={APP_STORE_URL} target="_blank" rel="noopener noreferrer">Download on the App Store</a>
+                  <a className="cl-store" href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer">Get it on Google Play</a>
+                </div>
                 <p className="cl-small">Already have the app? Open it and sign in with {email}.</p>
               </div>
               <a className="cl-ghost" href={continueHref}>Keep exploring on the web</a>
@@ -545,6 +548,7 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
 
 .cl-check{width:72px;height:72px;border-radius:50%;background:var(--emerald);border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;}
 .cl-kicker{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:rgba(245,240,230,.6);margin-bottom:12px;}
+.cl-stores{display:flex;flex-direction:column;gap:10px;}
 .cl-store{display:block;text-align:center;background:var(--cream);color:#000;text-decoration:none;padding:14px;border-radius:6px;font-size:14px;font-weight:700;min-height:48px;}
 .cl-small{font-size:12px;line-height:1.5;color:rgba(245,240,230,.6);margin-top:12px;overflow-wrap:anywhere;}
 .cl-ghost{display:block;margin-top:16px;text-align:center;border:1px solid rgba(245,240,230,.3);color:var(--cream);text-decoration:none;padding:14px;border-radius:4px;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;min-height:48px;}

@@ -20,6 +20,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useSearchParams } from "next/navigation";
+import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/app-stores";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -290,7 +291,8 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
 .ai-status p strong{color:var(--cream);font-weight:600;}
 
 /* app CTA */
-.ai-app-cta{display:inline-block;margin-top:22px;padding:14px 28px;background:var(--gold);color:var(--black);border-radius:4px;font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;transition:background .2s;}
+.ai-app-ctas{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:22px;}
+.ai-app-cta{display:inline-block;margin-top:0;padding:14px 28px;background:var(--gold);color:var(--black);border-radius:4px;font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;transition:background .2s;}
 .ai-app-cta:hover{background:#f2c835;}
 
 /* loading spinner */
@@ -354,12 +356,14 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
                 This invite for <strong>{page.invite.businessName}</strong> has already
                 been accepted. Open the Outsyde app to get started.
               </p>
-              <a
-                href="https://apps.apple.com/app/outsyde/id6738926870"
-                className="ai-app-cta"
-              >
-                Open the App
-              </a>
+              <div className="ai-app-ctas">
+                <a href={APP_STORE_URL} className="ai-app-cta">
+                  Open the App on iPhone
+                </a>
+                <a href={PLAY_STORE_URL} className="ai-app-cta">
+                  Open the App on Android
+                </a>
+              </div>
             </div>
           )}
 
@@ -383,12 +387,14 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
                 Your invitation has been accepted. Open the Outsyde app to get started
                 working with your team.
               </p>
-              <a
-                href="https://apps.apple.com/app/outsyde/id6738926870"
-                className="ai-app-cta"
-              >
-                Open the Outsyde App
-              </a>
+              <div className="ai-app-ctas">
+                <a href={APP_STORE_URL} className="ai-app-cta">
+                  Open the Outsyde App on iPhone
+                </a>
+                <a href={PLAY_STORE_URL} className="ai-app-cta">
+                  Open the Outsyde App on Android
+                </a>
+              </div>
             </div>
           )}
 
