@@ -5,7 +5,8 @@
 // see how often each person is emailed and what they got.
 //   By send:   broadcasts, tests and account setup batches, newest first → detail with every recipient
 //   By person: search an account → every logged email they got, newest first
-// Booking, order, receipt and claim code emails join this log in backend PR C2.
+// Booking, shoot, order, staff and account emails are logged by backend PR C2 (no send id, so they
+// show under By person only). Internal alerts and password or claim code emails are never logged.
 //
 // BFFs: GET /api/admin/emails/sends?limit&before, GET /api/admin/emails/sends/:id,
 // GET /api/admin/emails/people?q=, GET /api/admin/emails/people/:userId/emails.
@@ -335,8 +336,9 @@ export default function HistoryTab({
   return (
     <div className="em-wrap">
       <div className="em-sub">
-        Every email sent from these admin pages: announcements, tests and account setup emails. Booking, order and
-        receipt emails will show up here too once they are logged.
+        Every email Outsyde sends to customers, vendors, photographers and staff: announcements, tests, account setup,
+        bookings, shoots, orders and staff emails. Internal alerts to the Outsyde inbox and password codes are not shown.
+        Booking and order emails appear under By person.
       </div>
 
       <div className="em-seg" role="tablist" aria-label="History view">
