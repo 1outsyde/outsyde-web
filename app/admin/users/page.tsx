@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-// Verified 13-field allowlist from GET /api/admin/users.
-// There is no `status` field — isActive is the only status signal — and no
-// deletionStatus on this endpoint. Neither is typed here on purpose.
+// Allowlist from GET /api/admin/users. There is no `status` field: isActive is the
+// sign-in signal. deletionStatus / scheduledDeletionAt were added by the backend on
+// 2026-10-16 (optional so an older backend still renders).
 interface AdminUser {
   id: string;
   email: string | null;
@@ -19,6 +19,8 @@ interface AdminUser {
   isActive: boolean;
   createdAt: string;
   loyaltyPoints: number | null;
+  deletionStatus?: "active" | "pending_deletion" | "deleted";
+  scheduledDeletionAt?: string | null;
 }
 
 type AuthState = "loading" | "ok" | "unauthorized" | "forbidden";
@@ -77,6 +79,8 @@ export default function AdminUsersPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [actioningId, setActioningId] = useState<string | null>(null);
+  // Two-step confirm for scheduling a deletion (the user id awaiting confirmation).
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Debounce the search box so typing doesn't fire a request per keystroke.
   useEffect(() => {
@@ -179,6 +183,48 @@ export default function AdminUsersPage() {
     } finally {
       // Cleared only after the refetch, so a failed action never leaves an
       // immediately re-clickable button.
+      setActioningId(null);
+    }
+  }
+
+  async function runDeletionAction(user: AdminUser, action: "schedule-deletion" | "cancel-deletion") {
+    setActioningId(user.id);
+    setNotice(null);
+    setConfirmDeleteId(null);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/${action}`, { method: "POST" });
+      if (res.status === 401) {
+        setAuthState("unauthorized");
+        return;
+      }
+      const body = await res.json().catch(() => ({}));
+      const message =
+        (typeof body?.error === "string" && body.error) ||
+        (typeof body?.message === "string" && body.message) ||
+        "";
+      await loadData(roleFilter, search);
+      if (res.ok) {
+        if (action === "schedule-deletion") {
+          const when = body?.scheduledDeletionAt ? formatDate(body.scheduledDeletionAt) : "";
+          setNotice({
+            kind: "info",
+            text: body?.alreadyPending
+              ? `${displayName(user)} was already scheduled for deletion${when ? ` on ${when}` : ""}.`
+              : `${displayName(user)} is scheduled for deletion${when ? ` on ${when}` : ""}. They were signed out and emailed, and can cancel by signing in before then.`,
+          });
+        } else {
+          setNotice({ kind: "info", text: `Deletion cancelled for ${displayName(user)}.` });
+        }
+        return;
+      }
+      setNotice({
+        kind: res.status === 409 ? "warn" : "error",
+        text: message || `Couldn\u2019t ${action === "schedule-deletion" ? "schedule" : "cancel"} the deletion (${res.status}).`,
+      });
+    } catch {
+      setNotice({ kind: "error", text: "Couldn\u2019t reach the server. Refresh and check before trying again." });
+      await loadData(roleFilter, search);
+    } finally {
       setActioningId(null);
     }
   }
@@ -336,6 +382,12 @@ export default function AdminUsersPage() {
     }
     .search-input:focus { border-color: rgba(232,185,48,0.4); }
     /* Disabling does not revoke live tokens — this note must stay visible. */
+    .st-deleted { background: rgba(245,240,230,0.08); color: rgba(245,240,230,0.5); }
+    .row-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+    .btn-danger { background: transparent; border-color: rgba(255,107,107,0.4); color: #ff6b6b; }
+    .btn-danger:hover:not(:disabled) { border-color: #ff6b6b; }
+    .btn-danger-solid { background: #ff6b6b; color: #000; }
+    .btn-danger:disabled, .btn-danger-solid:disabled, .btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
     .action-note {
       font-size: 11.5px; color: rgba(245,240,230,0.35); line-height: 1.4;
       margin-bottom: 16px; max-width: 640px;
@@ -467,6 +519,9 @@ export default function AdminUsersPage() {
         ) : (
           users.map((user) => {
             const busy = actioningId === user.id;
+            const deletion = user.deletionStatus ?? "active";
+            const isDeleted = deletion === "deleted";
+            const isPending = deletion === "pending_deletion";
 
             return (
               <div key={user.id} className="issue-row">
@@ -474,13 +529,27 @@ export default function AdminUsersPage() {
                   <div className="issue-title">{displayName(user)}</div>
                   <div className="issue-meta">{buildMeta(user)}</div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <span className={`status-pill ${user.isActive ? "st-approved" : "st-rejected"}`}>
-                    {user.isActive ? "active" : "disabled"}
-                  </span>
+                <div className="row-actions">
+                  {isDeleted ? (
+                    <span className="status-pill st-deleted">deleted</span>
+                  ) : (
+                    <>
+                      <span className={`status-pill ${user.isActive ? "st-approved" : "st-rejected"}`}>
+                        {user.isActive ? "active" : "disabled"}
+                      </span>
+                      {isPending && (
+                        <span className="status-pill st-pending">
+                          {user.scheduledDeletionAt
+                            ? `deletes ${formatDate(user.scheduledDeletionAt)}`
+                            : "deletion scheduled"}
+                        </span>
+                      )}
+                    </>
+                  )}
                   {/* Admin accounts are rejected by the backend with a 403, so
-                      no button is offered rather than one that always fails. */}
-                  {!user.isAdmin && (
+                      no button is offered rather than one that always fails.
+                      Deleted accounts are scrubbed: no actions. */}
+                  {!user.isAdmin && !isDeleted && (
                     <button
                       className={`btn ${user.isActive ? "btn-ghost" : "btn-gold"}`}
                       onClick={() => setActive(user, !user.isActive)}
@@ -494,6 +563,38 @@ export default function AdminUsersPage() {
                           ? "Disable"
                           : "Enable"}
                     </button>
+                  )}
+                  {!user.isAdmin && isPending && (
+                    <button
+                      className="btn btn-ghost"
+                      onClick={() => runDeletionAction(user, "cancel-deletion")}
+                      disabled={busy}
+                    >
+                      Cancel deletion
+                    </button>
+                  )}
+                  {!user.isAdmin && deletion === "active" && confirmDeleteId !== user.id && (
+                    <button
+                      className="btn btn-danger"
+                      onClick={() => setConfirmDeleteId(user.id)}
+                      disabled={busy}
+                    >
+                      Schedule deletion
+                    </button>
+                  )}
+                  {!user.isAdmin && deletion === "active" && confirmDeleteId === user.id && (
+                    <>
+                      <button
+                        className="btn btn-danger-solid"
+                        onClick={() => runDeletionAction(user, "schedule-deletion")}
+                        disabled={busy}
+                      >
+                        {busy ? "Scheduling…" : "Delete in 30 days"}
+                      </button>
+                      <button className="btn btn-ghost" onClick={() => setConfirmDeleteId(null)} disabled={busy}>
+                        Keep account
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
