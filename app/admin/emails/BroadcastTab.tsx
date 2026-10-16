@@ -20,7 +20,18 @@ import {
 
 type Audience = "picked" | "vendors" | "photographers" | "consumers" | "all";
 type Counts = Record<Exclude<Audience, "picked">, number>;
-interface Budget { sentToday: number; limit: number | null; remaining: number | null }
+// resend = every email on the Resend account today, per Resend (backend PR C2); null when unknown.
+interface ResendUsage { used: number; limit: number | null; resetsAt: string | null }
+interface Budget { sentToday: number; limit: number | null; remaining: number | null; resend: ResendUsage | null }
+
+const RESET_FMT = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" });
+
+/** "All emails today: 7 of 100, resets 8:00 PM." (Resend's day ends at midnight UTC.) */
+function resendLine(u: ResendUsage | null): string | null {
+  if (!u || typeof u.used !== "number") return null;
+  const reset = u.resetsAt && !Number.isNaN(Date.parse(u.resetsAt)) ? `, resets ${RESET_FMT.format(new Date(u.resetsAt))}` : "";
+  return `All emails today: ${u.used}${u.limit !== null ? ` of ${u.limit}` : ""}${reset}.`;
+}
 interface SendState { id: string; status: string; recipients: number; sent: number; failed: number }
 
 const AUDIENCES: Audience[] = ["picked", "vendors", "photographers", "consumers", "all"];
@@ -88,7 +99,7 @@ export default function BroadcastTab({ onOpenSend }: { onOpenSend: (sendId: stri
       setLoadError(bad.status === 0 ? OFFLINE : errorText(bad.data, `Couldn't load the counts (${bad.status}).`));
       return;
     }
-    setBudget({ sentToday: Number(b.data?.sentToday ?? 0), limit: b.data?.limit ?? null, remaining: b.data?.remaining ?? null });
+    setBudget({ sentToday: Number(b.data?.sentToday ?? 0), limit: b.data?.limit ?? null, remaining: b.data?.remaining ?? null, resend: b.data?.resend ?? null });
     setCounts(a.data?.counts ?? null);
     setLoadError(null);
     setAuthState("ok");
@@ -408,6 +419,9 @@ export default function BroadcastTab({ onOpenSend }: { onOpenSend: (sendId: stri
                   ? `${budget.sentToday} sent today. No daily limit.`
                   : `${budget.sentToday} of ${budget.limit} sent today, ${budget.remaining ?? 0} left.`
                 : ""}
+              {budget && resendLine(budget.resend) ? (
+                <div style={{ color: "rgba(245,240,230,0.5)", fontSize: 12.5, marginTop: 2 }}>{resendLine(budget.resend)}</div>
+              ) : null}
               {sendBlocker ? (
                 <div style={{ color: "rgba(245,240,230,0.5)", fontSize: 12.5, marginTop: 2 }}>{sendBlocker}</div>
               ) : null}
