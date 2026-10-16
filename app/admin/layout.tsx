@@ -15,7 +15,19 @@ export default async function AdminLayout({
 
   return (
     <div style={{ minHeight: "100vh", background: "#000", color: "#F5F0E6" }}>
+      {/* Phone only (below 768px, same width as the AdminNav phone menu): 16px side padding and a
+          one line title. !important is needed to beat the inline styles; desktop is untouched. */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `@media (max-width: 767px) {
+  .admin-header { padding: 0 16px !important; position: relative; }
+  .admin-title { white-space: nowrap; flex: none; }
+  .admin-main { padding: 20px 16px 32px !important; }
+}`,
+        }}
+      />
       <div
+        className="admin-header"
         style={{
           display: "flex",
           alignItems: "center",
@@ -26,6 +38,7 @@ export default async function AdminLayout({
         }}
       >
         <span
+          className="admin-title"
           style={{
             fontFamily: "'Bebas Neue', sans-serif",
             fontSize: "20px",
@@ -37,7 +50,7 @@ export default async function AdminLayout({
         </span>
         <AdminNav />
       </div>
-      <div style={{ padding: "32px" }}>{children}</div>
+      <div className="admin-main" style={{ padding: "32px" }}>{children}</div>
     </div>
   );
 }

@@ -235,6 +235,13 @@ export default function AdminApplicationsPage() {
     @media (max-width: 900px) {
       .kpi-grid { grid-template-columns: repeat(2, 1fr); }
     }
+    /* Phone: let the filter row and each row's buttons wrap instead of running off the screen. */
+    @media (max-width: 640px) {
+      .tab-row { flex-wrap: wrap; }
+      .issue-row { flex-wrap: wrap; }
+      .issue-row > div:first-child { min-width: 0; flex: 1 1 180px; }
+      .issue-title, .issue-meta { overflow-wrap: anywhere; }
+    }
 
     /* ── Added for applications ────────────────────────────────────────────── */
     .status-pill {
