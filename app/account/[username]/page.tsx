@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
+import CoverVideo from '@/components/CoverVideo';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -18,6 +19,7 @@ interface User {
   avatarUrl?: string;      // alias the backend also returns
   coverMediaUrl?: string;
   coverMediaType?: 'image' | 'video';
+  coverPosterUrl?: string | null; // still picture (Mux thumbnail for video), additive
   followerCount?: number;
   followingCount?: number;
   isVendor?: boolean;
@@ -146,12 +148,9 @@ export default function PublicProfilePage() {
       {/* ── Cover media ───────────────────────────────────────────────────── */}
       <div className="relative w-full h-56 bg-[#1A1A1A] overflow-hidden">
         {coverIsVideo ? (
-          <video
+          <CoverVideo
             src={user.coverMediaUrl}
-            autoPlay
-            muted
-            loop
-            playsInline
+            poster={user.coverPosterUrl}
             className="absolute inset-0 w-full h-full object-cover"
           />
         ) : user.coverMediaUrl ? (
