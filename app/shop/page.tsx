@@ -326,7 +326,7 @@ export default function Marketplace() {
               <div className="mkt-soon-inner">
                 <h3>Your Brand Here</h3>
                 <p>More local brands are joining OutsYde. Want to sell with us?</p>
-                <a href="/business-inquiry" className="mkt-soon-cta">Partner With Us →</a>
+                <a href="/for-business" className="mkt-soon-cta">Partner With Us →</a>
               </div>
             </div>
           </div>

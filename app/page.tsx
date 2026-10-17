@@ -243,7 +243,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
             <a href="#photographers" className="btn btn-outline">
               Book a Photographer
             </a>
-            <a href="#business-band" className="hero-partner-link">
+            <a href="/for-business" className="hero-partner-link">
               Are you a business? Partner with us →
             </a>
           </div>
@@ -268,7 +268,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
               <a href="/business-signup" className="tri-btn btn-tri-gold">
                 Inquire to Join <span className="tri-btn-arrow">→</span>
               </a>
-              <a href="/coming-soon" className="tri-btn btn-tri-outline-cream">How It Works</a>
+              <a href="/for-business" className="tri-btn btn-tri-outline-cream">How It Works</a>
             </div>
           </div>
         </div>
@@ -479,7 +479,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
         </div>
         <div className="biz-band-ctas">
           <a href="/business-signup" className="btn-biz-cta btn-biz-gold">Inquire About Listing →</a>
-          <a href="/coming-soon" className="btn-biz-cta btn-biz-ghost">See How It Works</a>
+          <a href="/for-business" className="btn-biz-cta btn-biz-ghost">See How It Works</a>
         </div>
       </div>
 
@@ -505,7 +505,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
               <li><a href="/business-signup">Join the Marketplace</a></li>
               <li><a href="/business-signup">List Your Services</a></li>
               <li><a href="/coming-soon">Manage Bookings</a></li>
-              <li><a href="/coming-soon">Partner With Us</a></li>
+              <li><a href="/for-business">Partner With Us</a></li>
             </ul>
           </div>
 
