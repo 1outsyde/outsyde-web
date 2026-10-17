@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import CoverVideo from "@/components/CoverVideo";
+import { COVER_VIDEO_MAX_SECONDS, uploadCoverVideo } from "@/lib/coverMedia";
 
 interface UserProfile {
   userId: string;
@@ -14,6 +16,7 @@ interface UserProfile {
   profileImageUrl?: string;
   coverMediaUrl?: string;
   coverMediaType?: string;
+  coverPosterUrl?: string | null;
   city?: string;
   state?: string;
   loyaltyPoints?: number;
@@ -42,6 +45,8 @@ export default function AccountPage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [coverUploading, setCoverUploading] = useState<"" | "image" | "video">("");
+  const [coverTouched, setCoverTouched] = useState(false);
   const [editFields, setEditFields] = useState({
     bio: "",
     profileImageUrl: "",
@@ -86,9 +91,9 @@ export default function AccountPage() {
     setSaveError("");
     const payload: Record<string, any> = { bio: editFields.bio };
     if (editFields.profileImageUrl) payload.profileImageUrl = editFields.profileImageUrl;
-    if (editFields.coverMediaUrl) {
-      payload.coverMediaUrl = editFields.coverMediaUrl;
-      payload.coverMediaType = editFields.coverMediaType;
+    if (coverTouched) {
+      payload.coverMediaUrl = editFields.coverMediaUrl || null;
+      payload.coverMediaType = editFields.coverMediaUrl ? editFields.coverMediaType : null;
     }
     const res = await fetch("/api/account/profile", {
       method: "PATCH",
@@ -98,12 +103,38 @@ export default function AccountPage() {
     if (res.ok) {
       const updated = await fetch("/api/account/profile").then(r => r.json());
       setProfile(updated);
+      setCoverTouched(false);
       setEditing(false);
     } else {
       const err = await res.json();
       setSaveError(err.error || "Failed to save. Try again.");
     }
     setSaving(false);
+  }
+
+  async function handleCoverFile(file: File, kind: "image" | "video") {
+    setSaveError("");
+    setCoverUploading(kind);
+    try {
+      let value: string;
+      if (kind === "video") {
+        value = await uploadCoverVideo(file);
+      } else {
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("folder", "covers");
+        const res = await fetch("/api/vendor-dashboard/upload-image", { method: "POST", body: fd });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok || !d.url) throw new Error(d.error || "Image upload failed");
+        value = d.url;
+      }
+      setEditFields((f) => ({ ...f, coverMediaUrl: value, coverMediaType: kind }));
+      setCoverTouched(true);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setCoverUploading("");
+    }
   }
 
   const pts = profile?.loyaltyPoints ?? 0;
@@ -337,21 +368,35 @@ export default function AccountPage() {
                 placeholder="https://..." />
             </div>
             <div className="field-group">
-              <label className="field-label">Cover Image / Video URL</label>
-              <input className="field-input" value={editFields.coverMediaUrl}
-                onChange={(e) => setEditFields((f) => ({ ...f, coverMediaUrl: e.target.value }))}
-                placeholder="https://..." />
-            </div>
-            {editFields.coverMediaUrl && (
-              <div className="field-group">
-                <label className="field-label">Cover Media Type</label>
-                <select className="field-select" value={editFields.coverMediaType}
-                  onChange={(e) => setEditFields((f) => ({ ...f, coverMediaType: e.target.value as "image" | "video" }))}>
-                  <option value="image">Image</option>
-                  <option value="video">Video</option>
-                </select>
+              <label className="field-label">Cover Photo or Video</label>
+              <div style={{ position: "relative", width: "100%", aspectRatio: "16 / 9", borderRadius: 8, overflow: "hidden", background: "#111", marginBottom: 8 }}>
+                {editFields.coverMediaUrl ? (
+                  editFields.coverMediaType === "video"
+                    ? <CoverVideo src={editFields.coverMediaUrl} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+                    : <img src={editFields.coverMediaUrl} alt="cover preview" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#777", fontSize: 13 }}>No cover yet</div>
+                )}
               </div>
-            )}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <label className="btn btn-ghost" style={{ cursor: coverUploading ? "default" : "pointer" }}>
+                  {coverUploading === "image" ? "Uploading…" : "Upload Photo"}
+                  <input type="file" accept="image/*" style={{ display: "none" }} disabled={!!coverUploading}
+                    onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) handleCoverFile(file, "image"); }} />
+                </label>
+                <label className="btn btn-ghost" style={{ cursor: coverUploading ? "default" : "pointer" }}>
+                  {coverUploading === "video" ? "Uploading video…" : `Upload Video (max ${COVER_VIDEO_MAX_SECONDS}s)`}
+                  <input type="file" accept="video/*" style={{ display: "none" }} disabled={!!coverUploading}
+                    onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) handleCoverFile(file, "video"); }} />
+                </label>
+                {editFields.coverMediaUrl && (
+                  <button type="button" className="btn btn-ghost" disabled={!!coverUploading}
+                    onClick={() => { setEditFields((f) => ({ ...f, coverMediaUrl: "", coverMediaType: "image" })); setCoverTouched(true); }}>
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
             <div className="field-group">
               <label className="field-label">Bio</label>
               <textarea className="field-textarea" value={editFields.bio}
@@ -361,7 +406,7 @@ export default function AccountPage() {
             {saveError && <div className="error-msg">{saveError}</div>}
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setEditing(false)}>Cancel</button>
-              <button className="btn btn-gold" onClick={handleSave} disabled={saving}>
+              <button className="btn btn-gold" onClick={handleSave} disabled={saving || !!coverUploading}>
                 {saving ? "Saving…" : "Save Changes"}
               </button>
             </div>
@@ -372,7 +417,7 @@ export default function AccountPage() {
       <div className="cover">
         {profile.coverMediaUrl && (
           profile.coverMediaType === "video"
-            ? <video src={profile.coverMediaUrl} autoPlay muted loop playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ? <CoverVideo src={profile.coverMediaUrl} poster={profile.coverPosterUrl} style={{ width: "100%", height: "100%" }} />
             : <img src={profile.coverMediaUrl} alt="cover" />
         )}
         <div className="cover-overlay" />

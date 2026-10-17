@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import CoverVideo from "@/components/CoverVideo";
+import { COVER_VIDEO_MAX_SECONDS, uploadCoverVideo } from "@/lib/coverMedia";
 
 interface HoursDay { open: string; close: string; closed?: boolean; }
 
@@ -12,6 +14,7 @@ interface Business {
   category: string;
   logoImage?: string;
   coverImage?: string;
+  coverMediaType?: 'image' | 'video' | null;
   approvalStatus: string;
   rating?: number;
   reviewCount?: number;
@@ -59,6 +62,7 @@ interface StorefrontForm {
   state: string;
   logoImage: string;
   coverImage: string;
+  coverMediaType: 'image' | 'video';
   showEmail: boolean;
   showPhone: boolean;
   showWebsite: boolean;
@@ -216,6 +220,8 @@ export default function VendorDashboardPage() {
           state: biz.state ?? '',
           logoImage: biz.logoImage ?? '',
           coverImage: biz.coverImage ?? '',
+          // Keep the saved type so a storefront save never turns a video cover into an "image".
+          coverMediaType: biz.coverMediaType === 'video' ? 'video' : 'image',
           showEmail: biz.showEmail ?? true,
           showPhone: biz.showPhone ?? true,
           showWebsite: biz.showWebsite ?? true,
@@ -399,7 +405,7 @@ export default function VendorDashboardPage() {
           state: sfForm.state.trim(),
           logoImage: sfForm.logoImage.trim() || null,
           coverImage: sfForm.coverImage.trim() || null,
-          coverMediaType: sfForm.coverImage.trim() ? 'image' : null,
+          coverMediaType: sfForm.coverImage.trim() ? sfForm.coverMediaType : null,
           showEmail: sfForm.showEmail,
           showPhone: sfForm.showPhone,
           showWebsite: sfForm.showWebsite,
@@ -999,10 +1005,12 @@ export default function VendorDashboardPage() {
                   </div>
                 </div>
                 <div className="sf-field">
-                  <label className="sf-label">Cover Image</label>
+                  <label className="sf-label">Cover Photo or Video</label>
                   <div className="sf-img-row">
                     {sfForm.coverImage
-                      ? <img src={sfForm.coverImage} alt="cover" className="sf-img-preview" style={{ width: 88 }} />
+                      ? (sfForm.coverMediaType === 'video'
+                          ? <CoverVideo src={sfForm.coverImage} className="sf-img-preview" style={{ width: 88, fontSize: 9 }} />
+                          : <img src={sfForm.coverImage} alt="cover" className="sf-img-preview" style={{ width: 88 }} />)
                       : <div className="sf-img-placeholder" style={{ width: 88 }}>🖼</div>
                     }
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -1013,7 +1021,7 @@ export default function VendorDashboardPage() {
                           onClick={() => document.getElementById('sf-cover-input')?.click()}
                           type="button"
                         >
-                          {sfCoverUploading ? 'Uploading…' : 'Upload Cover'}
+                          {sfCoverUploading ? 'Uploading…' : 'Upload Photo'}
                         </button>
                         <input
                           id="sf-cover-input"
@@ -1026,7 +1034,7 @@ export default function VendorDashboardPage() {
                             setSfCoverUploading(true);
                             try {
                               const url = await handleUploadImage(file, 'covers');
-                              setSfForm(f => f && ({ ...f, coverImage: url }));
+                              setSfForm(f => f && ({ ...f, coverImage: url, coverMediaType: 'image' }));
                             } catch (err) {
                               setSfError(err instanceof Error ? err.message : 'Cover upload failed');
                             } finally {
@@ -1036,8 +1044,38 @@ export default function VendorDashboardPage() {
                           }}
                         />
                       </label>
+                      <label>
+                        <button
+                          className="sf-upload-btn"
+                          disabled={sfCoverUploading}
+                          onClick={() => document.getElementById('sf-cover-video-input')?.click()}
+                          type="button"
+                        >
+                          {sfCoverUploading ? 'Uploading…' : `Upload Video (max ${COVER_VIDEO_MAX_SECONDS}s)`}
+                        </button>
+                        <input
+                          id="sf-cover-video-input"
+                          type="file"
+                          accept="video/*"
+                          style={{ display: 'none' }}
+                          onChange={async e => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setSfCoverUploading(true);
+                            try {
+                              const uploadId = await uploadCoverVideo(file);
+                              setSfForm(f => f && ({ ...f, coverImage: uploadId, coverMediaType: 'video' }));
+                            } catch (err) {
+                              setSfError(err instanceof Error ? err.message : 'Video upload failed');
+                            } finally {
+                              setSfCoverUploading(false);
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                      </label>
                       {sfForm.coverImage && (
-                        <button className="sf-upload-btn" type="button" style={{ color: '#c0392b', borderColor: '#4a1a1a' }} onClick={() => setSfForm(f => f && ({ ...f, coverImage: '' }))}>
+                        <button className="sf-upload-btn" type="button" style={{ color: '#c0392b', borderColor: '#4a1a1a' }} onClick={() => setSfForm(f => f && ({ ...f, coverImage: '', coverMediaType: 'image' }))}>
                           Remove
                         </button>
                       )}
