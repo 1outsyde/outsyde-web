@@ -2,7 +2,8 @@
 // Public vendor signup page — /business-signup
 //
 // Flow:
-//   1. Collect account + business details in one form.
+//   1. Collect account + business details in one form. Industry choices come from the
+//      shared list (GET /api/taxonomy/business-categories), the same list the app uses.
 //   2. POST to /api/business-signup (BFF → outsyde-backend
 //      /api/auth/vendor/signup). The BFF forwards the session cookie the
 //      backend sets, so the vendor is logged in on outsyde-web immediately.
@@ -14,52 +15,60 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import ExistingAccountHint, { isAlreadyRegistered } from "@/components/ExistingAccountHint";
+import { isOtherCode, isTaxonomy, specialtiesFor, type BusinessTaxonomy, type TaxonomySpecialty } from "@/lib/business-taxonomy";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 
-const BUSINESS_CATEGORIES = [
-  "Food & Drinks",
-  "Beauty & Wellness",
-  "Health & Fitness",
-  "Shopping & Retail",
-  "Home Services",
-  "Professional Services",
-  "Entertainment",
-  "Arts & Crafts",
-];
-
-const INDUSTRIES = [
-  "Clothing & Fashion",
-  "Beauty Products",
-  "Beauty Services",
-  "Food & Dining",
-  "Fitness & Wellness",
-  "Home & Decor",
-  "Arts & Crafts",
-  "Professional Services",
-];
-
+// Same stored values as the app (BusinessSignupScreen.tsx), so both signups save identical data.
 const YEARS_IN_BUSINESS = [
-  { value: "less-than-1", label: "Less than 1 year" },
-  { value: "1-2", label: "1\u20132 years" },
-  { value: "3-5", label: "3\u20135 years" },
-  { value: "5-10", label: "5\u201310 years" },
-  { value: "10+", label: "10+ years" },
+  "Just starting",
+  "Less than 1 year",
+  "1-2 years",
+  "3-5 years",
+  "5-10 years",
+  "10+ years",
 ];
 
-const BUSINESS_STRUCTURES = [
-  { value: "sole-proprietor", label: "Sole proprietorship" },
-  { value: "llc", label: "LLC" },
-  { value: "corporation", label: "Corporation" },
-  { value: "partnership", label: "Partnership" },
-  { value: "nonprofit", label: "Non-profit" },
-];
+const EMPLOYEE_COUNTS = ["Just me", "2-5", "6-10", "11-25", "26-50", "51-100", "100+"];
+
+const BUSINESS_STRUCTURES = ["Sole Proprietor", "LLC", "Corporation", "Partnership", "Nonprofit", "Other"];
+
+const OTHER_DESCRIPTION_MAX = 500;
+const LOGO_MAX_SIDE = 512;
+
+/** Resize a picked image in the browser to a small JPEG data URL (max 512px on the long side). */
+function resizeLogo(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, LOGO_MAX_SIDE / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("canvas"));
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("image"));
+    };
+    img.src = url;
+  });
+}
 
 type OfferType = "products" | "services" | "both" | "";
 type SubmitState = "idle" | "submitting" | "error";
@@ -92,12 +101,24 @@ export default function BusinessSignupPage() {
 
   // business
   const [businessName, setBusinessName] = useState("");
-  const [businessCategory, setBusinessCategory] = useState("");
-  const [industries, setIndustries] = useState<string[]>([]);
   const [businessDescription, setBusinessDescription] = useState("");
   const [offerType, setOfferType] = useState<OfferType>("");
 
+  // industry (shared list from the backend)
+  const [taxonomy, setTaxonomy] = useState<BusinessTaxonomy | null>(null);
+  const [taxonomyError, setTaxonomyError] = useState(false);
+  const [categoryCode, setCategoryCode] = useState("");
+  const [specialties, setSpecialties] = useState<string[]>([]);
+  const [otherDescription, setOtherDescription] = useState("");
+
+  // logo (optional)
+  const [logoDataUrl, setLogoDataUrl] = useState("");
+  const [logoError, setLogoError] = useState("");
+
   // business details
+  const [isStartup, setIsStartup] = useState<boolean | null>(null);
+  const [isMultiStaff, setIsMultiStaff] = useState<boolean | null>(null);
+  const [employeeCount, setEmployeeCount] = useState("");
   const [yearsInBusiness, setYearsInBusiness] = useState("");
   const [businessType, setBusinessType] = useState("");
 
@@ -107,6 +128,10 @@ export default function BusinessSignupPage() {
   const [state, setState] = useState("");
   const [address, setAddress] = useState("");
   const [zipCode, setZipCode] = useState("");
+  const [billingAddress, setBillingAddress] = useState("");
+  const [billingCity, setBillingCity] = useState("");
+  const [billingState, setBillingState] = useState("");
+  const [billingZipCode, setBillingZipCode] = useState("");
 
   // online presence
   const [websiteUrl, setWebsiteUrl] = useState("");
@@ -122,8 +147,111 @@ export default function BusinessSignupPage() {
   const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
   const [agreementChecked, setAgreementChecked] = useState(false);
 
-  function toggleIndustry(name: string) {
-    setIndustries((prev) => (prev.includes(name) ? prev.filter((i) => i !== name) : [...prev, name]));
+  async function fetchTaxonomy(): Promise<BusinessTaxonomy | null> {
+    try {
+      const res = await fetch("/api/taxonomy/business-categories");
+      const data: unknown = await res.json().catch(() => null);
+      return res.ok && isTaxonomy(data) ? data : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function applyTaxonomy(t: BusinessTaxonomy | null) {
+    if (t) setTaxonomy(t);
+    else setTaxonomyError(true);
+  }
+
+  function loadTaxonomy() {
+    setTaxonomyError(false);
+    fetchTaxonomy().then(applyTaxonomy);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchTaxonomy().then((t) => {
+      if (!cancelled) applyTaxonomy(t);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const category = useMemo(
+    () => taxonomy?.categories.find((c) => c.code === categoryCode),
+    [taxonomy, categoryCode],
+  );
+  const maxSpecialties = taxonomy?.maxSpecialties ?? 3;
+  const availableSpecialties = specialtiesFor(category, offerType);
+  const serviceChoices = availableSpecialties.filter((s) => s.kind === "service");
+  const productChoices = availableSpecialties.filter((s) => s.kind === "product");
+  const needsOtherDescription = categoryCode === "other" || specialties.some(isOtherCode);
+  const offersServices = offerType === "services" || offerType === "both";
+
+  function chooseOffer(next: OfferType) {
+    setOfferType(next);
+    // Drop picks that no longer fit (e.g. product picks after switching to services only).
+    const allowed = new Set(specialtiesFor(category, next).map((s) => s.code));
+    setSpecialties((prev) => prev.filter((c) => allowed.has(c)));
+    if (next === "products") setIsMultiStaff(null);
+  }
+
+  function chooseCategory(code: string) {
+    if (code === categoryCode) return;
+    setCategoryCode(code);
+    setSpecialties([]);
+  }
+
+  function toggleSpecialty(code: string) {
+    setSpecialties((prev) => {
+      if (prev.includes(code)) return prev.filter((c) => c !== code);
+      if (prev.length >= maxSpecialties) return prev;
+      return [...prev, code];
+    });
+  }
+
+  async function handleLogoPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    setLogoError("");
+    if (!file) return;
+    if (!/^image\/(jpeg|png|webp|heic|heif|gif)$/i.test(file.type)) {
+      setLogoError("Please choose a JPG, PNG or WebP image.");
+      return;
+    }
+    try {
+      const dataUrl = await resizeLogo(file);
+      if (dataUrl.length > 2_000_000) {
+        setLogoError("That image is too large. Please choose a smaller one.");
+        return;
+      }
+      setLogoDataUrl(dataUrl);
+    } catch {
+      setLogoError("We couldn\u2019t read that image. Please try a JPG or PNG.");
+    }
+  }
+
+  function renderSpecialtyChips(list: TaxonomySpecialty[]) {
+    return (
+      <div className="bs-chips">
+        {list.map((sp) => {
+          const active = specialties.includes(sp.code);
+          const full = !active && specialties.length >= maxSpecialties;
+          return (
+            <button
+              type="button"
+              key={sp.code}
+              className={`bs-chip${active ? " active" : ""}`}
+              onClick={() => toggleSpecialty(sp.code)}
+              disabled={full}
+              aria-pressed={active}
+            >
+              {sp.label}
+            </button>
+          );
+        })}
+      </div>
+    );
   }
 
   async function handleUsernameBlur() {
@@ -181,12 +309,24 @@ export default function BusinessSignupPage() {
       setSubmitError("Business name is required.");
       return;
     }
-    if (!businessCategory) {
-      setSubmitError("Select a business category.");
-      return;
-    }
     if (!offerType) {
       setSubmitError("Let us know what your business offers.");
+      return;
+    }
+    if (!category) {
+      setSubmitError(taxonomyError ? "We couldn\u2019t load the industry list. Please try again." : "Choose your industry.");
+      return;
+    }
+    if (categoryCode !== "other" && specialties.length === 0) {
+      setSubmitError("Choose at least one thing you do.");
+      return;
+    }
+    if (needsOtherDescription && !otherDescription.trim()) {
+      setSubmitError("Tell us what your business does.");
+      return;
+    }
+    if (otherDescription.trim().length > OTHER_DESCRIPTION_MAX) {
+      setSubmitError(`Please keep your description under ${OTHER_DESCRIPTION_MAX} characters.`);
       return;
     }
     if (!acceptedTerms) {
@@ -214,10 +354,15 @@ export default function BusinessSignupPage() {
           password,
           username: username.trim().toLowerCase(),
           businessName: businessName.trim(),
-          businessCategory,
-          industries,
+          businessCategory: category.label,
+          categoryCode,
+          specialties,
+          otherDescription: needsOtherDescription ? otherDescription.trim() : undefined,
           businessDescription: businessDescription.trim() || undefined,
           offerType,
+          isStartup: isStartup ?? undefined,
+          isMultiStaff: offersServices ? isMultiStaff ?? undefined : false,
+          employeeCount: employeeCount || undefined,
           yearsInBusiness: yearsInBusiness || undefined,
           businessType: businessType || undefined,
           hasPhysicalLocation,
@@ -225,8 +370,13 @@ export default function BusinessSignupPage() {
           city: city.trim() || undefined,
           state: state.trim() || undefined,
           zipCode: hasPhysicalLocation ? zipCode.trim() || undefined : undefined,
+          billingAddress: !hasPhysicalLocation ? billingAddress.trim() || undefined : undefined,
+          billingCity: !hasPhysicalLocation ? billingCity.trim() || undefined : undefined,
+          billingState: !hasPhysicalLocation ? billingState.trim() || undefined : undefined,
+          billingZipCode: !hasPhysicalLocation ? billingZipCode.trim() || undefined : undefined,
           websiteUrl: websiteUrl.trim() || undefined,
           socialMedia: socialMedia.trim() || undefined,
+          logoDataUrl: logoDataUrl || undefined,
         }),
       });
       const data = await res.json();
@@ -236,6 +386,13 @@ export default function BusinessSignupPage() {
         if (data.field === "username" && data.error) {
           setUsernameError(data.error);
           setUsernameAvailability("taken");
+          // The username field is on the first step.
+          setCurrentStep(0);
+          return;
+        }
+        if (data.field === "industry" || data.field === "logo") {
+          setSubmitError(data.error || "Please check your industry choices.");
+          setCurrentStep(0);
           return;
         }
         setSubmitError(data.error || "Something went wrong. Please try again.");
@@ -312,6 +469,12 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
 .bs-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;}
 .bs-chip{padding:7px 13px;border-radius:20px;border:1px solid rgba(245,240,230,.18);font-size:12px;color:rgba(245,240,230,.6);background:transparent;cursor:pointer;transition:background .15s,color .15s,border-color .15s;font-family:var(--sans);}
 .bs-chip.active{background:var(--gold);color:var(--black);border-color:var(--gold);font-weight:600;}
+.bs-chip:disabled{opacity:.35;cursor:not-allowed;}
+.bs-sub-label{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(245,240,230,.45);margin:0 0 8px;}
+.bs-link-btn{background:none;border:none;padding:0;color:var(--gold);font-family:var(--sans);font-size:12px;cursor:pointer;text-decoration:underline;}
+.bs-logo-row{display:flex;align-items:center;gap:14px;}
+.bs-field .bs-logo-pick{width:72px;height:72px;border-radius:50%;border:1px dashed rgba(232,185,48,.6);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;font-size:11px;color:var(--gold);letter-spacing:.06em;text-transform:none !important;}
+.bs-field .bs-logo-pick img{width:100%;height:100%;object-fit:cover;}
 
 .bs-toggle{display:flex;gap:8px;margin-bottom:20px;}
 .bs-toggle-btn{flex:1;padding:11px 8px;border-radius:6px;border:1px solid rgba(245,240,230,.18);background:transparent;color:rgba(245,240,230,.6);font-family:var(--sans);font-size:12px;font-weight:600;letter-spacing:.03em;cursor:pointer;transition:background .15s,color .15s,border-color .15s;}
@@ -671,35 +834,121 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
                   </div>
 
                   <div className="bs-field">
-                    <label htmlFor="bs-category">Business category</label>
-                    <select
-                      id="bs-category"
-                      value={businessCategory}
-                      onChange={(e) => setBusinessCategory(e.target.value)}
-                      required
-                    >
-                      <option value="">Select a category</option>
-                      {BUSINESS_CATEGORIES.map((cat) => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
+                    <label>Logo (optional)</label>
+                    <div className="bs-logo-row">
+                      <label className="bs-logo-pick" htmlFor="bs-logo">
+                        {logoDataUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={logoDataUrl} alt="Your logo" />
+                        ) : (
+                          <span>Add logo</span>
+                        )}
+                      </label>
+                      <input
+                        id="bs-logo"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                        onChange={handleLogoPick}
+                        style={{ display: "none" }}
+                      />
+                      {logoDataUrl && (
+                        <button type="button" className="bs-link-btn" onClick={() => setLogoDataUrl("")}>
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    {logoError && <span className="bs-field-hint err" role="alert">{logoError}</span>}
                   </div>
 
                   <div className="bs-field">
-                    <label>Industries (select all that apply)</label>
+                    <label>What do you offer?</label>
                   </div>
-                  <div className="bs-chips">
-                    {INDUSTRIES.map((ind) => (
-                      <button
-                        type="button"
-                        key={ind}
-                        className={`bs-chip${industries.includes(ind) ? " active" : ""}`}
-                        onClick={() => toggleIndustry(ind)}
-                      >
-                        {ind}
-                      </button>
-                    ))}
+                  <div className="bs-toggle" role="group" aria-label="What your business offers">
+                    <button
+                      type="button"
+                      className={`bs-toggle-btn${offerType === "products" ? " active" : ""}`}
+                      onClick={() => chooseOffer("products")}
+                    >
+                      Products
+                    </button>
+                    <button
+                      type="button"
+                      className={`bs-toggle-btn${offerType === "services" ? " active" : ""}`}
+                      onClick={() => chooseOffer("services")}
+                    >
+                      Services
+                    </button>
+                    <button
+                      type="button"
+                      className={`bs-toggle-btn${offerType === "both" ? " active" : ""}`}
+                      onClick={() => chooseOffer("both")}
+                    >
+                      Both
+                    </button>
                   </div>
+
+                  <div className="bs-field">
+                    <label>Industry</label>
+                  </div>
+                  {taxonomyError ? (
+                    <p className="bs-field-hint err" style={{ marginBottom: 20 }}>
+                      We couldn&rsquo;t load the industry list.{" "}
+                      <button type="button" className="bs-link-btn" onClick={loadTaxonomy}>Try again</button>
+                    </p>
+                  ) : !taxonomy ? (
+                    <p className="bs-hint" style={{ marginBottom: 20 }}>Loading industries&hellip;</p>
+                  ) : (
+                    <div className="bs-chips" role="radiogroup" aria-label="Industry">
+                      {taxonomy.categories.map((c) => (
+                        <button
+                          type="button"
+                          key={c.code}
+                          role="radio"
+                          aria-checked={categoryCode === c.code}
+                          className={`bs-chip${categoryCode === c.code ? " active" : ""}`}
+                          onClick={() => chooseCategory(c.code)}
+                        >
+                          {c.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {category && category.code !== "other" && (
+                    <>
+                      <div className="bs-field">
+                        <label>What do you do? (pick up to {maxSpecialties})</label>
+                        {!offerType && (
+                          <span className="bs-hint">Choose products, services or both above to see your options.</span>
+                        )}
+                      </div>
+                      {offerType === "both" ? (
+                        <>
+                          <p className="bs-sub-label">Services</p>
+                          {renderSpecialtyChips(serviceChoices)}
+                          <p className="bs-sub-label">Products</p>
+                          {renderSpecialtyChips(productChoices)}
+                        </>
+                      ) : (
+                        offerType && renderSpecialtyChips(availableSpecialties)
+                      )}
+                    </>
+                  )}
+
+                  {needsOtherDescription && (
+                    <div className="bs-field">
+                      <label htmlFor="bs-other">Tell us what you do</label>
+                      <textarea
+                        id="bs-other"
+                        value={otherDescription}
+                        onChange={(e) => setOtherDescription(e.target.value.slice(0, OTHER_DESCRIPTION_MAX))}
+                        placeholder="Describe your business in your own words"
+                        rows={3}
+                        maxLength={OTHER_DESCRIPTION_MAX}
+                      />
+                      <span className="bs-hint">{otherDescription.length}/{OTHER_DESCRIPTION_MAX}</span>
+                    </div>
+                  )}
 
                   <div className="bs-field">
                     <label htmlFor="bs-desc">Description</label>
@@ -712,34 +961,55 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
                     />
                   </div>
 
+                  <p className="bs-section-label">Business details</p>
                   <div className="bs-field">
-                    <label>What do you offer?</label>
+                    <label>Is this a startup? (less than 2 years old)</label>
                   </div>
-                  <div className="bs-toggle" role="group" aria-label="What your business offers">
+                  <div className="bs-toggle" role="group" aria-label="Is this a startup">
                     <button
                       type="button"
-                      className={`bs-toggle-btn${offerType === "products" ? " active" : ""}`}
-                      onClick={() => setOfferType("products")}
+                      className={`bs-toggle-btn${isStartup === true ? " active" : ""}`}
+                      onClick={() => setIsStartup(true)}
                     >
-                      Products
+                      Yes
                     </button>
                     <button
                       type="button"
-                      className={`bs-toggle-btn${offerType === "services" ? " active" : ""}`}
-                      onClick={() => setOfferType("services")}
+                      className={`bs-toggle-btn${isStartup === false ? " active" : ""}`}
+                      onClick={() => setIsStartup(false)}
                     >
-                      Services
-                    </button>
-                    <button
-                      type="button"
-                      className={`bs-toggle-btn${offerType === "both" ? " active" : ""}`}
-                      onClick={() => setOfferType("both")}
-                    >
-                      Both
+                      No
                     </button>
                   </div>
 
-                  <p className="bs-section-label">Business details</p>
+                  {offersServices && (
+                    <>
+                      <div className="bs-field">
+                        <label>Do team members each take their own appointments?</label>
+                        <span className="bs-hint">
+                          Choose Yes if each person books their own clients, like barbers or stylists in one shop.
+                          Choose No if one person manages all bookings.
+                        </span>
+                      </div>
+                      <div className="bs-toggle" role="group" aria-label="Multiple team members take appointments">
+                        <button
+                          type="button"
+                          className={`bs-toggle-btn${isMultiStaff === true ? " active" : ""}`}
+                          onClick={() => setIsMultiStaff(true)}
+                        >
+                          Yes
+                        </button>
+                        <button
+                          type="button"
+                          className={`bs-toggle-btn${isMultiStaff === false ? " active" : ""}`}
+                          onClick={() => setIsMultiStaff(false)}
+                        >
+                          No
+                        </button>
+                      </div>
+                    </>
+                  )}
+
                   <div className="bs-row">
                     <div className="bs-field">
                       <label htmlFor="bs-years">Years in business</label>
@@ -750,23 +1020,36 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
                       >
                         <option value="">Select</option>
                         {YEARS_IN_BUSINESS.map((y) => (
-                          <option key={y.value} value={y.value}>{y.label}</option>
+                          <option key={y} value={y}>{y}</option>
                         ))}
                       </select>
                     </div>
                     <div className="bs-field">
-                      <label htmlFor="bs-structure">Business structure</label>
+                      <label htmlFor="bs-employees">Number of employees</label>
                       <select
-                        id="bs-structure"
-                        value={businessType}
-                        onChange={(e) => setBusinessType(e.target.value)}
+                        id="bs-employees"
+                        value={employeeCount}
+                        onChange={(e) => setEmployeeCount(e.target.value)}
                       >
                         <option value="">Select</option>
-                        {BUSINESS_STRUCTURES.map((s) => (
-                          <option key={s.value} value={s.value}>{s.label}</option>
+                        {EMPLOYEE_COUNTS.map((n) => (
+                          <option key={n} value={n}>{n}</option>
                         ))}
                       </select>
                     </div>
+                  </div>
+                  <div className="bs-field">
+                    <label htmlFor="bs-structure">Business structure</label>
+                    <select
+                      id="bs-structure"
+                      value={businessType}
+                      onChange={(e) => setBusinessType(e.target.value)}
+                    >
+                      <option value="">Select</option>
+                      {BUSINESS_STRUCTURES.map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <p className="bs-section-label">Location</p>
@@ -838,6 +1121,55 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
                           placeholder="11520"
                           autoComplete="postal-code"
                         />
+                      </div>
+                    </>
+                  )}
+
+                  {!hasPhysicalLocation && (
+                    <>
+                      <div className="bs-field">
+                        <label htmlFor="bs-bill-street">Billing address</label>
+                        <span className="bs-hint">Used for payout verification only. Not shown publicly.</span>
+                        <input
+                          id="bs-bill-street"
+                          type="text"
+                          value={billingAddress}
+                          onChange={(e) => setBillingAddress(e.target.value)}
+                          placeholder="123 Main Street"
+                          autoComplete="billing street-address"
+                        />
+                      </div>
+                      <div className="bs-row">
+                        <div className="bs-field">
+                          <label htmlFor="bs-bill-city">Billing city</label>
+                          <input
+                            id="bs-bill-city"
+                            type="text"
+                            value={billingCity}
+                            onChange={(e) => setBillingCity(e.target.value)}
+                            autoComplete="billing address-level2"
+                          />
+                        </div>
+                        <div className="bs-field">
+                          <label htmlFor="bs-bill-state">State</label>
+                          <input
+                            id="bs-bill-state"
+                            type="text"
+                            value={billingState}
+                            onChange={(e) => setBillingState(e.target.value)}
+                            autoComplete="billing address-level1"
+                          />
+                        </div>
+                        <div className="bs-field">
+                          <label htmlFor="bs-bill-zip">ZIP</label>
+                          <input
+                            id="bs-bill-zip"
+                            type="text"
+                            value={billingZipCode}
+                            onChange={(e) => setBillingZipCode(e.target.value)}
+                            autoComplete="billing postal-code"
+                          />
+                        </div>
                       </div>
                     </>
                   )}
