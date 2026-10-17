@@ -191,7 +191,6 @@ export default function PublicProfilePage() {
                 </div>
               )}
             </div>
-            <span className="absolute bottom-1 right-1 w-3 h-3 rounded-full bg-green-500 border-2 border-[#0F0F0F]" />
           </div>
 
           {/* Follow button */}
