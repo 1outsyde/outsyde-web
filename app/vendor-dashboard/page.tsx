@@ -643,7 +643,7 @@ export default function VendorDashboardPage() {
             <div className="stat-card">
               <div className="stat-label">Monthly Revenue</div>
               <div className="stat-value">{loadingStats ? "—" : formatCents(stats?.monthlyRevenueCents ?? 0)}</div>
-              <div className="stat-sub">This month (paid orders)</div>
+              <div className="stat-sub">This month, paid through Outsyde</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Total Orders</div>
