@@ -288,10 +288,9 @@ export default function ForBusinessClient() {
               <p id="fb-calc-help" className={styles.calcNote}>Use the price of your services and products before the customer service fee.</p>
             </div>
             <div className={styles.panel} aria-live="polite">
-              <div className={styles.calcRow}><span>Your customers pay, including the 8% service fee</span><b>{fmt(sales * 1.08)}</b></div>
               <div className={styles.calcRow}><span>Outsyde platform fee, 2%</span><b>{fmt(sales * 0.02)}</b></div>
               <div className={`${styles.calcRow} ${styles.hl}`}><span>Paid out to you</span><b>{fmt(sales * 0.98)}</b></div>
-              <p className={styles.calcNote}>The service fee is added on top of your price, so it never comes out of your pocket. Plan prices are billed separately.</p>
+              <p className={styles.calcNote}>Your customers pay a small service fee on top of your price, so it never comes out of your pocket, and they earn reward points in the Outsyde loyalty rewards program every time they buy. Plan prices are billed separately.</p>
             </div>
           </div>
         </section>
@@ -304,7 +303,7 @@ export default function ForBusinessClient() {
               <h3>Starter</h3>
               <div className={styles.who}>For businesses getting set up to sell and book online</div>
               <p>Starter puts your products and services in front of Outsyde shoppers and lets them book and pay you without the back and forth of texts and DMs. Deposits protect your time, and every payment lands in your bank through Stripe.</p>
-              <p>Your customers earn loyalty points every time they buy from you, which gives them a reason to come back. You also get a clear overview of your revenue, orders, bookings and rating, so you always know where you stand.</p>
+              <p>Your customers earn reward points through the Outsyde loyalty rewards program every time they buy from you, which gives them a reason to come back. You also get a clear overview of your revenue, orders, bookings and rating, so you always know where you stand.</p>
             </article>
             <article className={`${styles.panel} ${styles.panelFeatured}`}>
               <h3>Growth</h3>
@@ -324,13 +323,13 @@ export default function ForBusinessClient() {
         <section className={`${styles.section} ${styles.infoGrid}`} aria-label="Fees and getting started">
           <div className={styles.panel}>
             <h3>Simple, fair fees</h3>
-            <p>Fees are the same on every plan. Your customer pays a small service fee on top of your price, and Outsyde keeps 2% of your sale.</p>
+            <p>Fees are the same on every plan. Your customer pays a small service fee on top of your price, and Outsyde keeps 2% of your sale. In return, your customers earn reward points through the Outsyde loyalty rewards program every time they buy from you.</p>
             <div className={styles.split}>
-              <div><b>8%</b><span>Paid by your customer</span></div>
+              <div><b>Points</b><span>Earned by your customer</span></div>
               <div><b>2%</b><span>Outsyde platform fee</span></div>
               <div><b>98%</b><span>Paid out to you</span></div>
             </div>
-            <p>Example: on a $100 service, your customer pays $108 and you receive $98.</p>
+            <p>Example: on a $100 service, you receive $98.</p>
           </div>
           <div className={styles.panel}>
             <h3>Getting started</h3>
@@ -344,7 +343,8 @@ export default function ForBusinessClient() {
         </section>
 
         <section className={`${styles.panel} ${styles.pointsBlock}`} aria-labelledby="points-title">
-          <h3 id="points-title">Loyalty points your customers love</h3>
+          <h3 id="points-title">A loyalty rewards program for your customers</h3>
+          <p>Every purchase from your business earns your customers reward points through the Outsyde loyalty rewards program, which gives them a reason to come back and buy again.</p>
           <p>Points accumulate with every transaction across all Outsyde powered stores. Redeem them at checkout for a discount on your next purchase.</p>
           <p>Points are added automatically with every purchase. The more you shop, the more you save.</p>
         </section>

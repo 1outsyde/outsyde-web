@@ -80,7 +80,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       { name: "Product checkout and order tracking", cells: [Y, Y, Y] },
       { name: "Payouts to your bank through Stripe", cells: [Y, Y, Y] },
       { name: "Customer reviews and ratings", cells: [Y, Y, Y] },
-      { name: "Loyalty points for your customers", desc: "Shoppers earn points on every purchase, which keeps them coming back.", cells: [Y, Y, Y] },
+      { name: "Loyalty rewards program for your customers", desc: "Customers earn reward points on every purchase, which keeps them coming back.", cells: [Y, Y, Y] },
       { name: "Staff accounts", cells: [v("Up to 3"), v("Up to 8"), v("Unlimited")] },
     ],
   },
@@ -126,7 +126,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
 export const FAQS: { q: string; a: string }[] = [
   { q: "Can I change my plan later?", a: "Yes. You can move between Starter, Growth and Pro at any time from your account on goutsyde.com." },
   { q: "What happens if I cancel?", a: "Your plan stays active until the end of your current billing period. After that, your listings are paused, and they come back as soon as you start a plan again." },
-  { q: "Do the fees change by plan?", a: "No. Every plan has the same fees. Your customer pays an 8% service fee on top of your price, and Outsyde keeps 2% of the sale. You receive 98%." },
+  { q: "Do the fees change by plan?", a: "No. Every plan has the same fees. Your customer pays a small service fee on top of your price and earns reward points through the Outsyde loyalty rewards program. Outsyde keeps 2% of the sale, and you receive 98%." },
   { q: "How do I get paid?", a: "Payments go to your bank account through Stripe. You connect Stripe during setup, and your products and services go live once that is done." },
   { q: "Do I need to be approved?", a: "Yes. Every business is reviewed by our team before it goes live, which keeps the marketplace trustworthy for customers." },
   { q: "What does “Coming soon” mean?", a: "Those features are part of the plan and are being built now. You will get them on your plan as soon as they launch, with no extra charge for the plan itself." },
