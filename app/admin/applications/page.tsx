@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 // Field names verified against GET /api/admin/applications. The endpoint also
@@ -22,6 +23,8 @@ interface Application {
   ownerName: string | null;
   ownerEmail: string | null;
   ownerPhone: string | null;
+  // Added 2026-10-17 (backend #304): every signup answer; full view at /admin/applications/[id].
+  signupDetails?: { industry?: { categoryLabel?: string | null } };
 }
 
 type AuthState = "loading" | "ok" | "unauthorized" | "forbidden";
@@ -36,7 +39,8 @@ function formatDate(value: string): string {
 
 function buildMeta(app: Application): string {
   const location = [app.city, app.state].filter(Boolean).join(", ");
-  return [app.category, location, app.ownerName, formatDate(app.createdAt)]
+  const industry = app.signupDetails?.industry?.categoryLabel || app.category;
+  return [industry, location, app.ownerName, formatDate(app.createdAt)]
     .filter((part) => !!part && String(part).trim() !== "")
     .join(" · ");
 }
@@ -195,6 +199,8 @@ export default function AdminApplicationsPage() {
       margin-bottom: 8px;
     }
     .issue-title { font-size: 14px; color: #F5F0E6; font-weight: 500; }
+    .issue-link { text-decoration: none; display: inline-block; }
+    .issue-link:hover { color: #E8B930; text-decoration: underline; }
     .issue-meta { font-size: 12px; color: rgba(245,240,230,0.4); margin-top: 3px; }
     .severity-badge {
       font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
@@ -384,7 +390,9 @@ export default function AdminApplicationsPage() {
               <div key={app.id}>
                 <div className="issue-row">
                   <div>
-                    <div className="issue-title">{app.name}</div>
+                    <Link href={`/admin/applications/${encodeURIComponent(app.id)}`} className="issue-title issue-link">
+                      {app.name}
+                    </Link>
                     <div className="issue-meta">{buildMeta(app)}</div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
