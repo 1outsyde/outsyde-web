@@ -29,6 +29,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const routes = [
     "",                       // homepage
     "/shop",                  // marketplace
+    "/for-business",          // business plans and pricing
     "/shop/lotus",            // Lotus storefront
     "/shop/lotus/about",
     "/shop/lotus/terms",

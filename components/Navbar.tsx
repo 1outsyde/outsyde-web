@@ -159,6 +159,7 @@ export default function Navbar() {
             {!user && (
               <>
                 <a href="/shop" className="on-link">Shop</a>
+                <a href="/for-business" className="on-link">For Business</a>
                 <a href="/login" className="on-link-btn on-link-outline">Log In</a>
                 <a href="/signup" className="on-link-btn on-link-fill">Sign Up</a>
               </>
@@ -220,6 +221,7 @@ export default function Navbar() {
           {!user && (
             <>
               <a href="/shop" onClick={() => setMenuOpen(false)}>Shop</a>
+              <a href="/for-business" onClick={() => setMenuOpen(false)}>For Business</a>
               <a href="/login" onClick={() => setMenuOpen(false)}>Log In</a>
               <a href="/signup" onClick={() => setMenuOpen(false)}>Sign Up</a>
             </>

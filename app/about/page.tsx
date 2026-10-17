@@ -179,7 +179,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
         <div className="nav-links">
           <a href="/shop">Shop</a>
           <a href="/#photographers">Photographers</a>
-          <a href="/#business-band">For Businesses</a>
+          <a href="/for-business">For Businesses</a>
         </div>
         <div className="nav-actions">
           {session?.authenticated ? (
@@ -325,7 +325,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
         </div>
         <div className="about-cta-ctas">
           <a href="/shop" className="btn-about-cta btn-about-gold">Shop Now →</a>
-          <a href="/coming-soon" className="btn-about-cta btn-about-ghost">Partner With Us</a>
+          <a href="/for-business" className="btn-about-cta btn-about-ghost">Partner With Us</a>
         </div>
       </div>
 
@@ -351,7 +351,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
               <li><a href="/business-signup">Join the Marketplace</a></li>
               <li><a href="/business-signup">List Your Services</a></li>
               <li><a href="/coming-soon">Manage Bookings</a></li>
-              <li><a href="/coming-soon">Partner With Us</a></li>
+              <li><a href="/for-business">Partner With Us</a></li>
             </ul>
           </div>
 
