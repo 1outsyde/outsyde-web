@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import CoverVideo from "@/components/CoverVideo";
 import { COVER_VIDEO_MAX_SECONDS, uploadCoverVideo } from "@/lib/coverMedia";
+import { isTaxonomy, type BusinessTaxonomy } from "@/lib/business-taxonomy";
+import IndustrySection, { industryProblem, offerTypeOf, type IndustryValue } from "./IndustrySection";
 
 interface HoursDay { open: string; close: string; closed?: boolean; }
 
@@ -36,6 +38,12 @@ interface Business {
   responseTimeValue?: number;
   responseTimeUnit?: string;
   hoursOfOperation?: Record<string, HoursDay>;
+  // Industry (shared list, migration 047). Returned by GET /api/vendor/my-business.
+  categoryCode?: string | null;
+  specialties?: string[] | null;
+  otherDescription?: string | null;
+  hasProducts?: boolean;
+  hasServices?: boolean;
 }
 
 const DAYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] as const;
@@ -175,6 +183,11 @@ export default function VendorDashboardPage() {
 
   const [sfForm, setSfForm] = useState<StorefrontForm | null>(null);
   const [sfSaving, setSfSaving] = useState(false);
+  const [industry, setIndustry] = useState<IndustryValue>({ categoryCode: '', specialties: [], otherDescription: '' });
+  // Industry fields are sent only after the business changes them, so ordinary storefront saves stay as they were.
+  const [industryDirty, setIndustryDirty] = useState(false);
+  const [taxonomy, setTaxonomy] = useState<BusinessTaxonomy | null>(null);
+  const [taxonomyError, setTaxonomyError] = useState(false);
   const [sfError, setSfError] = useState("");
   const [sfSuccess, setSfSuccess] = useState(false);
   const [sfLogoUploading, setSfLogoUploading] = useState(false);
@@ -209,6 +222,7 @@ export default function VendorDashboardPage() {
             if (h) hours[d] = { open: h.open ?? '09:00', close: h.close ?? '17:00', closed: h.closed ?? false };
           }
         }
+        setIndustry(industryFrom(biz));
         setSfForm({
           name: biz.name ?? '',
           tagline: biz.tagline ?? '',
@@ -385,11 +399,44 @@ export default function VendorDashboardPage() {
     return url;
   }
 
+  function industryFrom(biz: Business): IndustryValue {
+    return {
+      categoryCode: biz.categoryCode ?? '',
+      specialties: Array.isArray(biz.specialties) ? biz.specialties : [],
+      otherDescription: biz.otherDescription ?? '',
+    };
+  }
+
+  async function loadTaxonomy() {
+    setTaxonomyError(false);
+    try {
+      const res = await fetch('/api/taxonomy/business-categories');
+      const data: unknown = await res.json().catch(() => null);
+      if (res.ok && isTaxonomy(data)) setTaxonomy(data);
+      else setTaxonomyError(true);
+    } catch {
+      setTaxonomyError(true);
+    }
+  }
+
+  useEffect(() => {
+    if (tab === 'storefront' && !taxonomy && !taxonomyError) loadTaxonomy();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
   async function handleSaveStorefront() {
     if (!sfForm) return;
-    setSfSaving(true);
     setSfError('');
     setSfSuccess(false);
+    const offer = offerTypeOf(business?.hasProducts, business?.hasServices);
+    if (industryDirty) {
+      const problem = industryProblem(industry, offer);
+      if (problem) {
+        setSfError(problem);
+        return;
+      }
+    }
+    setSfSaving(true);
     try {
       const res = await fetch('/api/vendor-dashboard/profile', {
         method: 'PATCH',
@@ -401,8 +448,9 @@ export default function VendorDashboardPage() {
           contactEmail: sfForm.contactEmail.trim(),
           contactPhone: sfForm.contactPhone.trim(),
           websiteUrl: sfForm.websiteUrl.trim(),
-          city: sfForm.city.trim(),
-          state: sfForm.state.trim(),
+          // Left out when blank: the backend rejects an empty city/state, which blocked every save for businesses without one.
+          city: sfForm.city.trim() || undefined,
+          state: sfForm.state.trim() || undefined,
           logoImage: sfForm.logoImage.trim() || null,
           coverImage: sfForm.coverImage.trim() || null,
           coverMediaType: sfForm.coverImage.trim() ? sfForm.coverMediaType : null,
@@ -414,6 +462,11 @@ export default function VendorDashboardPage() {
           responseTimeValue: sfForm.responseTimeValue,
           responseTimeUnit: sfForm.responseTimeUnit,
           hoursOfOperation: sfForm.hoursOfOperation,
+          ...(industryDirty ? {
+            categoryCode: industry.categoryCode,
+            specialties: industry.categoryCode === 'other' ? [] : industry.specialties,
+            otherDescription: industry.otherDescription.trim() || null,
+          } : {}),
         }),
       });
       const data = await res.json();
@@ -421,6 +474,8 @@ export default function VendorDashboardPage() {
         setSfError(data.error ?? 'Failed to save. Please try again.');
       } else {
         setBusiness(prev => prev ? { ...prev, ...data.business } : prev);
+        if (data.business) setIndustry(industryFrom(data.business));
+        setIndustryDirty(false);
         setSfSuccess(true);
         setTimeout(() => setSfSuccess(false), 3000);
       }
@@ -569,6 +624,15 @@ export default function VendorDashboardPage() {
         .sf-day-label { width: 90px; font-size: 12px; color: #666; text-transform: capitalize; flex-shrink: 0; }
         .sf-time-input { width: 100px; padding: 6px 8px; background: #141414; border: 1px solid #2a2a2a; border-radius: 5px; color: #f5f0e8; font-size: 12px; font-family: inherit; outline: none; }
         .sf-time-input:focus { border-color: #c9a84c; }
+        .sf-help { font-size: 12px; color: #777; margin: 0 0 12px; line-height: 1.5; }
+        .sf-sub-label { font-size: 11px; color: #777; margin: 4px 0 6px; }
+        .sf-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+        .sf-chip { padding: 7px 12px; border-radius: 999px; border: 1px solid #2a2a2a; background: #141414; color: #aaa; font-size: 12px; font-family: inherit; cursor: pointer; transition: border-color 0.15s, color 0.15s; }
+        .sf-chip:hover:not(:disabled) { border-color: #c9a84c; color: #f5f0e8; }
+        .sf-chip.active { border-color: #c9a84c; background: #1a1608; color: #c9a84c; }
+        .sf-chip:disabled { opacity: 0.4; cursor: default; }
+        .sf-chip:focus-visible, .sf-link-btn:focus-visible { outline: 2px solid #c9a84c; outline-offset: 2px; }
+        .sf-link-btn { background: none; border: none; padding: 0; color: #c9a84c; font: inherit; text-decoration: underline; cursor: pointer; }
         .sf-time-input:disabled { opacity: 0.3; cursor: not-allowed; }
         .sf-closed-label { font-size: 12px; color: #555; cursor: pointer; display: flex; align-items: center; gap: 5px; }
         .sf-img-row { display: flex; align-items: center; gap: 12px; }
@@ -925,6 +989,16 @@ export default function VendorDashboardPage() {
                   <textarea className="sf-textarea" placeholder="Tell customers about your business" value={sfForm.description} onChange={e => setSfForm(f => f && ({ ...f, description: e.target.value }))} />
                 </div>
               </div>
+
+              {/* Industry */}
+              <IndustrySection
+                taxonomy={taxonomy}
+                taxonomyError={taxonomyError}
+                onRetry={loadTaxonomy}
+                offer={offerTypeOf(business?.hasProducts, business?.hasServices)}
+                value={industry}
+                onChange={(next) => { setIndustry(next); setIndustryDirty(true); }}
+              />
 
               {/* Contact */}
               <div className="sf-section">
