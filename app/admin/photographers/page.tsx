@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 // Verified fields from GET /api/admin/photographers.
@@ -21,6 +22,10 @@ interface AdminPhotographer {
   visibilityStatus: string; // "public" | "hidden" | "flagged"
   adminNotes: string | null;
   createdAt: string;
+  // Added by the backend 2026-10-18 (#320); missing on older backends.
+  ownerEmail?: string | null;
+  ownerPhone?: string | null;
+  specialtyLabels?: string[];
 }
 
 type AuthState = "loading" | "ok" | "unauthorized" | "forbidden";
@@ -147,7 +152,8 @@ export default function AdminPhotographersPage() {
         p.displayName?.toLowerCase().includes(term) ||
         p.city?.toLowerCase().includes(term) ||
         p.state?.toLowerCase().includes(term) ||
-        p.specialties?.some((s) => s.toLowerCase().includes(term))
+        p.specialties?.some((s) => s.toLowerCase().includes(term)) ||
+        p.ownerEmail?.toLowerCase().includes(term)
       );
     });
   }, [photographers, visFilter, search]);
@@ -276,6 +282,8 @@ export default function AdminPhotographersPage() {
       margin-bottom: 8px;
     }
     .issue-title { font-size: 14px; color: #F5F0E6; font-weight: 500; }
+    .issue-link { display: inline-block; text-decoration: none; }
+    .issue-link:hover { color: #E8B930; text-decoration: underline; }
     .issue-meta { font-size: 12px; color: rgba(245,240,230,0.4); margin-top: 3px; }
     .severity-badge {
       font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
@@ -520,8 +528,11 @@ export default function AdminPhotographersPage() {
             return (
               <div key={p.id} className="issue-row">
                 <div>
-                  <div className="issue-title">{p.displayName}</div>
+                  <Link href={`/admin/photographers/${encodeURIComponent(p.id)}`} className="issue-title issue-link">{p.displayName}</Link>
                   <div className="issue-meta">{buildMeta(p)}</div>
+                  {(p.ownerEmail || p.ownerPhone) && (
+                    <div className="issue-meta">{[p.ownerEmail, p.ownerPhone].filter(Boolean).join(" · ")}</div>
+                  )}
                   {caution && (
                     <div className="row-caution">
                       May be a deleted account — restoring could republish it.
