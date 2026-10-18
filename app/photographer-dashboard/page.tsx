@@ -3,6 +3,16 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import {
+  BOOKING_FILTERS,
+  bookingStatusColor,
+  bookingStatusLabel,
+  isPendingRequest,
+  isVisibleBooking,
+  matchesBookingFilter,
+  reportTimeZoneOnce,
+  type BookingFilter,
+} from "@/lib/booking-status";
 
 interface PhotographerProfile {
   id: string;
@@ -43,14 +53,6 @@ function formatCurrency(cents: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 }
 
-function statusColor(status: string): string {
-  const s = status?.toLowerCase();
-  if (["confirmed", "completed", "paid"].includes(s)) return "status-green";
-  if (["pending", "processing"].includes(s)) return "status-yellow";
-  if (["cancelled", "rejected", "refunded"].includes(s)) return "status-red";
-  return "status-gray";
-}
-
 export default function PhotographerDashboardPage() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("overview");
@@ -61,6 +63,7 @@ export default function PhotographerDashboardPage() {
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [totalEarnedCents, setTotalEarnedCents] = useState<number | null>(null);
+  const [bookingFilter, setBookingFilter] = useState<BookingFilter>("all");
 
   async function handleBookingAction(bookingId: string, action: "accept" | "decline") {
     setActionLoading(`${bookingId}-${action}`);
@@ -135,6 +138,11 @@ export default function PhotographerDashboardPage() {
     })();
   }, [router]);
 
+  // Once the dashboard has loaded for a signed in photographer, fill in their time zone if it is empty.
+  useEffect(() => {
+    if (profile) reportTimeZoneOnce();
+  }, [profile]);
+
   if (loadingProfile) {
     return (
       <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -154,8 +162,13 @@ export default function PhotographerDashboardPage() {
 
   const hourlyRateDollars = profile.hourlyRate / 100;
 
-  const confirmedBookings = bookings.filter(b => ["confirmed", "completed", "paid"].includes(b.status?.toLowerCase()));
-  const pendingBookings = bookings.filter(b => b.status?.toLowerCase() === "pending");
+  // Unpaid checkouts (draft, pending_payment) are never shown. Backend #326 already leaves them out.
+  const visibleBookings = bookings.filter(b => isVisibleBooking(b.status));
+  const confirmedBookings = visibleBookings.filter(b => ["confirmed", "completed", "paid"].includes(b.status?.toLowerCase()));
+  // Real requests waiting on the photographer (pending_provider), plus legacy "pending" rows.
+  const pendingBookings = visibleBookings.filter(b => isPendingRequest(b.status));
+  const filteredBookings = visibleBookings.filter(b => matchesBookingFilter(b, bookingFilter));
+  const activeFilterLabel = BOOKING_FILTERS.find(f => f.key === bookingFilter)?.label ?? "All";
 
   return (
     <>
@@ -194,6 +207,10 @@ export default function PhotographerDashboardPage() {
         .tab-btn:hover { color: #aaa; }
         .tab-btn.active { color: #c9a84c; border-bottom-color: #c9a84c; }
         .table-wrap { overflow-x: auto; }
+        .booking-filter-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; }
+        .booking-filter-tab { font-size: 12px; font-weight: 500; font-family: inherit; letter-spacing: 0.04em; padding: 5px 14px; border-radius: 99px; border: 1px solid #2a2a2a; background: #141414; color: #666; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+        .booking-filter-tab:hover { color: #aaa; border-color: #3a3a3a; }
+        .booking-filter-tab.active { background: #c9a84c; color: #000; border-color: #c9a84c; }
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
         th { text-align: left; font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #555; padding: 8px 12px; border-bottom: 1px solid #1e1e1e; white-space: nowrap; }
         td { padding: 12px 12px; border-bottom: 1px solid #141414; color: #aaa; vertical-align: middle; }
@@ -288,7 +305,7 @@ export default function PhotographerDashboardPage() {
                 onClick={() => setTab(t)}
               >
                 {t.charAt(0).toUpperCase() + t.slice(1)}
-                {t === "bookings" && bookings.length > 0 && ` (${bookings.length})`}
+                {t === "bookings" && visibleBookings.length > 0 && ` (${visibleBookings.length})`}
               </button>
             ))}
           </div>
@@ -345,7 +362,7 @@ export default function PhotographerDashboardPage() {
                 </div>
               )}
 
-              {!loadingBookings && bookings.length > 0 && (
+              {!loadingBookings && visibleBookings.length > 0 && (
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "#555", marginBottom: 12 }}>
                     Recent bookings
@@ -356,21 +373,21 @@ export default function PhotographerDashboardPage() {
                         <tr><th>Customer</th><th>Date</th><th>Service</th><th>You earn</th><th>Status</th></tr>
                       </thead>
                       <tbody>
-                        {bookings.slice(0, 5).map((b) => (
+                        {visibleBookings.slice(0, 5).map((b) => (
                           <tr key={b.id}>
                             <td style={{ color: "#f5f0e8" }}>{b.customerName}</td>
                             <td>{b.date}</td>
                             <td>{b.serviceName ?? "—"}</td>
                             <td className="amount" style={{ color: "#27ae60" }}>${b.vendorNetAmount?.toFixed(2)}</td>
-                            <td><span className={statusColor(b.status)}>{b.status}</span></td>
+                            <td><span className={bookingStatusColor(b.status)}>{bookingStatusLabel(b.status)}</span></td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                  {bookings.length > 5 && (
+                  {visibleBookings.length > 5 && (
                     <button className="tab-btn" style={{ marginTop: 12, padding: "8px 0" }} onClick={() => setTab("bookings")}>
-                      View all {bookings.length} bookings →
+                      View all {visibleBookings.length} bookings →
                     </button>
                   )}
                 </div>
@@ -382,12 +399,28 @@ export default function PhotographerDashboardPage() {
             <div className="table-wrap">
               {loadingBookings ? (
                 <p style={{ color: "#333", fontSize: 13, padding: "32px 0", textAlign: "center" }}>Loading bookings…</p>
-              ) : bookings.length === 0 ? (
+              ) : visibleBookings.length === 0 ? (
                 <div className="empty-state">
                   <p>No bookings yet</p>
                   <p className="empty-sub">Bookings will appear here once clients schedule sessions.</p>
                 </div>
               ) : (
+                <>
+                <div className="booking-filter-tabs">
+                  {BOOKING_FILTERS.map(f => (
+                    <button
+                      key={f.key}
+                      className={`booking-filter-tab${bookingFilter === f.key ? " active" : ""}`}
+                      onClick={() => setBookingFilter(f.key)}
+                    >
+                      {f.label}
+                      {f.key !== "all" && ` (${visibleBookings.filter(b => matchesBookingFilter(b, f.key)).length})`}
+                    </button>
+                  ))}
+                </div>
+                {filteredBookings.length === 0 ? (
+                  <div className="empty-state"><p>No {activeFilterLabel.toLowerCase()} bookings.</p></div>
+                ) : (
                 <table>
                   <thead>
                     <tr>
@@ -396,7 +429,7 @@ export default function PhotographerDashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {bookings.map((b) => (
+                    {filteredBookings.map((b) => (
                       <tr key={b.id}>
                         <td style={{ color: "#555", fontFamily: "monospace", fontSize: 12 }}>
                           {b.bookingNumber != null ? `#S${String(b.bookingNumber).padStart(4, "0")}` : "—"}
@@ -408,7 +441,7 @@ export default function PhotographerDashboardPage() {
                         <td className="amount">${b.subtotalAmount?.toFixed(2)}</td>
                         <td style={{ color: "#c0392b" }}>-${b.bookingFeeAmount?.toFixed(2)}</td>
                         <td style={{ color: "#27ae60", fontWeight: 600 }}>${b.vendorNetAmount?.toFixed(2)}</td>
-                        <td><span className={statusColor(b.status)}>{b.status}</span></td>
+                        <td><span className={bookingStatusColor(b.status)}>{bookingStatusLabel(b.status)}</span></td>
                         <td>
                           {b.status === "pending_provider" && (
                             <div style={{ display: "flex", gap: 6 }}>
@@ -433,6 +466,8 @@ export default function PhotographerDashboardPage() {
                     ))}
                   </tbody>
                 </table>
+                )}
+                </>
               )}
             </div>
           )}
