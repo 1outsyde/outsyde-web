@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import ExistingAccountHint, { isAlreadyRegistered } from "@/components/ExistingAccountHint";
+import { isPhotographerTaxonomy, PHOTO_OTHER_CODE, type PhotographerOption, type PhotographerTaxonomy } from "@/lib/photographer-taxonomy";
 
 declare global {
   interface Window {
@@ -29,8 +30,11 @@ interface FormData {
   state: string;
   hourlyRate: string;
   portfolioUrl: string;
-  specialties: string[];
-  shootLocation: string;
+  // Shared list codes (photo.*), max from the list, Other needs specialtyOther (2026-10-18).
+  specialtyCodes: string[];
+  specialtyOther: string;
+  shootLocation: string[];
+  additionalServices: string[];
   experienceLevel: string;
   equipmentLevel: string;
   travelRadius: string;
@@ -53,37 +57,7 @@ const US_STATES = [
   "Virginia","Washington","West Virginia","Wisconsin","Wyoming",
 ];
 
-const SPECIALTIES = [
-  "Portraits","Weddings","Events","Commercial","Real Estate","Fashion",
-  "Sports","Wildlife","Street","Food","Architecture","Travel",
-  "Newborn & Family","Boudoir","Product","Other",
-];
-
-const SHOOT_LOCATIONS = [
-  "On location (client's choice)",
-  "Studio only",
-  "Studio + on location",
-  "Outdoor only",
-];
-
-const EXPERIENCE_LEVELS = [
-  "Hobbyist","Semi-professional","Professional","Industry veteran (10+ years)",
-];
-
-const EQUIPMENT_LEVELS = [
-  "Entry-level DSLR / mirrorless",
-  "Mid-range professional",
-  "High-end professional",
-  "Cinema / commercial grade",
-];
-
-const DELIVERY_TIMES = [
-  "24–48 hours","3–5 days","1 week","2 weeks","3–4 weeks","Negotiable",
-];
-
-const PRICING_TYPES = [
-  "Hourly","Per session","Package-based","Custom quote",
-];
+// Specialties and answer choices come from the shared list (GET /api/taxonomy/photographer).
 
 const STEPS = ["Account", "Profile"];
 
@@ -122,6 +96,8 @@ function validateStep(step: number, form: FormData): FieldErrors {
       errors.hourlyRate = "Enter a valid rate (minimum $1)";
     if (form.portfolioUrl.trim() && !/^https?:\/\/.+/.test(form.portfolioUrl.trim()))
       errors.portfolioUrl = "Enter a valid URL starting with http:// or https://";
+    if (form.specialtyCodes.includes(PHOTO_OTHER_CODE) && !form.specialtyOther.trim())
+      errors.specialtyOther = "Tell us what you shoot";
   }
 
   return errors;
@@ -143,13 +119,27 @@ export default function PhotographerSignupPage() {
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [usernameTimer, setUsernameTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [taxonomy, setTaxonomy] = useState<PhotographerTaxonomy | null>(null);
+  const [taxonomyError, setTaxonomyError] = useState(false);
+
+  function loadTaxonomy() {
+    setTaxonomyError(false);
+    fetch("/api/taxonomy/photographer")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: unknown) => (isPhotographerTaxonomy(d) ? setTaxonomy(d) : setTaxonomyError(true)))
+      .catch(() => setTaxonomyError(true));
+  }
+
+  useEffect(() => {
+    loadTaxonomy();
+  }, []);
 
   const [form, setForm] = useState<FormData>({
     email: "", password: "", confirmPassword: "",
     firstName: "", lastName: "", username: "", phone: "",
     displayName: "", bio: "", city: "", state: "",
-    hourlyRate: "", portfolioUrl: "", specialties: [],
-    shootLocation: "", experienceLevel: "", equipmentLevel: "",
+    hourlyRate: "", portfolioUrl: "", specialtyCodes: [], specialtyOther: "",
+    shootLocation: [], additionalServices: [], experienceLevel: "", equipmentLevel: "",
     travelRadius: "", deliveryTime: "", pricingType: "", startingPrice: "",
     minimumBooking: "",
   });
@@ -225,11 +215,24 @@ export default function PhotographerSignupPage() {
     setUsernameTimer(timer);
   }
 
-  function toggleSpecialty(s: string) {
+  function toggleSpecialty(code: string) {
+    const max = taxonomy?.maxSpecialties ?? 5;
     setForm((f) => {
-      const has = f.specialties.includes(s);
-      return { ...f, specialties: has ? f.specialties.filter((x) => x !== s) : [...f.specialties, s] };
+      const has = f.specialtyCodes.includes(code);
+      if (!has && f.specialtyCodes.length >= max) return f;
+      return { ...f, specialtyCodes: has ? f.specialtyCodes.filter((x) => x !== code) : [...f.specialtyCodes, code] };
     });
+  }
+
+  function toggleIn(field: "shootLocation" | "additionalServices", value: string) {
+    setForm((f) => {
+      const list = f[field];
+      return { ...f, [field]: list.includes(value) ? list.filter((x) => x !== value) : [...list, value] };
+    });
+  }
+
+  function opts(name: string): PhotographerOption[] {
+    return taxonomy?.options?.[name] ?? [];
   }
 
   function scrollTop() {
@@ -275,8 +278,10 @@ export default function PhotographerSignupPage() {
       state: form.state,
       hourlyRate: Number(form.hourlyRate),
       portfolioUrl: form.portfolioUrl.trim(),
-      specialties: form.specialties,
-      shootLocation: form.shootLocation || undefined,
+      specialtyCodes: form.specialtyCodes,
+      specialtyOther: form.specialtyCodes.includes(PHOTO_OTHER_CODE) ? form.specialtyOther.trim() : undefined,
+      shootLocation: form.shootLocation.length ? form.shootLocation : undefined,
+      additionalServices: form.additionalServices.length ? form.additionalServices : undefined,
       experienceLevel: form.experienceLevel || undefined,
       equipmentLevel: form.equipmentLevel || undefined,
       travelRadius: form.travelRadius || undefined,
@@ -632,9 +637,11 @@ export default function PhotographerSignupPage() {
                   {errors.hourlyRate && <div className="error-msg">{errors.hourlyRate}</div>}
                 </div>
                 <div className="field-group">
-                  <label>Travel radius (miles)</label>
-                  <input className="input-field" type="number" placeholder="25" min="0"
-                    value={form.travelRadius} onChange={(e) => set("travelRadius", e.target.value)} />
+                  <label>How far will you travel?</label>
+                  <select className="input-field" value={form.travelRadius} onChange={(e) => set("travelRadius", e.target.value)}>
+                    <option value="">Select…</option>
+                    {opts("travelRadius").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
                 </div>
               </div>
 
@@ -647,72 +654,130 @@ export default function PhotographerSignupPage() {
 
               <div className="section-divider">Specialties</div>
 
-              <div className="field-group">
-                <label>Pick all that apply</label>
-                <div className="chips">
-                  {SPECIALTIES.map((s) => (
-                    <button key={s} type="button"
-                      className={`chip${form.specialties.includes(s) ? " selected" : ""}`}
-                      onClick={() => toggleSpecialty(s)}>
-                      {s}
-                    </button>
-                  ))}
+              {taxonomyError ? (
+                <div className="field-group">
+                  <div className="error-msg">
+                    We couldn&rsquo;t load the specialty list.{" "}
+                    <button type="button" className="chip" onClick={loadTaxonomy}>Try again</button>
+                  </div>
                 </div>
-              </div>
+              ) : !taxonomy ? (
+                <div className="field-group"><label>Loading choices…</label></div>
+              ) : (
+                <>
+                  <div className="field-group">
+                    <label>What do you shoot? Pick up to {taxonomy.maxSpecialties}</label>
+                    <div className="chips">
+                      {taxonomy.specialties.map((sp) => {
+                        const on = form.specialtyCodes.includes(sp.code);
+                        const full = !on && form.specialtyCodes.length >= taxonomy.maxSpecialties;
+                        return (
+                          <button key={sp.code} type="button" aria-pressed={on} disabled={full}
+                            className={`chip${on ? " selected" : ""}`}
+                            style={full ? { opacity: 0.4, cursor: "default" } : undefined}
+                            onClick={() => toggleSpecialty(sp.code)}>
+                            {sp.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-              <div className="section-divider">Additional details <span style={{ color: "#555", textTransform: "none", fontWeight: 400, letterSpacing: 0 }}>(optional)</span></div>
+                  {form.specialtyCodes.includes(PHOTO_OTHER_CODE) && (
+                    <div className="field-group" data-field="specialtyOther">
+                      <label htmlFor="ps-other">Tell us what you shoot <span className="req">*</span></label>
+                      <textarea id="ps-other" className={fieldClass("specialtyOther")} rows={3} maxLength={taxonomy.otherMax}
+                        placeholder="Describe your photography in your own words"
+                        value={form.specialtyOther} onChange={(e) => set("specialtyOther", e.target.value.slice(0, taxonomy.otherMax))} />
+                      {errors.specialtyOther && <div className="error-msg">{errors.specialtyOther}</div>}
+                    </div>
+                  )}
 
-              <div className="row-2">
-                <div className="field-group">
-                  <label>Shoot location</label>
-                  <select className="input-field" value={form.shootLocation} onChange={(e) => set("shootLocation", e.target.value)}>
-                    <option value="">Select…</option>
-                    {SHOOT_LOCATIONS.map((l) => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                </div>
-                <div className="field-group">
-                  <label>Experience level</label>
-                  <select className="input-field" value={form.experienceLevel} onChange={(e) => set("experienceLevel", e.target.value)}>
-                    <option value="">Select…</option>
-                    {EXPERIENCE_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                </div>
-              </div>
+                  <div className="section-divider">Additional details <span style={{ color: "#555", textTransform: "none", fontWeight: 400, letterSpacing: 0 }}>(optional)</span></div>
 
-              <div className="row-2">
-                <div className="field-group">
-                  <label>Equipment level</label>
-                  <select className="input-field" value={form.equipmentLevel} onChange={(e) => set("equipmentLevel", e.target.value)}>
-                    <option value="">Select…</option>
-                    {EQUIPMENT_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                </div>
-                <div className="field-group">
-                  <label>Delivery time</label>
-                  <select className="input-field" value={form.deliveryTime} onChange={(e) => set("deliveryTime", e.target.value)}>
-                    <option value="">Select…</option>
-                    {DELIVERY_TIMES.map((d) => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
-              </div>
+                  <div className="field-group">
+                    <label>Where do you shoot?</label>
+                    <div className="chips">
+                      {opts("shootLocation").map((o) => {
+                        const on = form.shootLocation.includes(o.value);
+                        return (
+                          <button key={o.value} type="button" aria-pressed={on}
+                            className={`chip${on ? " selected" : ""}`} onClick={() => toggleIn("shootLocation", o.value)}>
+                            {o.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-              <div className="row-2">
-                <div className="field-group">
-                  <label>Pricing type</label>
-                  <select className="input-field" value={form.pricingType} onChange={(e) => set("pricingType", e.target.value)}>
-                    <option value="">Select…</option>
-                    {PRICING_TYPES.map((p) => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-                <div className="field-group">
-                  <label>Starting price ($)</label>
-                  <input className="input-field" type="number" placeholder="200" min="0"
-                    value={form.startingPrice} onChange={(e) => set("startingPrice", e.target.value)} />
-                </div>
-              </div>
+                  <div className="row-2">
+                    <div className="field-group">
+                      <label>Experience</label>
+                      <select className="input-field" value={form.experienceLevel} onChange={(e) => set("experienceLevel", e.target.value)}>
+                        <option value="">Select…</option>
+                        {opts("experienceLevel").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                    </div>
+                    <div className="field-group">
+                      <label>Equipment</label>
+                      <select className="input-field" value={form.equipmentLevel} onChange={(e) => set("equipmentLevel", e.target.value)}>
+                        <option value="">Select…</option>
+                        {opts("equipmentLevel").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="row-2">
+                    <div className="field-group">
+                      <label>Delivery time</label>
+                      <select className="input-field" value={form.deliveryTime} onChange={(e) => set("deliveryTime", e.target.value)}>
+                        <option value="">Select…</option>
+                        {opts("deliveryTime").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                    </div>
+                    <div className="field-group">
+                      <label>Minimum booking</label>
+                      <select className="input-field" value={form.minimumBooking} onChange={(e) => set("minimumBooking", e.target.value)}>
+                        <option value="">Select…</option>
+                        {opts("minimumBooking").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="row-2">
+                    <div className="field-group">
+                      <label>Pricing type</label>
+                      <select className="input-field" value={form.pricingType} onChange={(e) => set("pricingType", e.target.value)}>
+                        <option value="">Select…</option>
+                        {opts("pricingType").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                    </div>
+                    <div className="field-group">
+                      <label>Starting price ($)</label>
+                      <input className="input-field" type="number" placeholder="200" min="0"
+                        value={form.startingPrice} onChange={(e) => set("startingPrice", e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className="field-group">
+                    <label>Extra services you offer</label>
+                    <div className="chips">
+                      {opts("additionalServices").map((o) => {
+                        const on = form.additionalServices.includes(o.value);
+                        return (
+                          <button key={o.value} type="button" aria-pressed={on}
+                            className={`chip${on ? " selected" : ""}`} onClick={() => toggleIn("additionalServices", o.value)}>
+                            {o.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="stripe-note">
-                <strong>About payments:</strong> Your profile won't be publicly bookable until you connect a Stripe account. You can do this after your application is approved — our team will reach out with instructions.
+                <strong>About payments:</strong> Clients can book you once you connect a Stripe account for payouts. You can connect it from your photographer dashboard right after you sign up.
               </div>
             </div>
           )}
