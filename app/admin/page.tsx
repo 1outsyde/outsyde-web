@@ -11,6 +11,9 @@ interface Stats {
   pendingRefunds: number;
   totalRevenue: number;
   regularCustomers: number;
+  // Outsyde loyalty rewards customers have spent (backend #314; codes given back after a full refund are not counted).
+  rewardsRedeemedCents?: number;
+  rewardsRedeemedCount?: number;
 }
 
 interface Issue {
@@ -274,6 +277,15 @@ export default function AdminOverviewPage() {
               <div className="kpi-label">Customers</div>
               <div className="kpi-value">{stats.regularCustomers.toLocaleString()}</div>
             </div>
+            {typeof stats.rewardsRedeemedCents === "number" && (
+              <div className="kpi-card">
+                <div className="kpi-label">Rewards Redeemed</div>
+                <div className="kpi-value">${(stats.rewardsRedeemedCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                <div className="admin-sub" style={{ marginTop: 4 }}>
+                  {(stats.rewardsRedeemedCount ?? 0).toLocaleString()} codes used, paid by Outsyde
+                </div>
+              </div>
+            )}
           </div>
         )}
 

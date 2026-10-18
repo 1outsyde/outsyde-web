@@ -90,6 +90,8 @@ interface Order {
   customerName?: string;
   items?: { name: string; quantity: number; priceCents?: number; variantLabel?: string | null }[];
   shippingAddress?: string | null;
+  // Outsyde loyalty rewards the customer used, in cents (backend #314). Paid by Outsyde.
+  discountAmountCents?: number | null;
 }
 
 interface Booking {
@@ -104,6 +106,8 @@ interface Booking {
   subtotalAmount: number;
   bookingFeeAmount: number;
   vendorNetAmount: number;
+  // Outsyde loyalty rewards the customer used, in cents (backend #314). Paid by Outsyde.
+  discountAmountCents?: number | null;
 }
 
 interface StripeStatus {
@@ -813,6 +817,11 @@ export default function VendorDashboardPage() {
                         )}
 
                         <div className="order-total">Total: {formatCents(o.totalAmount ?? 0)}</div>
+                        {(o.discountAmountCents ?? 0) > 0 && (
+                          <div style={{ fontSize: 12, color: "#c8a882", marginBottom: 10 }}>
+                            Customer used {formatCents(o.discountAmountCents ?? 0)} in Outsyde rewards, paid by Outsyde. Your payout is unchanged.
+                          </div>
+                        )}
 
                         <div className="order-address">
                           {(() => {
@@ -1213,7 +1222,14 @@ export default function VendorDashboardPage() {
                         <td>{b.serviceName ?? "—"}</td>
                         <td className="amount">${b.subtotalAmount.toFixed(2)}</td>
                         <td style={{ color: "#c0392b" }}>-${b.bookingFeeAmount.toFixed(2)}</td>
-                        <td style={{ color: "#27ae60", fontWeight: 600 }}>${b.vendorNetAmount.toFixed(2)}</td>
+                        <td style={{ color: "#27ae60", fontWeight: 600 }}>
+                          ${b.vendorNetAmount.toFixed(2)}
+                          {(b.discountAmountCents ?? 0) > 0 && (
+                            <div style={{ fontSize: 11, color: "#c8a882", fontWeight: 400 }}>
+                              Customer used ${((b.discountAmountCents ?? 0) / 100).toFixed(2)} Outsyde rewards, paid by Outsyde
+                            </div>
+                          )}
+                        </td>
                         <td><span className={statusColor(b.status)}>{b.status}</span></td>
                       </tr>
                     ))}
