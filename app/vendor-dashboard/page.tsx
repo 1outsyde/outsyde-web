@@ -7,6 +7,15 @@ import CoverVideo from "@/components/CoverVideo";
 import { COVER_VIDEO_MAX_SECONDS, uploadCoverVideo } from "@/lib/coverMedia";
 import { isTaxonomy, type BusinessTaxonomy } from "@/lib/business-taxonomy";
 import IndustrySection, { industryProblem, offerTypeOf, type IndustryValue } from "./IndustrySection";
+import {
+  BOOKING_FILTERS,
+  bookingStatusColor,
+  bookingStatusLabel,
+  isVisibleBooking,
+  matchesBookingFilter,
+  reportTimeZoneOnce,
+  type BookingFilter,
+} from "@/lib/booking-status";
 
 interface HoursDay { open: string; close: string; closed?: boolean; }
 
@@ -198,6 +207,7 @@ export default function VendorDashboardPage() {
   const [sfCoverUploading, setSfCoverUploading] = useState(false);
 
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
+  const [bookingFilter, setBookingFilter] = useState<BookingFilter>("all");
   const [shipFormOrderId, setShipFormOrderId] = useState<string | null>(null);
   const [shipTracking, setShipTracking] = useState("");
   const [shipCarrier, setShipCarrier] = useState("UPS");
@@ -427,6 +437,15 @@ export default function VendorDashboardPage() {
     if (tab === 'storefront' && !taxonomy && !taxonomyError) loadTaxonomy();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
+
+  // Once the dashboard has loaded the owner's business, fill in their time zone if it is empty.
+  const loadedBusinessId = business?.id;
+  useEffect(() => {
+    if (loadedBusinessId) reportTimeZoneOnce();
+  }, [loadedBusinessId]);
+
+  // Unpaid checkouts (draft, pending_payment) are never shown. Backend #326 already leaves them out.
+  const visibleBookings = bookings.filter(b => isVisibleBooking(b.status));
 
   async function handleSaveStorefront() {
     if (!sfForm) return;
@@ -779,7 +798,7 @@ export default function VendorDashboardPage() {
               <button key={t} className={`tab-btn${tab === t ? " active" : ""}`} onClick={() => setTab(t)}>
                 {t === "storefront" ? "Edit Storefront" : t.charAt(0).toUpperCase() + t.slice(1)}
                 {t === "orders" && orders.length > 0 && ` (${orders.length})`}
-                {t === "bookings" && bookings.length > 0 && ` (${bookings.length})`}
+                {t === "bookings" && visibleBookings.length > 0 && ` (${visibleBookings.length})`}
               </button>
             ))}
           </div>
@@ -1273,13 +1292,32 @@ export default function VendorDashboardPage() {
             </div>
           )}
 
-          {tab === "bookings" && (
+          {tab === "bookings" && (() => {
+            const filteredBookings = visibleBookings.filter(b => matchesBookingFilter(b, bookingFilter));
+            const activeFilterLabel = BOOKING_FILTERS.find(f => f.key === bookingFilter)?.label ?? "All";
+            return (
             <div className="table-wrap">
               {loadingBookings ? (
                 <table><tbody><tr><td className="loading-row" colSpan={8}>Loading bookings…</td></tr></tbody></table>
-              ) : bookings.length === 0 ? (
+              ) : visibleBookings.length === 0 ? (
                 <div className="empty-state"><p>No bookings yet</p><p className="empty-sub">Bookings will appear here once customers schedule sessions.</p></div>
               ) : (
+                <>
+                <div className="order-filter-tabs">
+                  {BOOKING_FILTERS.map(f => (
+                    <button
+                      key={f.key}
+                      className={`order-filter-tab${bookingFilter === f.key ? " active" : ""}`}
+                      onClick={() => setBookingFilter(f.key)}
+                    >
+                      {f.label}
+                      {f.key !== "all" && ` (${visibleBookings.filter(b => matchesBookingFilter(b, f.key)).length})`}
+                    </button>
+                  ))}
+                </div>
+                {filteredBookings.length === 0 ? (
+                  <div className="empty-state"><p>No {activeFilterLabel.toLowerCase()} bookings.</p></div>
+                ) : (
                 <table>
                   <thead>
                     <tr>
@@ -1288,7 +1326,7 @@ export default function VendorDashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {bookings.map((b) => (
+                    {filteredBookings.map((b) => (
                       <tr key={b.id}>
                         <td style={{ color: "#f5f0e8" }}>{b.customerName}</td>
                         <td>{b.date}</td>
@@ -1304,14 +1342,17 @@ export default function VendorDashboardPage() {
                             </div>
                           )}
                         </td>
-                        <td><span className={statusColor(b.status)}>{b.status}</span></td>
+                        <td><span className={bookingStatusColor(b.status)}>{bookingStatusLabel(b.status)}</span></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                )}
+                </>
               )}
             </div>
-          )}
+            );
+          })()}
         </div>
       </div>
     </>
