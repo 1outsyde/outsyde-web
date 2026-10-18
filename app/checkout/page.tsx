@@ -56,7 +56,21 @@ interface FeeBreakdown {
   platformFeeCents?: number;
   totalChargedToConsumerCents: number;
   outsydePointsEarned?: number;
+  // Points code (backend #314): what the code took off, and what the card is charged.
+  discountCents?: number;
+  amountChargedCents?: number;
 }
+
+// Outsyde loyalty rewards: 500 points = $1. A product code needs an order (before the
+// service fee) of at least 10 times its value, and works on orders from one shop.
+const POINT_TIERS = [
+  { points: 2500, discountCents: 500 },
+  { points: 5000, discountCents: 1000 },
+  { points: 12500, discountCents: 2500 },
+  { points: 25000, discountCents: 5000 },
+  { points: 50000, discountCents: 10000 },
+];
+type MyCode = { id: string; code: string; discountCents: number };
 
 export default function CheckoutPage() {
   return (
@@ -100,6 +114,29 @@ function CheckoutForm() {
 
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
 
+  // Use my points: the customer's codes and balance.
+  const [pointsBalance, setPointsBalance] = useState(0);
+  const [myCodes, setMyCodes] = useState<MyCode[]>([]);
+  const [redeeming, setRedeeming] = useState<number | null>(null);
+
+  async function loadPoints() {
+    try {
+      const r = await fetch("/api/account/points?type=balance");
+      if (!r.ok) return;
+      const d = await r.json();
+      setPointsBalance(typeof d.balance === "number" ? d.balance : 0);
+      setMyCodes(
+        Array.isArray(d.activeCodes)
+          ? d.activeCodes
+              .filter((c: { id?: unknown }) => typeof c.id === "string")
+              .map((c: MyCode) => ({ id: c.id, code: c.code, discountCents: c.discountCents }))
+          : [],
+      );
+    } catch {
+      // No points section if it can't load; checkout still works.
+    }
+  }
+
   useEffect(() => {
     setMounted(true);
     setCart(getCart());
@@ -112,6 +149,7 @@ function CheckoutForm() {
           router.push("/login?redirect=/checkout");
         } else {
           setAuthed(true);
+          loadPoints();
         }
       })
       .catch(() => {
@@ -135,7 +173,8 @@ function CheckoutForm() {
   // Fee preview (client-side, updated by backend response after PI creation)
   const subtotalCents = cart.reduce((s, i) => s + i.priceCents * i.qty, 0);
   const serviceFeeCents = Math.round(subtotalCents * 0.08);
-  const discountCents = promoResult?.valid ? promoResult.discountCents : 0;
+  const singleShop = vendors.length <= 1;
+  const discountCents = promoResult?.valid && singleShop ? promoResult.discountCents : 0;
   const estimatedTotalCents = subtotalCents + serviceFeeCents - discountCents;
 
   // After backend responds, show authoritative breakdown
@@ -146,19 +185,26 @@ function CheckoutForm() {
     ? feeBreakdown.consumerUpchargeCents / 100
     : serviceFeeCents / 100;
   const displayTotal = feeBreakdown
-    ? feeBreakdown.totalChargedToConsumerCents / 100
+    ? (feeBreakdown.amountChargedCents ?? feeBreakdown.totalChargedToConsumerCents) / 100
     : estimatedTotalCents / 100;
+  const codeTooBig = (cents: number) => subtotalCents < cents * 10;
   const displayPoints = feeBreakdown?.outsydePointsEarned ?? 0;
 
-  async function handleValidatePromo() {
-    if (!promoCode.trim()) return;
+  async function handleValidatePromo(codeOverride?: string) {
+    const code = (codeOverride ?? promoCode).trim();
+    if (!code) return;
+    if (!singleShop) {
+      setPromoResult({ valid: false, discountCents: 0, codeId: "", message: "Codes work on orders from one shop. Check out each shop separately to use one." });
+      return;
+    }
+    setFeeBreakdown(null);
     setPromoValidating(true);
     setPromoResult(null);
     try {
       const res = await fetch("/api/checkout/validate-promo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: promoCode.trim() }),
+        body: JSON.stringify({ code, baseCents: subtotalCents }),
       });
       const data = await res.json();
       if (res.ok && data.valid) {
@@ -166,7 +212,7 @@ function CheckoutForm() {
           valid: true,
           discountCents: data.discountCents,
           codeId: data.codeId,
-          message: `−$${(data.discountCents / 100).toFixed(2)} applied`,
+          message: `$${(data.discountCents / 100).toFixed(2)} off applied`,
         });
       } else {
         setPromoResult({
@@ -180,6 +226,34 @@ function CheckoutForm() {
       setPromoResult({ valid: false, discountCents: 0, codeId: "", message: "Could not validate code." });
     } finally {
       setPromoValidating(false);
+    }
+  }
+
+  function applyMyCode(c: MyCode) {
+    setPromoCode(c.code);
+    handleValidatePromo(c.code);
+  }
+
+  async function turnPointsIntoCode(points: number) {
+    setRedeeming(points);
+    try {
+      const r = await fetch("/api/account/points/redeem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pointsToRedeem: points }),
+      });
+      const d = await r.json();
+      if (!r.ok || !d.code) {
+        setPromoResult({ valid: false, discountCents: 0, codeId: "", message: d.error || "Your points couldn't be used right now." });
+        return;
+      }
+      await loadPoints();
+      setPromoCode(d.code);
+      await handleValidatePromo(d.code);
+    } catch {
+      setPromoResult({ valid: false, discountCents: 0, codeId: "", message: "Your points couldn't be used right now." });
+    } finally {
+      setRedeeming(null);
     }
   }
 
@@ -214,14 +288,24 @@ function CheckoutForm() {
             state: sv.address.state,
             zipCode: sv.address.postal_code,
           },
-          ...(promoResult?.valid ? { promoCodeId: promoResult.codeId } : {}),
+          ...(promoResult?.valid && singleShop ? { promoCodeId: promoResult.codeId } : {}),
         }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        const msg: string = (data as { error?: string }).error ?? "";
+        // The backend sends { error: { code, message } } for checkout refusals.
+        const rawErr = (data as { error?: unknown }).error;
+        const errObj = rawErr && typeof rawErr === "object" ? (rawErr as { code?: string; message?: string }) : null;
+        const msg: string = errObj ? `${errObj.code ?? ""} ${errObj.message ?? ""}` : typeof rawErr === "string" ? rawErr : "";
+        if (errObj?.code && ["INVALID_PROMO", "PROMO_MINIMUM_NOT_MET", "PROMO_SINGLE_SHOP_ONLY", "PROMO_IN_USE", "PROMO_CHECK_FAILED"].includes(errObj.code)) {
+          setPromoResult({ valid: false, discountCents: 0, codeId: "", message: errObj.message || "That code can't be used on this order." });
+          setError(errObj.message || "That code can't be used on this order.");
+          loadPoints();
+          setProcessing(false);
+          return;
+        }
         if (msg.includes("ADDRESS_REQUIRED") || msg.includes("INVALID_ADDRESS")) {
           setError("Please check your shipping address and try again.");
         } else if (msg.includes("STRIPE_NOT_ONBOARDED")) {
@@ -294,7 +378,7 @@ function CheckoutForm() {
 
       if (result.paymentIntent?.status === "succeeded") {
         const itemCount = cart.reduce((n, i) => n + i.qty, 0);
-        const totalCharged = fb?.totalChargedToConsumerCents ?? estimatedTotalCents;
+        const totalCharged = fb?.amountChargedCents ?? fb?.totalChargedToConsumerCents ?? estimatedTotalCents;
         const pointsEarned = fb?.outsydePointsEarned ?? 0;
         clearCart();
         const params = new URLSearchParams({
@@ -367,6 +451,11 @@ function CheckoutForm() {
 .promo-msg{font-size:.75rem;margin-top:.3rem;}
 .promo-msg.ok{color:#7CB342;}
 .promo-msg.err{color:#ff5555;}
+.points-pick{margin-top:.75rem;}
+.points-pick-head{font-size:.8rem;color:var(--muted);margin-bottom:.45rem;}
+.points-pick-row{display:flex;flex-wrap:wrap;gap:.45rem;}
+.points-pick-row button{padding:.5rem .8rem;background:transparent;color:var(--gold);border:1px solid var(--line);border-radius:6px;font-size:.75rem;cursor:pointer;font-family:'Hanken Grotesk';}
+.points-pick-row button:disabled{opacity:.45;cursor:not-allowed;}
 .same-toggle{display:flex;align-items:center;gap:.55rem;font-size:.82rem;color:#ccc;cursor:pointer;margin-bottom:1.25rem;}
 .same-toggle input{width:16px;height:16px;accent-color:var(--emerald-light);cursor:pointer;}
 #card-box{padding:.85rem;border:1px solid #333;border-radius:6px;background:var(--input);}
@@ -424,11 +513,11 @@ function CheckoutForm() {
 
               <div style={{ marginTop: "1rem" }}>
                 <div className="feerow"><span>Subtotal</span><span>${displaySubtotal.toFixed(2)}</span></div>
-                <div className="feerow"><span>Outsyde Service Fee (8%)</span><span>${displayFee.toFixed(2)}</span></div>
-                {promoResult?.valid && (
+                <div className="feerow"><span>Outsyde Service Fee</span><span>${displayFee.toFixed(2)}</span></div>
+                {discountCents > 0 && (
                   <div className="feerow discount">
-                    <span>Promo Code Discount</span>
-                    <span>−${(promoResult.discountCents / 100).toFixed(2)}</span>
+                    <span>Outsyde rewards</span>
+                    <span>${(discountCents / 100).toFixed(2)} off</span>
                   </div>
                 )}
                 <div className="feerow free"><span>Shipping</span><span>Free</span></div>
@@ -524,7 +613,7 @@ function CheckoutForm() {
                   placeholder="Enter code"
                 />
                 <button
-                  onClick={handleValidatePromo}
+                  onClick={() => handleValidatePromo()}
                   disabled={promoValidating || !promoCode.trim()}
                 >
                   {promoValidating ? "Checking…" : "Apply"}
@@ -534,6 +623,43 @@ function CheckoutForm() {
                 <div className={`promo-msg ${promoResult.valid ? "ok" : "err"}`}>
                   {promoResult.message}
                 </div>
+              )}
+              {singleShop && (myCodes.length > 0 || POINT_TIERS.some((t) => t.points <= pointsBalance)) && (
+                <div className="points-pick">
+                  <div className="points-pick-head">
+                    Use my points. You have {pointsBalance.toLocaleString()} points in Outsyde loyalty rewards.
+                  </div>
+                  <div className="points-pick-row">
+                    {myCodes.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        disabled={promoValidating || codeTooBig(c.discountCents)}
+                        onClick={() => applyMyCode(c)}
+                        title={codeTooBig(c.discountCents) ? `For orders of $${(c.discountCents * 10) / 100} or more` : c.code}
+                      >
+                        ${c.discountCents / 100} off
+                        {codeTooBig(c.discountCents) ? ` (orders of $${(c.discountCents * 10) / 100}+)` : ""}
+                      </button>
+                    ))}
+                    {POINT_TIERS.filter((t) => t.points <= pointsBalance && !myCodes.some((c) => c.discountCents === t.discountCents)).map((t) => (
+                      <button
+                        key={t.points}
+                        type="button"
+                        disabled={redeeming !== null || promoValidating || codeTooBig(t.discountCents)}
+                        onClick={() => turnPointsIntoCode(t.points)}
+                      >
+                        {redeeming === t.points
+                          ? "Working…"
+                          : `${t.points.toLocaleString()} points for $${t.discountCents / 100} off`}
+                        {codeTooBig(t.discountCents) ? ` (orders of $${(t.discountCents * 10) / 100}+)` : ""}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {!singleShop && (
+                <div className="promo-msg">Codes work on orders from one shop. Check out each shop separately to use one.</div>
               )}
             </div>
 
