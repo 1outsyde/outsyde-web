@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import ExistingAccountHint, { isAlreadyRegistered } from "@/components/ExistingAccountHint";
+import InterestsPicker from "@/components/InterestsPicker";
+import { EMPTY_INTERESTS, interestsPayload, type InterestAnswers } from "@/lib/customer-interests";
 
 declare global {
   interface Window {
@@ -38,7 +40,7 @@ interface FormData {
   gender: string;
   ethnicity: string;
   shoppingFrequency: string;
-  selectedIndustries: string[];
+  interests: InterestAnswers;
 }
 
 type FieldErrors = Partial<Record<keyof FormData, string>>;
@@ -64,13 +66,6 @@ const ETHNICITIES = [
 
 const SHOPPING_FREQUENCIES = [
   "Daily","A few times a week","Weekly","A few times a month","Monthly","Rarely",
-];
-
-const INDUSTRIES = [
-  "Fashion & Apparel","Beauty & Wellness","Food & Beverage","Fitness & Sports",
-  "Home & Garden","Technology","Travel & Adventure","Art & Culture",
-  "Health & Medical","Finance","Education","Entertainment","Automotive",
-  "Pets","Sustainability","Other",
 ];
 
 const STEPS = ["Account", "Address", "Profile"];
@@ -143,7 +138,7 @@ export default function ConsumerSignupPage() {
     billingStreet: "", billingAptUnit: "", billingCity: "",
     billingState: "", billingZip: "", billingCountry: "United States",
     dateOfBirth: "", gender: "", ethnicity: "",
-    shoppingFrequency: "", selectedIndustries: [],
+    shoppingFrequency: "", interests: EMPTY_INTERESTS,
   });
 
   // Load Google Maps script
@@ -244,13 +239,6 @@ export default function ConsumerSignupPage() {
     setUsernameTimer(timer);
   }
 
-  function toggleIndustry(ind: string) {
-    setForm((f) => {
-      const has = f.selectedIndustries.includes(ind);
-      return { ...f, selectedIndustries: has ? f.selectedIndustries.filter((i) => i !== ind) : [...f.selectedIndustries, ind] };
-    });
-  }
-
   function scrollTop() {
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -321,9 +309,8 @@ export default function ConsumerSignupPage() {
       gender: form.gender || undefined,
       ethnicity: form.ethnicity || undefined,
       shoppingFrequency: form.shoppingFrequency || undefined,
-      selectedIndustries: form.selectedIndustries,
-      industryNiches: {},
-      industryValues: {},
+      // Shared list codes (2026-10-18): industries, what they're into, what matters, Other text.
+      ...interestsPayload(form.interests),
       source: 'outsyde-web',
     };
 
@@ -478,6 +465,9 @@ export default function ConsumerSignupPage() {
         }
         .chip:hover { border-color: #555; color: #ccc; }
         .chip.selected { border-color: #c9a84c; color: #c9a84c; background: #1a1505; }
+        .interests-note { font-size: 13px; color: #888; margin: 0 0 18px; }
+        .interest-block { border-left: 2px solid #2a2a2a; padding-left: 14px; margin: 0 0 18px; }
+        .interest-title { font-size: 14px; color: #c9a84c; margin-bottom: 10px; }
         .actions {
           display: flex;
           justify-content: space-between;
@@ -785,18 +775,7 @@ export default function ConsumerSignupPage() {
                 </div>
               </div>
 
-              <div className="field-group">
-                <label>Interests — pick any</label>
-                <div className="chips">
-                  {INDUSTRIES.map((ind) => (
-                    <button key={ind} type="button"
-                      className={`chip${form.selectedIndustries.includes(ind) ? " selected" : ""}`}
-                      onClick={() => toggleIndustry(ind)}>
-                      {ind}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <InterestsPicker value={form.interests} onChange={(interests) => setForm((f) => ({ ...f, interests }))} />
             </div>
           )}
 
