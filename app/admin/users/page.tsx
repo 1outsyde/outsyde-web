@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 // Allowlist from GET /api/admin/users. There is no `status` field: isActive is the
@@ -278,6 +279,8 @@ export default function AdminUsersPage() {
       margin-bottom: 8px;
     }
     .issue-title { font-size: 14px; color: #F5F0E6; font-weight: 500; }
+    .issue-link { display: inline-block; text-decoration: none; }
+    .issue-link:hover { color: #E8B930; text-decoration: underline; }
     .issue-meta { font-size: 12px; color: rgba(245,240,230,0.4); margin-top: 3px; }
     .severity-badge {
       font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
@@ -526,7 +529,7 @@ export default function AdminUsersPage() {
             return (
               <div key={user.id} className="issue-row">
                 <div>
-                  <div className="issue-title">{displayName(user)}</div>
+                  <Link href={`/admin/users/${encodeURIComponent(user.id)}`} className="issue-title issue-link">{displayName(user)}</Link>
                   <div className="issue-meta">{buildMeta(user)}</div>
                 </div>
                 <div className="row-actions">
