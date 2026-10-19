@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { describeFreePlanEnd, isComplimentarySubscription } from "@/lib/free-plan";
 import { buildCheckoutBody, tierNotAvailableMessage } from "@/lib/checkout-grant";
+import { describePaidPlan, switchChargeNote } from "@/lib/subscription-state";
 
 interface Tier {
   id: string;
@@ -35,6 +36,9 @@ interface CurrentSubscription {
   cancelAtPeriodEnd?: boolean;
   // Present on /api/vendor/subscription rows; null/absent for complimentary (free) plans.
   stripeSubscriptionId?: string | null;
+  // Backend #342 (additive): the day listings pause when the plan is late, and whether they are paused.
+  graceEndsAt?: string | null;
+  listingsPaused?: boolean | null;
 }
 
 const TIER_ACCENT: Record<string, string> = {
@@ -258,6 +262,15 @@ function ManageContent() {
   // everything below is unchanged for them.
   const isFree = current ? isComplimentarySubscription(current) : false;
   const freeEnd = isFree && current ? describeFreePlanEnd(current) : null;
+  const paidState = current && !isFree ? describePaidPlan(current) : null;
+  const selectedTier = tiers?.find((t) => t.id === selected) ?? null;
+  const chargeNote = selected && selected !== current?.tierId
+    ? switchChargeNote({
+        currentIsPaid: !!current && !isFree && !!current.stripeSubscriptionId,
+        currentStatus: current?.status,
+        targetPriceInCents: selectedTier?.priceInCents,
+      })
+    : null;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -287,13 +300,14 @@ function ManageContent() {
                   </p>
                 )}
               </div>
-              {!isFree && (
+              {paidState && (
                 <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
-                  current.status === "active" ? "bg-emerald-500/15 text-emerald-400"
-                  : current.status === "past_due" ? "bg-amber-400/15 text-amber-400"
+                  paidState.kind === "active" ? "bg-emerald-500/15 text-emerald-400"
+                  : paidState.kind === "late" ? "bg-amber-400/15 text-amber-400"
+                  : paidState.kind === "paused" ? "bg-red-500/15 text-red-400"
                   : "bg-zinc-700 text-zinc-400"
                 }`}>
-                  {current.status === "active" ? "Active" : current.status === "past_due" ? "Past Due" : current.status}
+                  {paidState.pill}
                 </span>
               )}
             </div>
@@ -303,7 +317,12 @@ function ManageContent() {
                 <span className={freeEnd.kind === "ended" ? "text-zinc-400" : "text-white"}>{freeEnd.label}</span>
               </div>
             )}
-            {!isFree && current.currentPeriodEnd && (
+            {paidState?.note && (
+              <p className={`mt-4 text-sm ${paidState.kind === "paused" ? "text-red-300" : "text-amber-300"}`} role="status">
+                {paidState.note}
+              </p>
+            )}
+            {!isFree && paidState?.showRenewal && current.currentPeriodEnd && (
               <div className="mt-4 flex items-center gap-2 text-sm text-zinc-400">
                 <CalendarClock size={14} className="shrink-0" />
                 {current.cancelAtPeriodEnd ? (
@@ -369,6 +388,8 @@ function ManageContent() {
         )}
 
         {checkoutError && <p className="mt-4 text-sm text-red-400" role="alert">{checkoutError}</p>}
+
+        {chargeNote && <p className="mt-4 text-sm text-zinc-400">{chargeNote}</p>}
 
         <button
           type="button"
