@@ -16,6 +16,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, Loader2, Smartphone } from "lucide-react";
+import { isPlanLive } from "@/lib/subscription-state";
 
 interface CurrentSubscription {
   id: string;
@@ -53,8 +54,10 @@ function SuccessContent() {
         const data = (await res.json()) as { subscription?: CurrentSubscription; error?: string };
         const subscription = data.subscription ?? null;
         setSub(subscription);
-        if (subscription && subscription.status === "active") {
+        if (subscription && isPlanLive(subscription.status)) {
           setConfirmed(true);
+        } else if (subscription && (subscription.status === "past_due" || subscription.status === "unpaid")) {
+          setConfirmError("Your payment didn't go through yet. Open Manage Plan to update your payment.");
         } else {
           setConfirmError("Your subscription is not active yet. Please allow a few moments and refresh.");
         }
