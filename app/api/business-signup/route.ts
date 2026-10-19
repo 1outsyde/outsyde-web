@@ -27,7 +27,7 @@
 import { NextResponse } from "next/server";
 import { sendBusinessSignupConfirmation } from "@/lib/emails";
 
-const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+const USERNAME_RE = /^[a-z0-9_.]{3,20}$/;
 const OFFER_TYPES = new Set(["products", "services", "both"]);
 const LOGO_DATA_URL_RE = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/;
 const LOGO_MAX_BYTES = 2 * 1024 * 1024;
@@ -134,7 +134,7 @@ export async function POST(req: Request) {
   }
   if (typeof username !== "string" || !USERNAME_RE.test(username.trim())) {
     return NextResponse.json(
-      { error: "Username must be 3\u201320 lowercase letters, numbers, or underscores.", field: "username" },
+      { error: "Username must be 3\u201320 lowercase letters, numbers, underscores, or periods.", field: "username" },
       { status: 400 },
     );
   }
