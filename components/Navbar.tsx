@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import StripeConnectModal from "./StripeConnectModal";
+import OfferPrompt from "./plan-offer/OfferPrompt";
 
 interface MeUser {
   id: string;
@@ -23,6 +24,8 @@ export default function Navbar() {
   // dismissed resets on every page load (useState), so the modal re-appears on every
   // new sign-in (which triggers a full navigation) and on every fresh app load.
   const [connectModalDismissed, setConnectModalDismissed] = useState(false);
+  // A hidden plan offer popup goes first; the payouts popup waits until it closes (one popup at a time).
+  const [offerPopupOpen, setOfferPopupOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -59,7 +62,8 @@ export default function Navbar() {
     !isAdmin &&
     (isVendor || isPhotographer) &&
     user?.stripeConnectComplete === false &&
-    !connectModalDismissed;
+    !connectModalDismissed &&
+    !offerPopupOpen;
 
   return (
     <>
@@ -261,6 +265,13 @@ export default function Navbar() {
           )}
         </div>
       )}
+
+      <OfferPrompt
+        enabled={!!user && !isAdmin && !!user.businessId}
+        payoutsReady={user?.stripeConnectComplete !== false}
+        onPopupOpenChange={setOfferPopupOpen}
+        onPayoutsDeferred={handleDismissConnectModal}
+      />
 
       {showConnectModal && (
         <StripeConnectModal

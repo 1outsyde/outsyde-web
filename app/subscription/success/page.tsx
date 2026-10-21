@@ -1,22 +1,23 @@
 "use client";
 
 // app/subscription/success/page.tsx
-// Shown after Stripe Checkout completes. Reads ?plan= from the URL, calls
-// /api/subscription/status to confirm the plan is active, then presents a
-// "Return to app" button that fires the outsyde:// deep link.
+// Shown after Stripe Checkout completes (every plan checkout, and plan offers) and after a one tap offer accept.
+// Artboard "4. Plan active" on the Hidden Plan Offer Flow canvas.
 //
-// Deep link behaviour:
-//   - Tapping the button calls window.location.href = "outsyde://dashboard"
-//   - If the deep link doesn't open the app (browser stays visible after 2 s),
-//     the button is replaced with a plain message: "Return to the Outsyde app
-//     on your device" — no external link, because the app is not yet on any
-//     store.
+// Access the second it's paid (Plan Offers board 2.5): Stripe returns here with ?session_id=cs_...; the page
+// asks the backend to check that checkout and activate now (POST /api/subscription/reconcile) in case Stripe's
+// webhook hasn't landed, then checks /api/subscription/status every 2 seconds for up to 20 seconds.
+// Without session_id (the old /vendor/dashboard return drops the query) it still polls the status.
+//
+// Deep link: "Back to the Outsyde app" sets window.location.href = "outsyde://dashboard"; if the browser is
+// still visible after 2 seconds the button is replaced with a plain message.
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { CheckCircle2, Loader2, Smartphone } from "lucide-react";
 import { isPlanLive } from "@/lib/subscription-state";
+import { formatEtDate } from "@/lib/free-plan";
+import { FONT_HREF, planOfferCss } from "@/components/plan-offer/planOfferCss";
+import { CheckIcon, SpinnerIcon, XIcon } from "@/components/plan-offer/icons";
 
 interface CurrentSubscription {
   id: string;
@@ -27,9 +28,19 @@ interface CurrentSubscription {
   status: string;
 }
 
+const POLL_MS = 2000;
+const POLL_TRIES = 10;
+const SESSION_RE = /^cs_[A-Za-z0-9_]+$/;
+
 function SuccessContent() {
   const searchParams = useSearchParams();
   const planParam = searchParams.get("plan") ?? "";
+  const sessionParam = searchParams.get("session_id") ?? "";
+  const sessionId = SESSION_RE.test(sessionParam) ? sessionParam : "";
+  // Plan offers pass the offered plan, and its billing start when it follows a dated Free plan.
+  const fromOffer = searchParams.get("offer") === "1";
+  const startsParam = searchParams.get("starts") ?? "";
+  const startsDate = startsParam && !Number.isNaN(Date.parse(startsParam)) ? formatEtDate(startsParam) : "";
 
   const [confirming, setConfirming] = useState(true);
   const [confirmed, setConfirmed] = useState(false);
@@ -40,36 +51,56 @@ function SuccessContent() {
   const [deepLinkState, setDeepLinkState] = useState<"idle" | "tapped" | "failed">("idle");
 
   useEffect(() => {
+    let cancelled = false;
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+    async function reconcile() {
+      if (!sessionId) return;
+      await fetch("/api/subscription/reconcile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      }).catch(() => null);
+    }
+
+    async function readStatus(): Promise<"live" | "late" | "pending" | "signed_out" | "error"> {
+      const res = await fetch("/api/subscription/status", { cache: "no-store" }).catch(() => null);
+      if (!res) return "error";
+      if (res.status === 401) return "signed_out";
+      if (!res.ok) return "error";
+      const data = (await res.json().catch(() => ({}))) as { subscription?: CurrentSubscription };
+      const subscription = data.subscription ?? null;
+      if (!cancelled) setSub(subscription);
+      if (subscription && isPlanLive(subscription.status)) return "live";
+      if (subscription && (subscription.status === "past_due" || subscription.status === "unpaid")) return "late";
+      return "pending";
+    }
+
     async function confirmPlan() {
-      try {
-        const res = await fetch("/api/subscription/status");
-        if (res.status === 401) {
-          setConfirmError("Session expired. Please return to the app and log in again.");
-          return;
-        }
-        if (!res.ok) {
-          const data = (await res.json()) as { error?: string };
-          throw new Error(data.error || "Could not confirm your plan.");
-        }
-        const data = (await res.json()) as { subscription?: CurrentSubscription; error?: string };
-        const subscription = data.subscription ?? null;
-        setSub(subscription);
-        if (subscription && isPlanLive(subscription.status)) {
-          setConfirmed(true);
-        } else if (subscription && (subscription.status === "past_due" || subscription.status === "unpaid")) {
-          setConfirmError("Your payment didn't go through yet. Open Manage Plan to update your payment.");
-        } else {
-          setConfirmError("Your subscription is not active yet. Please allow a few moments and refresh.");
-        }
-      } catch (err) {
-        setConfirmError(err instanceof Error ? err.message : "Could not confirm your plan.");
-      } finally {
-        setConfirming(false);
+      await reconcile();
+      let last: Awaited<ReturnType<typeof readStatus>> = "pending";
+      for (let i = 0; i < POLL_TRIES && !cancelled; i++) {
+        last = await readStatus();
+        // A passing error (network, 5xx) is tried again like pending; only the last answer counts.
+        if (last !== "pending" && last !== "error") break;
+        // Ask the backend again halfway through, in case the checkout finished after the first check.
+        if (i === Math.floor(POLL_TRIES / 2)) await reconcile();
+        await wait(POLL_MS);
       }
+      if (cancelled) return;
+      if (last === "live") setConfirmed(true);
+      else if (last === "signed_out") setConfirmError("Your session ended. Return to the app, or sign in again, and your plan will be there.");
+      else if (last === "late") setConfirmError("Your payment didn't go through yet. Open Manage Plan to update your payment.");
+      else if (last === "error") setConfirmError("We couldn't check your plan right now. Refresh this page in a moment.");
+      else setConfirmError("Your plan isn't active yet. Refresh this page in a moment.");
+      setConfirming(false);
     }
 
     confirmPlan();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
 
   function handleReturnToApp() {
     setDeepLinkState("tapped");
@@ -91,104 +122,85 @@ function SuccessContent() {
   }
 
   const displayName =
+    (fromOffer && planParam) ||
     sub?.tierDisplayName ||
     sub?.tierName ||
-    (planParam ? decodeURIComponent(planParam) : "your plan");
+    (planParam ? decodeURIComponent(planParam) : "");
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center px-5">
-      <div className="max-w-sm w-full text-center space-y-6">
+    <>
+      <link rel="stylesheet" href={FONT_HREF} precedence="default" />
+      <style dangerouslySetInnerHTML={{ __html: planOfferCss }} />
+      <div className="po po-dark">
+        <div className="po-body">
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: -24 }}>
+            <a className="po-x" href="/vendor-dashboard" aria-label="Close"><XIcon color="#F5F0E6" /></a>
+          </div>
 
-        {/* Confirming */}
-        {confirming && (
-          <>
-            <Loader2 size={32} className="animate-spin text-zinc-500 mx-auto" />
-            <p className="text-sm text-zinc-400">Confirming your subscription…</p>
-          </>
-        )}
+          {confirming && (
+            <>
+              <div className="po-badge-icon" style={{ background: "#1A1A1A" }}><SpinnerIcon color="#E8B930" /></div>
+              <h1 className="po-display po-dark-h">Confirming your plan</h1>
+              <p className="po-dark-p">This only takes a moment.</p>
+            </>
+          )}
 
-        {/* Error */}
-        {!confirming && confirmError && (
-          <>
-            <p className="text-sm text-red-400" role="alert">{confirmError}</p>
-            <a
-              href="/subscription"
-              className="inline-block rounded-xl bg-zinc-800 px-6 py-3 text-sm font-medium hover:bg-zinc-700 transition-colors"
-            >
-              Back to plans
-            </a>
-          </>
-        )}
+          {!confirming && confirmError && (
+            <>
+              <h1 className="po-display po-dark-h">Almost there</h1>
+              <p className="po-dark-p" role="alert">{confirmError}</p>
+              <div className="po-spacer" />
+              <a className="po-btn po-btn-gold" href="/subscription/manage">Open Manage Plan</a>
+              <a className="po-btn po-btn-ghost" href="/subscription">Back to plans</a>
+            </>
+          )}
 
-        {/* Confirmed */}
-        {!confirming && confirmed && (
-          <>
-            <div className="flex flex-col items-center gap-3">
-              <CheckCircle2 size={48} className="text-emerald-400" />
-              <h1 className="text-2xl font-semibold">You&rsquo;re all set!</h1>
-              <p className="text-sm text-zinc-400">
-                <span className="text-white font-medium">{displayName}</span> is now active.
-              </p>
-            </div>
-
-            {/* Next setup step on the web (payouts, username). Primary, so a desktop visitor is never
-                left with only an app button. */}
-            <Link
-              href="/finish"
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#22c55e] py-3.5 font-medium text-black hover:opacity-90 transition-opacity"
-            >
-              Continue setup
-            </Link>
-
-            {/* Return to app area */}
-            {deepLinkState === "idle" && (
-              <button
-                type="button"
-                onClick={handleReturnToApp}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-zinc-700 py-3.5 font-medium text-zinc-200 hover:bg-zinc-800 transition-colors"
-              >
-                <Smartphone size={16} />
-                Return to Outsyde App
-              </button>
-            )}
-
-            {deepLinkState === "tapped" && (
-              <div className="flex w-full items-center justify-center gap-2 rounded-2xl bg-zinc-800 py-3.5 text-sm text-zinc-400">
-                <Loader2 size={16} className="animate-spin" />
-                Opening app…
+          {!confirming && confirmed && (
+            <>
+              <div className="po-badge-icon" style={{ background: "#E8B930", width: 76, height: 76, borderRadius: 38 }}><CheckIcon size={40} color="#000" /></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <h1 className="po-display po-dark-h">{displayName ? <>You&rsquo;re on the {displayName} plan</> : "Your plan is active"}</h1>
+                <p className="po-dark-p">
+                  {startsDate
+                    ? <>Your free plan runs until {startsDate}. Billing starts then, and nothing is charged before.</>
+                    : <>You&rsquo;re all set. We emailed you the details.</>}
+                </p>
               </div>
-            )}
-
-            {deepLinkState === "failed" && (
-              <div className="rounded-2xl border border-zinc-800 bg-zinc-900 px-5 py-4 space-y-1">
-                <p className="text-sm text-zinc-300 font-medium">Return to the Outsyde app on your device</p>
-                <p className="text-xs text-zinc-500">You can close this tab.</p>
+              <div className="po-dark-card">
+                <p className="po-dark-eyebrow">FINISH SETTING UP</p>
+                <div style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 15 }}><CheckIcon color="#E8B930" />Plan chosen</div>
+                <div style={{ fontSize: 15, color: "#CFC6B4" }}>Set up payouts so customers&rsquo; payments reach you</div>
               </div>
-            )}
+              <div className="po-spacer" />
+              {/* Next setup step on the web (payouts, username). Primary, so a desktop visitor is never
+                  left with only an app button. */}
+              <a className="po-btn po-btn-gold" href="/finish">Continue setup</a>
 
-            <a
-              href="/subscription/manage"
-              className="block text-xs text-zinc-500 hover:text-zinc-400 transition-colors"
-            >
-              Manage your subscription
-            </a>
-          </>
-        )}
+              {deepLinkState === "idle" && (
+                <button type="button" onClick={handleReturnToApp} className="po-btn po-btn-ghost">
+                  Back to the Outsyde app
+                </button>
+              )}
+              {deepLinkState === "tapped" && <p className="po-dark-p" style={{ textAlign: "center" }}>Opening the app…</p>}
+              {deepLinkState === "failed" && (
+                <div className="po-dark-card" style={{ textAlign: "center" }}>
+                  <p style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Return to the Outsyde app on your device</p>
+                  <p className="po-dark-p" style={{ fontSize: 13 }}>You can close this tab.</p>
+                </div>
+              )}
 
+              <a href="/subscription/manage" className="po-fine" style={{ color: "#B5AC98" }}>Manage your subscription</a>
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
 export default function SuccessPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-          <Loader2 size={24} className="animate-spin text-zinc-500" />
-        </div>
-      }
-    >
+    <Suspense fallback={<div className="min-h-screen bg-black" />}>
       <SuccessContent />
     </Suspense>
   );

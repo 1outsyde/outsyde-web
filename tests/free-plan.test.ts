@@ -54,7 +54,7 @@ const connected = { hasConnectAccount: true, stripeOnboardingComplete: true };
   // ── labels ───────────────────────────────────────────────────────────────
   console.log("\nTest 1: plan label (admin vendors page)");
   let l = planLabel({ subscription: free({}), ...connected }, NOW);
-  assert(l.text === "Free — permanent" && l.kind === "free" && l.end === "permanent", "permanent: end 2099-01-01Z → \"Free — permanent\"", l);
+  assert(l.text === "Free, no end date" && l.kind === "free" && l.end === "permanent", "permanent: end 2099-01-01Z → \"Free, no end date\"", l);
   assert(!/2098|2099/.test(l.text ?? ""), "permanent is tested BEFORE formatting (never \"December 31, 2098\")");
   assert(formatEtDate("2099-01-01T00:00:00.000Z") === "December 31, 2098", "…which is what formatting it would have said");
   l = planLabel({ subscription: free({ currentPeriodEnd: "2026-12-31T04:59:59.000Z" }), ...connected }, NOW);
@@ -141,7 +141,7 @@ const connected = { hasConnectAccount: true, stripeOnboardingComplete: true };
   }
   assert(!isComplimentarySubscription({ priceInCents: 0, stripeSubscriptionId: "sub_1" }), "a 0-priced row WITH a Stripe subscription is not free");
   assert(!isComplimentarySubscription({ priceInCents: null, stripeSubscriptionId: null }) && !isComplimentarySubscription({}), "missing price → not free");
-  assert(describeFreePlanEnd({ status: "active", currentPeriodEnd: "2099-01-01T00:00:00.000Z" }, NOW).label === "Free — permanent", "Lana's manage label: Free — permanent");
+  assert(describeFreePlanEnd({ status: "active", currentPeriodEnd: "2099-01-01T00:00:00.000Z" }, NOW).label === "Free, no end date", "Lana's manage label: Free, no end date");
   assert(describeFreePlanEnd({ status: "canceled", currentPeriodEnd: "2026-09-29T14:00:00.000Z" }, NOW).kind === "ended", "an ended winner: ended (the card is hidden)");
 
   // ── readJsonSafe ─────────────────────────────────────────────────────────

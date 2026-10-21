@@ -37,6 +37,11 @@ const nextConfig: NextConfig = {
         headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
       },
       {
+        // The app opens the plan offer confirm page with ?token= (its sign in): never send it in a Referer.
+        source: "/plan-offer",
+        headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+      },
+      {
         // iOS universal links: Apple fetches this file (no extension) and needs it as JSON.
         source: "/.well-known/apple-app-site-association",
         headers: [{ key: "Content-Type", value: "application/json" }],

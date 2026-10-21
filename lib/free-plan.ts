@@ -86,7 +86,7 @@ export function describeFreePlanEnd(
   plan: { status?: string | null; currentPeriodEnd?: string | Date | null },
   now: Date = new Date(),
 ): { kind: FreePlanEndKind; label: string } {
-  if (isPermanentEnd(plan.currentPeriodEnd)) return { kind: "permanent", label: "Free — permanent" };
+  if (isPermanentEnd(plan.currentPeriodEnd)) return { kind: "permanent", label: "Free, no end date" };
   const end = toMs(plan.currentPeriodEnd);
   const canceled = (plan.status ?? "").toLowerCase() === "canceled";
   if (canceled || (end !== null && end <= now.getTime())) {
