@@ -292,7 +292,7 @@ function ManageContent() {
                 <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-1">Current Plan</p>
                 <p className="text-xl font-semibold">{current.tierDisplayName || current.tierName}</p>
                 {isFree ? (
-                  <p className="text-lg font-semibold mt-0.5 text-white">Free plan — no charge</p>
+                  <p className="text-lg font-semibold mt-0.5 text-white">Free plan, no charge</p>
                 ) : (
                   <p className={`text-lg font-semibold mt-0.5 ${TIER_ACCENT[current.tierName?.toLowerCase()] ?? "text-white"}`}>
                     ${(current.priceInCents / 100).toFixed(0)}

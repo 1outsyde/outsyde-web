@@ -137,7 +137,7 @@ export default function SubscriptionPage() {
         <div className="mt-6 bg-zinc-900 border border-zinc-800 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-white mb-1">📊 How audience analytics work</h3>
           <p className="text-xs text-zinc-400 leading-relaxed mb-3">
-            We collect consumer demographics — age, niche/interest category, location, and geo-data —
+            We collect consumer demographics (age, niche or interest category, location and geo data)
             so you can advertise to exactly the right people. When matched with an influencer,
             their audience profile must align with yours before any campaign goes live.
           </p>

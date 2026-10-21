@@ -2,7 +2,9 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import FreePlanPanel from "./FreePlanPanel";
+import OfferCell from "./OfferCell";
 import { planLabel, type AdminSubscriptionSummary } from "@/lib/free-plan";
+import type { AdminOfferSummary } from "@/lib/plan-offer";
 
 interface AdminBusiness {
   id: string;
@@ -14,14 +16,11 @@ interface AdminBusiness {
   createdAt?: string;
   // Additive fields from GET /api/admin/businesses (free-plan controls).
   subscription?: AdminSubscriptionSummary | null;
+  // Hidden plan offers (backend #346): latest offer and the owner's @username.
+  planOffer?: AdminOfferSummary | null;
+  ownerUsername?: string | null;
   hasConnectAccount?: boolean;
   stripeOnboardingComplete?: boolean | null;
-}
-
-interface Tier {
-  id: string;
-  name: string;
-  displayName: string;
 }
 
 type AuthState = "loading" | "ok" | "unauthorized" | "forbidden";
@@ -38,17 +37,11 @@ export default function AdminVendorsPage() {
   const [authState, setAuthState] = useState<AuthState>("loading");
   const [businesses, setBusinesses] = useState<AdminBusiness[]>([]);
   const [total, setTotal] = useState(0);
-  const [grandfatheredTierId, setGrandfatheredTierId] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Per-row grant link state: businessId → { loading, url, error }
-  const [grantState, setGrantState] = useState<
-    Record<string, { loading?: boolean; url?: string; error?: string; copied?: boolean }>
-  >({});
-
-  // Per-row free-plan panel state: businessId → { open }. Separate from grantState.
+  // Per-row free-plan panel state: businessId → { open }.
   const [freeState, setFreeState] = useState<Record<string, { open?: boolean }>>({});
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -58,10 +51,7 @@ export default function AdminVendorsPage() {
     const params = new URLSearchParams({ limit: "100", offset: "0" });
     if (q) params.set("search", q);
 
-    const [bizRes, tiersRes] = await Promise.all([
-      fetch(`/api/admin/businesses?${params.toString()}`),
-      fetch("/api/subscription/tiers"),
-    ]);
+    const bizRes = await fetch(`/api/admin/businesses?${params.toString()}`);
 
     if (bizRes.status === 401 || bizRes.status === 403) {
       setAuthState(bizRes.status === 401 ? "unauthorized" : "forbidden");
@@ -78,12 +68,6 @@ export default function AdminVendorsPage() {
     setBusinesses(bizData.businesses ?? []);
     setTotal(bizData.total ?? bizData.businesses?.length ?? 0);
     setAuthState("ok");
-
-    if (tiersRes.ok) {
-      const tiersData = await tiersRes.json() as { tiers?: Tier[] };
-      const gf = tiersData.tiers?.find((t) => t.name === "grandfathered");
-      if (gf) setGrandfatheredTierId(gf.id);
-    }
   }, []);
 
   useEffect(() => {
@@ -99,50 +83,16 @@ export default function AdminVendorsPage() {
     }, DEBOUNCE_MS);
   }
 
-  async function handleGenerateLink(businessId: string) {
-    if (!grandfatheredTierId) return;
-    setGrantState((prev) => ({ ...prev, [businessId]: { loading: true } }));
-    try {
-      const res = await fetch("/api/admin/subscription/grant-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ businessId, tierId: grandfatheredTierId }),
-      });
-      const data = await res.json() as { grantUrl?: string; error?: string };
-      if (!res.ok || !data.grantUrl) {
-        setGrantState((prev) => ({
-          ...prev,
-          [businessId]: { error: data.error ?? "Failed to generate link." },
-        }));
-        return;
-      }
-      setGrantState((prev) => ({ ...prev, [businessId]: { url: data.grantUrl } }));
-    } catch {
-      setGrantState((prev) => ({
-        ...prev,
-        [businessId]: { error: "Network error. Try again." },
-      }));
-    }
-  }
-
-  async function handleCopy(businessId: string, url: string) {
-    try {
-      await navigator.clipboard.writeText(url);
-      setGrantState((prev) => ({ ...prev, [businessId]: { url, copied: true } }));
-      setTimeout(() => {
-        setGrantState((prev) => ({ ...prev, [businessId]: { url } }));
-      }, 2000);
-    } catch {
-      // fallback: select the input
-    }
-  }
-
   function toggleFreePanel(businessId: string) {
     setFreeState((prev) => ({ ...prev, [businessId]: { open: !prev[businessId]?.open } }));
   }
 
   function updateSubscription(businessId: string, subscription: AdminSubscriptionSummary) {
     setBusinesses((prev) => prev.map((b) => (b.id === businessId ? { ...b, subscription } : b)));
+  }
+
+  function updateOffer(businessId: string, planOffer: AdminOfferSummary) {
+    setBusinesses((prev) => prev.map((b) => (b.id === businessId ? { ...b, planOffer } : b)));
   }
 
   const css = `
@@ -200,6 +150,28 @@ export default function AdminVendorsPage() {
     .btn-ghost:hover:not(:disabled) { border-color: rgba(245,240,230,0.3); }
     .btn-copy { background: rgba(16,185,129,0.15); border-color: rgba(16,185,129,0.3); color: #34d399; }
     .btn-copy:hover { background: rgba(16,185,129,0.25); }
+
+    /* ── Plan offer column (artboard Admin) ───────────────────────────────── */
+    .vp-offer { display: block; font-size: 13px; line-height: 1.4; }
+    .vp-offer-none { color: rgba(245,240,230,0.5); }
+    .vp-offer-pending { color: #E8B930; font-weight: 600; }
+    .vp-offer-accepted { color: #8FD3B6; }
+    .vp-offer-withdrawn { color: rgba(245,240,230,0.5); }
+    .vp-offer-panel {
+      margin-top: 10px; width: 320px; max-width: 100%; background: #F5F0E6; color: #111; border-radius: 14px;
+      padding: 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 16px 40px rgba(0,0,0,0.5);
+    }
+    .vp-offer-q { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 1px; color: #1A3C34; }
+    .vp-offer-opt { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid #D8CFBC; border-radius: 10px; background: #fff; cursor: pointer; }
+    .vp-offer-opt-on { border: 2px solid #000; }
+    .vp-offer-opt input { margin-top: 3px; }
+    .vp-offer-opt-title { display: block; font-weight: 700; font-size: 14px; }
+    .vp-offer-opt-sub { display: block; font-size: 12.5px; color: #555; }
+    .vp-offer-date { background: #fff; border: 1px solid #D8CFBC; border-radius: 6px; color: #111; font-family: inherit; font-size: 14px; padding: 7px 10px; }
+    .vp-offer-check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #333; cursor: pointer; }
+    .vp-offer-note { margin: 0; font-size: 12.5px; line-height: 1.5; color: #3A3A3A; }
+    .vp-offer-send { min-height: 44px; border-radius: 10px; border: none; background: #000; color: #E8B930; font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+    .vp-offer-send:disabled { opacity: 0.45; cursor: not-allowed; }
 
     .grant-url {
       display: flex; align-items: center; gap: 8px; margin-top: 8px;
@@ -320,12 +292,7 @@ export default function AdminVendorsPage() {
       <div className="vp">
         <div className="vp-h1">Vendors</div>
         <div className="vp-sub">
-          Generate grandfathered plan links for existing vendors, or give a free plan / free-plan link from each row.
-          {!grandfatheredTierId && (
-            <span style={{ color: "#ff6b6b", marginLeft: 8 }}>
-              ⚠ Grandfathered tier not found — grant links unavailable.
-            </span>
-          )}
+          Offer the Grandfathered plan or a free plan to a business, or give, extend or revoke a free plan directly.
         </div>
 
         <div className="vp-search-row">
@@ -352,12 +319,11 @@ export default function AdminVendorsPage() {
                 <th className="vp-th">Business</th>
                 <th className="vp-th vp-th-hide">Owner</th>
                 <th className="vp-th vp-th-hide">Status</th>
-                <th className="vp-th">Grant Link</th>
+                <th className="vp-th">Plan offer</th>
               </tr>
             </thead>
             <tbody>
               {businesses.map((biz) => {
-                const gs = grantState[biz.id] ?? {};
                 const statusKey = (biz.approvalStatus ?? "").toLowerCase();
                 const statusClass =
                   statusKey === "approved" ? "vp-status-approved"
@@ -390,57 +356,27 @@ export default function AdminVendorsPage() {
                     </td>
                     <td className="vp-td vp-td-hide">
                       {biz.ownerName && <span>{biz.ownerName}</span>}
+                      {biz.ownerUsername && <span className="vp-td-sub">@{biz.ownerUsername}</span>}
                       {biz.ownerEmail && (
                         <span className="vp-td-sub">{biz.ownerEmail}</span>
                       )}
                     </td>
                     <td className="vp-td vp-td-hide">
                       <span className={`vp-status ${statusClass}`}>
-                        {biz.approvalStatus ?? "—"}
+                        {biz.approvalStatus ?? "Not set"}
                       </span>
                       {biz.createdAt && (
                         <span className="vp-td-sub">{formatDate(biz.createdAt)}</span>
                       )}
                     </td>
                     <td className="vp-td">
-                      {!gs.url ? (
-                        <button
-                          className="btn btn-gold"
-                          disabled={!grandfatheredTierId || !!gs.loading}
-                          onClick={() => handleGenerateLink(biz.id)}
-                        >
-                          {gs.loading ? "Generating…" : "Generate Grant Link"}
-                        </button>
-                      ) : (
-                        <div>
-                          <div className="grant-url">
-                            <span className="grant-url-text">{gs.url}</span>
-                            <button
-                              className="btn btn-copy"
-                              onClick={() => handleCopy(biz.id, gs.url!)}
-                            >
-                              {gs.copied ? "Copied!" : "Copy"}
-                            </button>
-                          </div>
-                          <span className="grant-ok">Valid for 48 hours.</span>
-                          <div style={{ marginTop: 6 }}>
-                            <button
-                              className="btn btn-ghost"
-                              style={{ fontSize: 11, padding: "4px 10px" }}
-                              onClick={() =>
-                                setGrantState((prev) => {
-                                  const next = { ...prev };
-                                  delete next[biz.id];
-                                  return next;
-                                })
-                              }
-                            >
-                              Regenerate
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      {gs.error && <p className="grant-err">{gs.error}</p>}
+                      <OfferCell
+                        businessId={biz.id}
+                        ownerLabel={biz.ownerUsername ? `@${biz.ownerUsername}` : biz.ownerName || "The owner"}
+                        offer={biz.planOffer}
+                        onOfferChange={updateOffer}
+                        onStale={() => load(search)}
+                      />
                     </td>
                   </tr>
                   {freeOpen && (

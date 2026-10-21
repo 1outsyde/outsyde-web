@@ -263,7 +263,7 @@ export async function sendBusinessSignupConfirmation(p: { email: string; busines
     <tr><td style="background-color:#E8B930;padding:16px 24px;border-radius:4px 4px 0 0;"><h2 style="color:#0a0a0a;margin:0;font-size:18px;">🎉 Application received</h2></td></tr>
     <tr><td style="background-color:#141414;padding:24px;border-radius:0 0 4px 4px;">
       <p style="color:#ffffff;font-size:15px;line-height:1.7;margin:0 0 16px 0;">Hi ${p.ownerName}, thanks for applying to list <strong>${p.businessName}</strong> on Outsyde. Your application is now pending review.</p>
-      <p style="color:#999;font-size:14px;line-height:1.7;margin:0 0 20px 0;">You don't have to wait on approval to get set up — you can choose your subscription plan right now. Log in with the email and password you just created to pick a plan; your business goes live once it's both approved and subscribed.</p>
+      <p style="color:#999;font-size:14px;line-height:1.7;margin:0 0 20px 0;">You don't have to wait on approval to get set up. You can choose your subscription plan right now. Log in with the email and password you just created to pick a plan; your business goes live once it's both approved and subscribed.</p>
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr><td align="center" style="padding:8px 0;">
           <a href="https://goutsyde.com/subscription" style="display:inline-block;background-color:#E8B930;color:#0a0a0a;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:12px 28px;border-radius:4px;">Choose Your Subscription</a>
