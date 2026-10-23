@@ -4,6 +4,7 @@ import {
   emptySheet, switchPaid, sheetFromType, parsePriceCents, ticketBody, ticketRowLines, ticketsSummary,
   refundLabel, addressLabel, hostOptions, dayOfNote, previewPrice, refundChangeAllowed, isScrolledToEnd,
   publishFailure, nextStepLabel, timeZoneList, shareUrl,
+  addDaysToDate, autoEndDate, clockChangeNote, changedFields, profilePayoutNote, whenRange,
   type HostEvent, type HostTicketType, type EventForm,
 } from "../app/events/_host/editorLogic";
 import { hostEarningsCents } from "../app/events/_host/hostFees";
@@ -38,11 +39,11 @@ eq(isoInZone("2026-10-25", "21:00", "Not/AZone"), null, "unknown zone is null");
 eq(isoInZone("2026-10-25", "", NY), null, "missing time is null");
 eq(isoInZone("10/25/2026", "21:00", NY), null, "wrong date format is null");
 eq(new Date(isoInZone("2026-10-25", "21:00", NY)!).toISOString(), "2026-10-26T01:00:00.000Z", "offset string is the right instant");
-eq(eventTimes({ date: "2026-10-25", startTime: "21:00", endTime: "02:00", timezone: NY }),
+eq(eventTimes({ date: "2026-10-25", startTime: "21:00", endTime: "02:00", endDate: "", timezone: NY }),
   { startsAt: "2026-10-25T21:00:00-04:00", endsAt: "2026-10-26T02:00:00-04:00" }, "end earlier than start is the next day");
-eq(eventTimes({ date: "2026-10-25", startTime: "18:00", endTime: "22:00", timezone: NY }),
+eq(eventTimes({ date: "2026-10-25", startTime: "18:00", endTime: "22:00", endDate: "", timezone: NY }),
   { startsAt: "2026-10-25T18:00:00-04:00", endsAt: "2026-10-25T22:00:00-04:00" }, "same day end");
-eq(eventTimes({ date: "2026-10-31", startTime: "22:00", endTime: "03:00", timezone: NY }),
+eq(eventTimes({ date: "2026-10-31", startTime: "22:00", endTime: "03:00", endDate: "", timezone: NY }),
   { startsAt: "2026-10-31T22:00:00-04:00", endsAt: "2026-11-01T03:00:00-05:00" }, "next day across the DST change keeps each side's offset");
 
 console.log("formFromEvent");
@@ -53,6 +54,28 @@ eq([f0.addressVisibility, f0.listed, f0.capacity, f0.refundPolicy, f0.refundCuto
 const f1 = formFromEvent(mkEvent({ visibility: "unlisted", capacity: null, refundPolicy: "no_refunds", refundCutoffHours: null, hostType: "business", description: null }));
 eq([f1.listed, f1.capacity, f1.refundPolicy, f1.hostAs, f1.description], [false, "", "no_refunds", "business", ""], "unlisted, no capacity, no refunds, business host");
 eq(eventTimes(f0), { startsAt: "2026-10-25T21:00:00-04:00", endsAt: "2026-10-26T02:00:00-04:00" }, "round trip: form back to the same instants");
+
+console.log("multi day events");
+const three = mkEvent({ startsAt: "2026-10-25T00:00:00.000Z", endsAt: "2026-10-28T00:00:00.000Z" }); // Oct 24 20:00 to Oct 27 20:00 EDT
+const f3 = formFromEvent(three);
+eq([f3.date, f3.startTime, f3.endTime, f3.endDate], ["2026-10-24", "20:00", "20:00", "2026-10-27"], "a 3 day event keeps its end date");
+eq(eventTimes(f3), { startsAt: "2026-10-24T20:00:00-04:00", endsAt: "2026-10-27T20:00:00-04:00" }, "3 day round trip: same instants");
+eq(validateForm({ ...f3 }), null, "same start and end time on different days is valid");
+eq(patchBody(f3, { ...f3, endTime: "23:00" }), { endsAt: "2026-10-27T23:00:00-04:00" }, "end only edit keeps the end date");
+eq(patchBody(f3, { ...f3, endDate: "2026-10-26" }), { endsAt: "2026-10-26T20:00:00-04:00" }, "end date edit sends the end only");
+eq(formFromEvent(mkEvent()).endDate, "", "an ordinary next day end leaves the end date empty");
+eq(formFromEvent(mkEvent({ endsAt: "2026-10-26T03:00:00.000Z" })).endDate, "", "a same day end leaves it empty");
+eq(formFromEvent(mkEvent({ endsAt: "2026-10-27T02:00:00.000Z" })).endDate, "2026-10-26", "next day with a later end time keeps the end date");
+eq(validateForm({ ...f3, endDate: "2026-10-23" }), "The event has to end after it starts.", "end date before the start refused");
+eq([addDaysToDate("2026-12-31", 1), autoEndDate({ date: "2026-10-25", startTime: "21:00", endTime: "02:00" }), autoEndDate({ date: "2026-10-25", startTime: "18:00", endTime: "22:00" })], ["2027-01-01", "2026-10-26", "2026-10-25"], "auto end date");
+eq(whenRange(three.startsAt, three.endsAt, NY), "Sat, Oct 24, 8:00 PM to Tue, Oct 27, 8:00 PM", "review shows both dates for a multi day event");
+eq(whenRange("2026-10-26T01:00:00.000Z", "2026-10-26T06:00:00.000Z", NY), "Sun, Oct 25, 9:00 PM to 2:00 AM", "review keeps the short form for an overnight event");
+
+console.log("clock change (spring forward gap, America/New_York 2026-03-08 02:00 to 03:00)");
+eq(isoInZone("2026-03-08", "02:30", NY), "2026-03-08T01:30:00-05:00", "02:30 doesn't exist: the zone math lands on 01:30 EST");
+eq(clockChangeNote("2026-03-08", "02:30", NY), "That time doesn't exist on this date because of the clock change. We'll use 1:30 AM.", "note says the time that will be saved");
+eq(clockChangeNote("2026-03-08", "03:30", NY), null, "a real time has no note");
+eq(clockChangeNote("2026-11-01", "01:30", NY), null, "the repeated fall back hour has no note");
 
 console.log("validateForm");
 const good: EventForm = { ...emptyForm(NY), title: "Party", date: "2026-11-20", startTime: "21:00", endTime: "23:00" };
@@ -117,6 +140,13 @@ const vip = mkType({ id: "t2", name: "VIP", priceCents: 4500, quantity: 20, maxP
 eq(sheetFromType(vip, NY), { paid: true, name: "VIP", price: "45.00", quantity: "20", maxPerOrder: "4", perAccountLimit: "", salesStart: "date", salesDate: "2026-11-01", salesTime: "10:00", unlockAfterId: "" }, "type back into the sheet");
 eq(sheetFromType(mkType({ unlockAfterTicketTypeId: "t9" }), NY).salesStart, "after", "unlock type back into the sheet");
 eq(ticketBody(sheetFromType(vip, NY), NY), { ok: true, body: { name: "VIP", priceCents: 4500, quantity: 20, maxPerOrder: 4, perAccountLimit: null, salesStartAt: "2026-11-01T10:00:00-05:00", unlockAfterTicketTypeId: null } }, "sheet round trip keeps the same values");
+
+console.log("ticket PATCH sends only changes");
+const vipBase = (ticketBody(sheetFromType(mkType({ id: "t5", name: "Round 2", priceCents: 3000, quantity: 75, maxPerOrder: 10, perAccountLimit: null, unlockAfterTicketTypeId: "t1" }), NY), NY) as { ok: true; body: Record<string, unknown> }).body;
+eq(changedFields(vipBase, { ...vipBase }), {}, "nothing changed");
+eq(changedFields(vipBase, { ...vipBase, quantity: 80 }), { quantity: 80 }, "only the quantity, unlock and price not resent");
+eq(changedFields(vipBase, { ...vipBase, unlockAfterTicketTypeId: null }), { unlockAfterTicketTypeId: null }, "clearing the unlock is a change");
+eq(profilePayoutNote("business"), "Payouts for this event go to your business's Stripe account. Finish its payout setup in the Outsyde app.", "business payout note");
 
 console.log("labels");
 const NOW = new Date("2026-10-23T12:00:00Z");

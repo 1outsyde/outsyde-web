@@ -1,6 +1,6 @@
 "use client";
 
-import { activeTypes, refundChangeAllowed, ticketRowLines, type EventForm, type HostEvent, type HostTicketType } from "./editorLogic";
+import { activeTypes, profilePayoutNote, refundChangeAllowed, ticketRowLines, type EventForm, type HostEvent, type HostTicketType } from "./editorLogic";
 
 export type PayoutBanner =
   | { kind: "none" }
@@ -39,7 +39,7 @@ export default function TicketsStep({ event, types, form, setForm, payout, onSta
                 {payout.sending ? "Opening Stripe" : "Set up payouts"}
               </button>
             ) : (
-              <div className="ed-hint">Payouts for this event go to your {event.hostType === "business" ? "business" : "photographer profile"}&apos;s Stripe account. Finish its payout setup in the Outsyde app.</div>
+              <div className="ed-hint">{profilePayoutNote(event.hostType)}</div>
             )}
             {payout.error && <div className="ed-err" role="alert">{payout.error}</div>}
           </div>

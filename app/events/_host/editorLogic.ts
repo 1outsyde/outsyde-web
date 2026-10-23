@@ -79,7 +79,10 @@ export interface EventForm {
   hostAs: HostAs;
   date: string; // YYYY-MM-DD in the event's time zone
   startTime: string; // HH:MM
-  endTime: string; // HH:MM (earlier than the start means the next day)
+  endTime: string; // HH:MM
+  /** YYYY-MM-DD when the event ends on a day of its own choosing; empty means the start day, or the next day
+   * when the end time is before the start time. */
+  endDate: string;
   timezone: string;
   venueName: string;
   addressLine1: string;
@@ -97,7 +100,7 @@ export interface EventForm {
 export function emptyForm(timezone: string): EventForm {
   return {
     title: "", description: "", coverImageUrl: null, hostAs: "user",
-    date: "", startTime: "", endTime: "", timezone,
+    date: "", startTime: "", endTime: "", endDate: "", timezone,
     venueName: "", addressLine1: "", addressLine2: "", city: "", state: "", postalCode: "",
     addressVisibility: "ticket_holders", listed: true,
     capacity: "", refundPolicy: "until_cutoff", refundCutoffHours: "24",
@@ -126,11 +129,44 @@ export function isoInZone(date: string, time: string, tz: string, addDays = 0): 
   return `${p.y}-${pad(p.m)}-${pad(p.d)}T${pad(p.h)}:${pad(p.mi)}:${pad(p.s)}${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
 }
 
-/** Start and end from the form. An end time earlier than the start time means the next day. */
-export function eventTimes(f: Pick<EventForm, "date" | "startTime" | "endTime" | "timezone">): { startsAt: string; endsAt: string } | null {
+type TimeFields = Pick<EventForm, "date" | "startTime" | "endTime" | "endDate" | "timezone">;
+
+/** YYYY-MM-DD plus n days (calendar math, no time zone involved). */
+export function addDaysToDate(date: string, n: number): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!m) return "";
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + n));
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+}
+
+/** The end day the simple rule gives: the start day, or the next day when the end time is before the start time. */
+export function autoEndDate(f: Pick<EventForm, "date" | "startTime" | "endTime">): string {
+  if (!f.date) return "";
+  return addDaysToDate(f.date, f.endTime && f.startTime && f.endTime < f.startTime ? 1 : 0);
+}
+
+/** Start and end from the form. With no end date, an end time earlier than the start time means the next day. */
+export function eventTimes(f: TimeFields): { startsAt: string; endsAt: string } | null {
   const startsAt = isoInZone(f.date, f.startTime, f.timezone);
-  const endsAt = isoInZone(f.date, f.endTime, f.timezone, f.endTime < f.startTime ? 1 : 0);
+  const endsAt = f.endDate
+    ? isoInZone(f.endDate, f.endTime, f.timezone)
+    : isoInZone(f.date, f.endTime, f.timezone, f.endTime < f.startTime ? 1 : 0);
   return startsAt && endsAt ? { startsAt, endsAt } : null;
+}
+
+function wallHm(iso: string, tz: string): string {
+  return fmt(iso, tz, { hour: "numeric", minute: "2-digit" });
+}
+
+/**
+ * A wall time that doesn't exist on that date (the spring forward gap) is saved as another time. Returns the note
+ * to show under the time inputs, or null when the saved time is what was typed.
+ */
+export function clockChangeNote(date: string, time: string, tz: string): string | null {
+  const iso = isoInZone(date, time, tz);
+  if (!iso) return null;
+  if (iso.slice(0, 10) === date && iso.slice(11, 16) === time) return null;
+  return `That time doesn't exist on this date because of the clock change. We'll use ${wallHm(iso, tz)}.`;
 }
 
 function wallDate(iso: string, tz: string): string {
@@ -145,6 +181,14 @@ function wallTime(iso: string, tz: string): string {
 
 /** Event JSON back into form state (times in the event's own time zone). */
 export function formFromEvent(e: HostEvent): EventForm {
+  const f = baseFormFromEvent(e);
+  // The saved end day. Kept only when the simple rule wouldn't give it (a multi day event), so moving the start
+  // date of an ordinary event keeps moving its end with it.
+  const endDay = wallDate(e.endsAt, safeZone(e.timezone));
+  return { ...f, endDate: endDay === autoEndDate(f) ? "" : endDay };
+}
+
+function baseFormFromEvent(e: HostEvent): EventForm {
   const tz = safeZone(e.timezone);
   return {
     title: e.title ?? "",
@@ -154,6 +198,7 @@ export function formFromEvent(e: HostEvent): EventForm {
     date: wallDate(e.startsAt, tz),
     startTime: wallTime(e.startsAt, tz),
     endTime: wallTime(e.endsAt, tz),
+    endDate: "",
     timezone: e.timezone,
     venueName: e.venueName ?? "",
     addressLine1: e.addressLine1 ?? "",
@@ -182,8 +227,10 @@ export function validateForm(f: EventForm): string | null {
   if (f.title.trim().length > 120) return "Keep the event name to 120 characters or fewer.";
   if (!f.date) return "Pick a date for your event.";
   if (!f.startTime || !f.endTime) return "Pick when your event starts and ends.";
-  if (f.startTime === f.endTime) return "The event has to end after it starts.";
-  if (!eventTimes(f)) return "Check the date, times and time zone.";
+  if (!f.endDate && f.startTime === f.endTime) return "The event has to end after it starts.";
+  const times = eventTimes(f);
+  if (!times) return f.endDate ? "Check the end date, times and time zone." : "Check the date, times and time zone.";
+  if (new Date(times.endsAt).getTime() <= new Date(times.startsAt).getTime()) return "The event has to end after it starts.";
   if (f.capacity.trim() !== "") {
     const c = intOrNull(f.capacity);
     if (c == null || c < 1 || c > 100000) return "Capacity has to be a whole number from 1 to 100,000, or left empty.";
@@ -241,7 +288,7 @@ export function patchBody(base: EventForm, f: EventForm): Record<string, unknown
   if (rb.refundPolicy !== rf.refundPolicy || rb.refundCutoffHours !== rf.refundCutoffHours) Object.assign(body, rf);
 
   const startMoved = base.date !== f.date || base.startTime !== f.startTime || base.timezone !== f.timezone;
-  const endMoved = startMoved || base.endTime !== f.endTime;
+  const endMoved = startMoved || base.endTime !== f.endTime || base.endDate !== f.endDate;
   if (endMoved) {
     const times = eventTimes(f);
     if (times) {
@@ -361,7 +408,35 @@ export function ticketBody(s: TicketSheet, tz: string): SheetResult {
   };
 }
 
+/**
+ * Fields of `next` that differ from `base` (both ticket bodies from ticketBody). Used for a ticket type PATCH so
+ * unchanged values (price, sales start, unlock) are not sent again. Values are compared as JSON.
+ */
+export function changedFields(base: Record<string, unknown>, next: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(next)) if (JSON.stringify(base[k] ?? null) !== JSON.stringify(v ?? null)) out[k] = v;
+  return out;
+}
+
 /* ---------- labels ---------- */
+
+/** Business and photographer hosts get paid through that profile's own Stripe account, set up in the app. */
+export function profilePayoutNote(hostType: HostAs): string {
+  return `Payouts for this event go to your ${hostType === "business" ? "business" : "photographer profile"}'s Stripe account. Finish its payout setup in the Outsyde app.`;
+}
+
+/** "Sat, Oct 25, 9:00 PM to 2:00 AM", or with both dates when the event ends after the next morning. */
+export function whenRange(startsAt: string, endsAt: string, tz: string): string {
+  const day = (iso: string) => wallDate(iso, safeZone(tz));
+  const start = fmt(startsAt, tz, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  const nextDay = addDaysToDate(day(startsAt), 1);
+  const endDay = day(endsAt);
+  const shortEnd = endDay === day(startsAt) || (endDay === nextDay && wallTime(endsAt, tz) < wallTime(startsAt, tz));
+  const end = shortEnd
+    ? wallHm(endsAt, tz)
+    : fmt(endsAt, tz, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return `${start} to ${end}`;
+}
 
 export function activeTypes(types: HostTicketType[]): HostTicketType[] {
   return types.filter((t) => t.status === "active");

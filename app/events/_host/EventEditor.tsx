@@ -18,8 +18,8 @@ import ReviewStep, { type Agreement } from "./ReviewStep";
 import LiveStep from "./LiveStep";
 import { EDITOR_CSS } from "./editorStyles";
 import {
-  activeTypes, createBody, emptyForm, emptySheet, formFromEvent, hostOptions, isHostEvent, isHostTicketType,
-  nextStepLabel, patchBody, publishFailure, sheetFromType, validateForm,
+  activeTypes, changedFields, createBody, emptyForm, emptySheet, formFromEvent, hostOptions, isHostEvent, isHostTicketType,
+  nextStepLabel, patchBody, profilePayoutNote, publishFailure, sheetFromType, ticketBody, validateForm,
   type EventForm, type HostAs, type HostEvent, type HostTicketType, type PublishNext, type TicketSheet,
 } from "./editorLogic";
 
@@ -252,8 +252,15 @@ export default function EventEditor({ eventId: routeId }: { eventId?: string }) 
   async function saveType(body: Record<string, unknown>): Promise<string | null> {
     if (!eventId || !sheet) return GENERIC_ERROR;
     const editing = sheet.editing;
+    // PATCH only what changed, like the event itself: unchanged price, sales start and unlock are not resent.
+    let patch = body;
+    if (editing && event) {
+      const before = ticketBody(sheetFromType(editing, event.timezone), event.timezone);
+      if (before.ok) patch = changedFields(before.body, body);
+      if (Object.keys(patch).length === 0) { setSheet(null); return null; }
+    }
     const r = editing
-      ? await call("PATCH", `/api/events/${eventId}/ticket-types/${editing.id}`, body)
+      ? await call("PATCH", `/api/events/${eventId}/ticket-types/${editing.id}`, patch)
       : await call("POST", `/api/events/${eventId}/ticket-types`, body);
     if (!r) return null;
     if ((r.status !== 200 && r.status !== 201) || !r.body?.success || !isHostTicketType(r.body.ticketType)) {
@@ -373,7 +380,8 @@ export default function EventEditor({ eventId: routeId }: { eventId?: string }) 
   }
 
   async function runNext(n: PublishNext) {
-    if (n === "new") router.push("/events/new");
+    // A full load gives a fresh editor (a client navigation could keep this one's state).
+    if (n === "new") window.location.assign("/events/new");
     else if (n === "tickets") go("tickets");
     else if (n === "payouts") await startPayouts();
     else if (n === "manage" && eventId) router.push(`/events/${eventId}/manage`);
@@ -417,6 +425,7 @@ export default function EventEditor({ eventId: routeId }: { eventId?: string }) 
   }
 
   if (screen === "start") {
+    const startCover = safeHttpUrl(form.coverImageUrl);
     return page(
       <>
         <div className="ed-top">
@@ -425,16 +434,16 @@ export default function EventEditor({ eventId: routeId }: { eventId?: string }) 
           <div className="ed-icon-spacer" />
         </div>
         <div className="ed-body ed-stack">
-          <label className={`ed-cover-tile${form.coverImageUrl ? " has" : ""}`}>
-            {form.coverImageUrl ? (
+          <label className={`ed-cover-tile${startCover ? " has" : ""}`}>
+            {startCover ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={form.coverImageUrl} alt="" className="ed-cover-img" />
+              <img src={startCover} alt="" className="ed-cover-img" />
             ) : (
               <span className="ed-cover-icon" aria-hidden="true">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="9" cy="9" r="2" /><path d="M21 15l-5-5L5 21" /></svg>
               </span>
             )}
-            <span className="ed-cover-title">{uploading ? "Uploading" : form.coverImageUrl ? "Change cover photo" : "Add a cover photo"}</span>
+            <span className="ed-cover-title">{uploading ? "Uploading" : startCover ? "Change cover photo" : "Add a cover photo"}</span>
             <span className="ed-hint ed-cover-sub">This is what people see in Discover. You can change it later.</span>
             <input type="file" accept="image/*" className="ed-hidden-file" disabled={uploading}
               onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) uploadCover(f); }} />
@@ -525,6 +534,9 @@ export default function EventEditor({ eventId: routeId }: { eventId?: string }) 
         {publishError && (
           <div className="ed-stack-sm" role="alert">
             <p className="ed-err">{publishError.message}</p>
+            {publishError.next === "payouts" && event && event.hostType !== "user" && (
+              <p className="ed-hint">{profilePayoutNote(event.hostType)}</p>
+            )}
             {nextStepLabel(publishError.next) && !(publishError.next === "payouts" && event?.hostType !== "user") && (
               <button type="button" className="ed-secondary" onClick={() => runNext(publishError.next)}>
                 {nextStepLabel(publishError.next)}

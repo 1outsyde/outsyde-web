@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { fmt } from "../../e/_shared/format";
+import { safeHttpUrl } from "../../tickets/ticketsLogic";
 import { priceLabel, whenLabel, whereLabel } from "../eventsLogic";
 import AgreementText from "./AgreementText";
 import {
-  addressLabel, eventTimes, hostAsLabel, isScrolledToEnd, previewPrice, refundLabel, ticketsSummary,
+  addressLabel, eventTimes, hostAsLabel, isScrolledToEnd, previewPrice, refundLabel, ticketsSummary, whenRange,
   type EventForm, type HostEvent, type HostTicketType,
 } from "./editorLogic";
 
@@ -45,11 +46,12 @@ export function PreviewCard({ form, types, startsAt, showPrice = true }: { form:
     whereLabel(card.addressHidden ? { ...card, venueName: null } : card),
     showPrice ? priceLabel(previewPrice(types)) : "",
   ].filter(Boolean);
+  const cover = safeHttpUrl(form.coverImageUrl);
   return (
     <div className="ed-card">
       <div className="ed-card-cover">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        {form.coverImageUrl ? <img src={form.coverImageUrl} alt="" /> : <span>No cover photo yet</span>}
+        {cover ? <img src={cover} alt="" /> : <span>No cover photo yet</span>}
         <span className="ed-card-tag">EVENT</span>
       </div>
       <div className="ed-card-body">
@@ -80,7 +82,7 @@ export default function ReviewStep(p: ReviewStepProps) {
 
   const rows: { label: string; value: string; to: "details" | "tickets" }[] = [
     { label: "Hosted as", value: hostAsLabel(event.hostType), to: "details" },
-    { label: "When", value: times ? `${fmt(times.startsAt, form.timezone, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} to ${fmt(times.endsAt, form.timezone, { hour: "numeric", minute: "2-digit" })}` : "Not set", to: "details" },
+    { label: "When", value: times ? whenRange(times.startsAt, times.endsAt, form.timezone) : "Not set", to: "details" },
     { label: "Address", value: addressLabel(form.addressVisibility), to: "details" },
     { label: "Discover", value: form.listed ? "Shown in Discover" : "Only people with the link", to: "details" },
     { label: "Tickets", value: ticketsSummary(types), to: "tickets" },

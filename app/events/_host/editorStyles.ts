@@ -25,6 +25,8 @@ export const EDITOR_CSS = `
 .ed-strong { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
 .ed-gold-sm { font-size: 12px; color: #E8B930; }
 .ed-gold { color: #E8B930; }
+.ed-left { align-self: flex-start; padding: 0; }
+.ed-warn { color: #E8B930; }
 .ed-muted { font-size: 14px; color: #B8B0A0; padding: 24px 16px; }
 .ed-err { font-size: 14px; color: #e57a6e; margin: 0; line-height: 1.4; }
 .ed-ok { font-size: 14px; color: #9FC2B5; margin: 0; line-height: 1.4; }
@@ -63,7 +65,7 @@ export const EDITOR_CSS = `
 .ed-radio input[type=radio]:disabled { cursor: not-allowed; opacity: 0.4; }
 .ed-radio-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .ed-inline { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.ed-hours { width: 72px; min-height: 40px; text-align: center; padding: 0 8px; }
+.ed-hours { width: 72px; min-height: 44px; text-align: center; padding: 0 8px; }
 .ed-switchrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 6px 6px 12px; border-radius: 12px; background: #1C1C1E; }
 .ed-switch { width: 58px; height: 44px; flex: 0 0 58px; border: 0; background: transparent; padding: 0; position: relative; cursor: pointer; }
 .ed-switch::before { content: ""; position: absolute; left: 6px; top: 8px; width: 46px; height: 28px; border-radius: 14px; background: #48484A; transition: background 0.15s; }

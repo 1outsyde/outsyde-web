@@ -1,6 +1,8 @@
 "use client";
 
-import { dayOfNote, hostAsLabel, timeZoneList, type EventForm, type HostAs } from "./editorLogic";
+import { useState } from "react";
+import { safeHttpUrl } from "../../tickets/ticketsLogic";
+import { autoEndDate, clockChangeNote, dayOfNote, hostAsLabel, timeZoneList, type EventForm, type HostAs } from "./editorLogic";
 
 export interface DetailsStepProps {
   form: EventForm;
@@ -23,16 +25,30 @@ const VISIBILITY: { value: EventForm["addressVisibility"]; label: string }[] = [
 export default function DetailsStep({ form, setForm, hosts, hostLocked, startLocked, uploading, onPickCover }: DetailsStepProps) {
   const set = <K extends keyof EventForm>(k: K, v: EventForm[K]) => setForm({ ...form, [k]: v });
   const hostChoices = hostLocked ? [form.hostAs] : hosts;
+  const cover = safeHttpUrl(form.coverImageUrl);
+  // Open when the saved end is on a day the simple rule wouldn't give (formFromEvent fills endDate only then).
+  const [multiDay, setMultiDay] = useState(form.endDate !== "");
+  const endDay = form.endDate || autoEndDate(form);
+  const notes = [
+    form.date && form.startTime ? clockChangeNote(form.date, form.startTime, form.timezone) : null,
+    endDay && form.endTime ? clockChangeNote(endDay, form.endTime, form.timezone) : null,
+  ].filter((n, i, all): n is string => !!n && all.indexOf(n) === i);
+
+  function toggleMultiDay() {
+    if (multiDay) { setMultiDay(false); set("endDate", ""); return; }
+    setMultiDay(true);
+    set("endDate", autoEndDate(form));
+  }
 
   return (
     <div className="ed-stack">
       <div className="ed-namerow">
-        <label className="ed-thumb" aria-label={form.coverImageUrl ? "Change cover photo" : "Add a cover photo"}>
-          {form.coverImageUrl
+        <label className="ed-thumb" aria-label={cover ? "Change cover photo" : "Add a cover photo"}>
+          {cover
             // eslint-disable-next-line @next/next/no-img-element
-            ? <img src={form.coverImageUrl} alt="" />
+            ? <img src={cover} alt="" />
             : <span className="ed-thumb-plus" aria-hidden="true">+</span>}
-          <span className="ed-thumb-text">{uploading ? "Uploading" : form.coverImageUrl ? "Change" : "Cover"}</span>
+          <span className="ed-thumb-text">{uploading ? "Uploading" : cover ? "Change" : "Cover"}</span>
           <input
             type="file" accept="image/*" className="ed-hidden-file" disabled={uploading}
             onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) onPickCover(f); }}
@@ -75,8 +91,20 @@ export default function DetailsStep({ form, setForm, hosts, hostLocked, startLoc
             onChange={(e) => set("endTime", e.target.value)} />
         </div>
       </div>
-      {form.startTime && form.endTime && form.endTime < form.startTime && (
+      {!multiDay && form.startTime && form.endTime && form.endTime < form.startTime && (
         <div className="ed-hint">Ends the next day.</div>
+      )}
+      {notes.map((n) => <div key={n} className="ed-hint ed-warn" role="status">{n}</div>)}
+      <button type="button" className="ed-textbtn ed-gold ed-left" aria-expanded={multiDay} aria-controls="ev-enddate-field"
+        onClick={toggleMultiDay}>
+        {multiDay ? "Ends the same day or the next morning" : "Ends on a different day"}
+      </button>
+      {multiDay && (
+        <div className="ed-field" id="ev-enddate-field">
+          <label htmlFor="ev-enddate" className="ed-label">END DATE</label>
+          <input id="ev-enddate" type="date" className="ed-in" value={form.endDate || endDay} min={form.date || undefined}
+            onChange={(e) => set("endDate", e.target.value)} />
+        </div>
       )}
       {startLocked && <div className="ed-hint">This event has started, so its start time can&apos;t change.</div>}
 
