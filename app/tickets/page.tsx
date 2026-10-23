@@ -136,6 +136,7 @@ export default function TicketsPage() {
                       )}
                       <div className="tk-info">
                         <h2 className="tk-title"><Link href={`/e/${t.event.slug}`}>{t.event.title}</Link></h2>
+                        {t.event.status === "cancelled" && <div className="tk-cancelled">Event cancelled</div>}
                         <div style={{ fontSize: 13, fontWeight: 600 }}>{whenLine(t.event)}</div>
                         <div className="tk-place">
                           {place.lines.length > 0 && <div>{place.lines.join(", ")}</div>}
@@ -171,7 +172,7 @@ export default function TicketsPage() {
                         {panel.step === "error" && (
                           <>
                             <div className="tk-err" role="alert">{panel.message}</div>
-                            {panel.orderId && panel.free !== undefined && (
+                            {panel.message === GENERIC_ERROR && panel.orderId && panel.free !== undefined && (
                               <button type="button" className="tk-btn" onClick={() => setPanel(t.id, { step: "confirm", orderId: panel.orderId!, free: panel.free! })}>Try again</button>
                             )}
                           </>
@@ -229,6 +230,7 @@ export default function TicketsPage() {
 }
 
 const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Hanken+Grotesk:wght@400;500;600;700&display=swap');
 body{background:#0B0B0B;margin:0}
 .tk-page{min-height:100vh;background:#0B0B0B;color:#F5F0E6;font-family:'Hanken Grotesk',system-ui,sans-serif}
 .tk-wrap{max-width:480px;margin:0 auto;padding:16px 20px 60px;box-sizing:border-box}
@@ -246,6 +248,7 @@ body{background:#0B0B0B;margin:0}
 .tk-info{padding:16px 18px 6px;display:flex;flex-direction:column;gap:4px}
 .tk-title{font-family:'Bebas Neue',sans-serif;font-size:28px;line-height:1;margin:0;font-weight:400;overflow-wrap:anywhere}
 .tk-card .tk-title a{color:#0B0B0B}
+.tk-cancelled{font-size:12px;font-weight:700;color:#9B2C2C}
 .tk-place{font-size:13px;color:#4A453C;display:flex;flex-direction:column;gap:2px}
 .tk-qrbox{padding:14px 18px 12px;display:flex;flex-direction:column;align-items:center;gap:10px}
 .tk-qr{width:200px;height:200px;max-width:100%;background:#F5F0E6;display:block}
