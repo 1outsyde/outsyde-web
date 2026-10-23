@@ -1,0 +1,155 @@
+/** Pure helpers for the My Tickets page. No React, no network. */
+
+export interface TicketEvent {
+  id: string;
+  slug: string;
+  title: string;
+  status: string;
+  startsAt: string;
+  endsAt: string;
+  timezone: string;
+  coverImageUrl: string | null;
+  city: string | null;
+  state: string | null;
+  venueName: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  postalCode: string | null;
+  addressHidden: boolean;
+  addressRevealAt: string | null;
+}
+
+export interface MyTicket {
+  id: string;
+  code: string;
+  status: string;
+  orderId: string;
+  checkedInAt: string | null;
+  ticketTypeName: string;
+  qrUrl: string | null;
+  walletUrl?: string | null;
+  event: TicketEvent;
+}
+
+export const GENERIC_ERROR = "Something went wrong. Try again.";
+
+export function errorCopy(body: unknown): string {
+  const msg = (body as { error?: unknown } | null)?.error;
+  return typeof msg === "string" && msg.trim() ? msg : GENERIC_ERROR;
+}
+
+function safeZone(tz: string): string {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return tz;
+  } catch {
+    return "UTC";
+  }
+}
+
+function fmt(iso: string, tz: string, opts: Intl.DateTimeFormatOptions): string {
+  return new Intl.DateTimeFormat("en-US", { timeZone: safeZone(tz), ...opts }).format(new Date(iso));
+}
+
+/** "Sat, Oct 31 · 9:00 PM" in the event's own time zone. */
+export function whenLine(e: Pick<TicketEvent, "startsAt" | "timezone">): string {
+  const day = fmt(e.startsAt, e.timezone, { weekday: "short", month: "short", day: "numeric" });
+  const time = fmt(e.startsAt, e.timezone, { hour: "numeric", minute: "2-digit" });
+  return `${day} · ${time}`;
+}
+
+export interface PlaceInfo {
+  visible: boolean;
+  lines: string[];
+  note: string | null;
+  /** Visible address as one string, or the city and state when hidden. */
+  text: string;
+}
+
+export function placeInfo(e: TicketEvent): PlaceInfo {
+  const cityLine = [e.city, e.state].filter(Boolean).join(", ");
+  if (e.addressHidden) {
+    const note = e.addressRevealAt
+      ? `Full address on ${fmt(e.addressRevealAt, e.timezone, { weekday: "long", month: "long", day: "numeric" })} at ${fmt(e.addressRevealAt, e.timezone, { hour: "numeric", minute: "2-digit" })}.`
+      : null;
+    const lines = cityLine ? [cityLine] : [];
+    return { visible: false, lines, note, text: cityLine };
+  }
+  const street = [e.addressLine1, e.addressLine2].filter(Boolean).join(", ");
+  const lines = [e.venueName, street, cityLine].filter((x): x is string => !!x);
+  return { visible: true, lines, note: null, text: lines.join(", ") };
+}
+
+/** Google Maps search link, only when the street address is visible. */
+export function directionsUrl(e: TicketEvent): string | null {
+  if (e.addressHidden || !e.addressLine1) return null;
+  const q = placeInfo(e).text;
+  return q ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}` : null;
+}
+
+export function splitSections(tickets: MyTicket[], now: Date = new Date()): { upcoming: MyTicket[]; past: MyTicket[] } {
+  const upcoming: MyTicket[] = [];
+  const past: MyTicket[] = [];
+  for (const t of tickets) {
+    (new Date(t.event.endsAt).getTime() > now.getTime() ? upcoming : past).push(t);
+  }
+  return { upcoming, past };
+}
+
+export interface EventGroup {
+  event: TicketEvent;
+  tickets: MyTicket[];
+}
+
+export function groupByEvent(tickets: MyTicket[]): EventGroup[] {
+  const map = new Map<string, EventGroup>();
+  for (const t of tickets) {
+    const g = map.get(t.event.id);
+    if (g) g.tickets.push(t);
+    else map.set(t.event.id, { event: t.event, tickets: [t] });
+  }
+  return Array.from(map.values());
+}
+
+/* ---------- calendar file ---------- */
+
+export function escapeIcs(s: string): string {
+  return s.replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r\n|\r|\n/g, "\\n");
+}
+
+function icsUtc(d: Date): string {
+  return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+}
+
+function fold(line: string): string {
+  if (line.length <= 75) return line;
+  const parts = [line.slice(0, 75)];
+  for (let i = 75; i < line.length; i += 74) parts.push(" " + line.slice(i, i + 74));
+  return parts.join("\r\n");
+}
+
+export function icsFileName(e: Pick<TicketEvent, "slug">): string {
+  return `${e.slug}.ics`;
+}
+
+export function buildIcs(t: MyTicket, now: Date = new Date()): string {
+  const e = t.event;
+  const place = placeInfo(e).text;
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Outsyde//Events//EN",
+    "CALSCALE:GREGORIAN",
+    "BEGIN:VEVENT",
+    `UID:${t.id}`,
+    `DTSTAMP:${icsUtc(now)}`,
+    `DTSTART:${icsUtc(new Date(e.startsAt))}`,
+    `DTEND:${icsUtc(new Date(e.endsAt))}`,
+    `SUMMARY:${escapeIcs(e.title)}`,
+    ...(place ? [`LOCATION:${escapeIcs(place)}`] : []),
+    `URL:https://goutsyde.com/e/${e.slug}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ];
+  return lines.map(fold).join("\r\n") + "\r\n";
+}

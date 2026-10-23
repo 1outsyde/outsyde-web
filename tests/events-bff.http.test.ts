@@ -306,6 +306,37 @@ async function call(base: string, method: string, path: string, opts: { token?: 
       await new Promise<void>((x) => stub.close(() => x()));
     }
 
+    // ===== Task 4: My Tickets page (/tickets) =====
+    console.log("My Tickets (/tickets)");
+    {
+      const pageRes = await fetch(new URL("/tickets", WEB), { redirect: "manual" });
+      const pageText = await pageRes.text();
+      assert(pageRes.status === 200 && /My Tickets|MY TICKETS|Loading your tickets/.test(pageText), "signed out: /tickets serves the client page (200, no server redirect)", pageRes.status);
+      r = await call(WEB, "GET", `/api/events/me/tickets`);
+      assert(r.status === 401, "signed out: me/tickets is 401, which the page turns into /login?return=/tickets", r);
+      const tkEv = (await call(BACKEND, "POST", "/api/events", { token: hostTok, body: { title: `${P} Tickets Night`, startsAt: inDays(10), endsAt: inDays(10, 4), timezone: "America/Los_Angeles", city: "Freeport", state: "NY", capacity: 30 } })).body.event;
+      const tkType = (await call(BACKEND, "POST", `/api/events/${tkEv.id}/ticket-types`, { token: hostTok, body: { name: "Free RSVP", priceCents: 0, quantity: 10 } })).body.ticketType;
+      await call(BACKEND, "POST", `/api/events/${tkEv.id}/publish`, { token: hostTok });
+      const tkRsvp = await call(WEB, "POST", `/api/events/${tkEv.id}/rsvp`, { token: guestTok, body: { ticketTypeId: tkType.id, quantity: 1, idempotencyKey: `${P}-tk1` } });
+      assert(tkRsvp.status === 201 && tkRsvp.body?.order?.tickets?.length === 1, "seeded a free RSVP", tkRsvp);
+      const tkOrder: string = tkRsvp.body?.order?.id;
+      r = await call(WEB, "GET", `/api/events/me/tickets`, { token: guestTok });
+      const mine = (r.body?.tickets ?? []).filter((t: any) => t.orderId === tkOrder);
+      assert(mine.length === 1 && mine.every((t: any) => typeof t.code === "string" && t.event?.slug === tkEv.slug && t.event?.timezone === "America/Los_Angeles"), "me/tickets returns the ticket with code, event slug and time zone", r.body);
+      assert(mine.every((t: any) => t.qrUrl === null || (typeof t.qrUrl === "string" && /^https?:\/\//.test(t.qrUrl))), "qrUrl is null or an absolute URL, which the page passes straight to <img src>", mine.map((t: any) => t.qrUrl));
+      const direct2 = await call(BACKEND, "GET", `/api/events/me/tickets`, { token: guestTok });
+      const directMine = (direct2.body?.tickets ?? []).filter((t: any) => t.orderId === tkOrder);
+      assert(JSON.stringify(mine.map((t: any) => t.qrUrl)) === JSON.stringify(directMine.map((t: any) => t.qrUrl)), "the BFF's qrUrl equals the backend's qrUrl", { mine: mine.map((t: any) => t.qrUrl), directMine: directMine.map((t: any) => t.qrUrl) });
+      r = await call(WEB, "GET", `/api/events/orders/${tkOrder}`, { token: guestTok });
+      assert(r.status === 200 && r.body?.order?.totalCents === 0, "order has totalCents 0, so the page offers Cancel my RSVP", r.body?.order);
+      r = await call(WEB, "POST", `/api/events/orders/${tkOrder}/cancel`, { token: guestTok });
+      assert(r.status === 200 && r.body?.success === true, "cancel through the BFF succeeds", r);
+      r = await call(WEB, "GET", `/api/events/me/tickets`, { token: guestTok });
+      assert(!(r.body?.tickets ?? []).some((t: any) => t.orderId === tkOrder), "cancelled tickets no longer come back from me/tickets", r.body);
+      r = await call(WEB, "POST", `/api/events/orders/${tkOrder}/cancel`, { token: guestTok });
+      assert(r.status >= 400 && typeof r.body?.error === "string" && typeof r.body?.code === "string", "a second cancel is refused with a message and a code the page can show", r);
+    }
+
     console.log("Backend unreachable (in process, closed port)");
     process.env.OUTSYDE_BACKEND_URL = "http://127.0.0.1:1";
     const { NextRequest } = await import("next/server");
