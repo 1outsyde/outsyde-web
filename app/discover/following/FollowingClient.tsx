@@ -75,8 +75,10 @@ export default function FollowingClient() {
 
   useEffect(() => {
     if (viewer.status !== "in") return;
-    load(undefined);
-    return () => { seq.current++; busy.current = false; };
+    const run = seq;
+    const flag = busy;
+    queueMicrotask(() => load(undefined));
+    return () => { run.current++; flag.current = false; };
   }, [viewer.status, load]);
 
   const retryFirst = useCallback(() => { setPhase("first"); load(undefined); }, [load]);
