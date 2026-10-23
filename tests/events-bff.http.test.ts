@@ -339,6 +339,21 @@ async function call(base: string, method: string, path: string, opts: { token?: 
       assert(r.status >= 400 && typeof r.body?.error === "string" && typeof r.body?.code === "string", "a second cancel is refused with a message and a code the page can show", r);
     }
 
+    // ===== Task 5: /events/payouts and the Tickets links =====
+    console.log("Payouts page and links (/events/payouts)");
+    {
+      const pg = await fetch(new URL("/events/payouts?stripe=done", WEB), { redirect: "manual" });
+      assert(pg.status === 200, "GET /events/payouts returns 200 (client page, no server redirect)", pg.status);
+      r = await call(WEB, "GET", `/api/events/payouts/status?hostType=user`);
+      assert(r.status === 401, "signed out: payouts status is 401, which the page turns into the login redirect", r);
+      r = await call(WEB, "GET", `/api/events/payouts/status?hostType=user`, { token: guestTok });
+      assert(r.status === 200 && r.body?.success === true && r.body?.ready === false, "seeded user with no account: ready is false", r);
+      for (const path of ["/account", "/account/bookings", "/account/orders", "/account/points", "/"]) {
+        const res = await fetch(new URL(path, WEB), { redirect: "manual" });
+        assert(res.status === 200, `${path} HTML still renders 200`, res.status);
+      }
+    }
+
     console.log("Backend unreachable (in process, closed port)");
     process.env.OUTSYDE_BACKEND_URL = "http://127.0.0.1:1";
     const { NextRequest } = await import("next/server");

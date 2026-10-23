@@ -205,6 +205,7 @@ export default function BookingsPage() {
           <Link href="/account" className="tab-link">Profile</Link>
           <Link href="/account/bookings" className="tab-link active">Bookings</Link>
           <Link href="/account/orders" className="tab-link">Orders</Link>
+          <Link href="/tickets" className="tab-link">Tickets</Link>
           <Link href="/account/points" className="tab-link">Points</Link>
         </div>
 

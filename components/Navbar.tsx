@@ -173,6 +173,7 @@ export default function Navbar() {
               <>
                 <a href="/shop" className="on-link">Shop</a>
                 <a href="/account" className="on-link">My Activity</a>
+                <a href="/tickets" className="on-link">Tickets</a>
                 <a href="/account/points" className="on-points">
                   {(user.loyaltyPoints ?? 0).toLocaleString()} pts
                 </a>
@@ -183,6 +184,7 @@ export default function Navbar() {
             {user && isVendor && (
               <>
                 <a href="/account" className="on-link">My Shop</a>
+                <a href="/tickets" className="on-link">Tickets</a>
                 <a href="/vendor-dashboard" className="on-link">Dashboard</a>
                 <button onClick={handleLogout} className="on-link">Log Out</button>
               </>
@@ -190,6 +192,7 @@ export default function Navbar() {
 
             {user && isPhotographer && !isVendor && (
               <>
+                <a href="/tickets" className="on-link">Tickets</a>
                 <a href="/photographer-dashboard" className="on-link">Dashboard</a>
                 <button onClick={handleLogout} className="on-link">Log Out</button>
               </>
@@ -197,6 +200,7 @@ export default function Navbar() {
 
             {user && isAdmin && (
               <>
+                <a href="/tickets" className="on-link">Tickets</a>
                 <a href="/admin" className="on-link">Admin Panel</a>
                 <button onClick={handleLogout} className="on-link">Log Out</button>
               </>
@@ -235,6 +239,7 @@ export default function Navbar() {
             <>
               <a href="/shop" onClick={() => setMenuOpen(false)}>Shop</a>
               <a href="/account" onClick={() => setMenuOpen(false)}>My Activity</a>
+              <a href="/tickets" onClick={() => setMenuOpen(false)}>Tickets</a>
               <a href="/account/points" onClick={() => setMenuOpen(false)}>
                 Points ({(user.loyaltyPoints ?? 0).toLocaleString()})
               </a>
@@ -245,6 +250,7 @@ export default function Navbar() {
           {user && isVendor && (
             <>
               <a href="/account" onClick={() => setMenuOpen(false)}>My Shop</a>
+              <a href="/tickets" onClick={() => setMenuOpen(false)}>Tickets</a>
               <a href="/vendor-dashboard" onClick={() => setMenuOpen(false)}>Dashboard</a>
               <button onClick={handleLogout}>Log Out</button>
             </>
@@ -252,6 +258,7 @@ export default function Navbar() {
 
           {user && isPhotographer && !isVendor && (
             <>
+              <a href="/tickets" onClick={() => setMenuOpen(false)}>Tickets</a>
               <a href="/photographer-dashboard" onClick={() => setMenuOpen(false)}>Dashboard</a>
               <button onClick={handleLogout}>Log Out</button>
             </>
@@ -259,6 +266,7 @@ export default function Navbar() {
 
           {user && isAdmin && (
             <>
+              <a href="/tickets" onClick={() => setMenuOpen(false)}>Tickets</a>
               <a href="/admin" onClick={() => setMenuOpen(false)}>Admin Panel</a>
               <button onClick={handleLogout}>Log Out</button>
             </>
