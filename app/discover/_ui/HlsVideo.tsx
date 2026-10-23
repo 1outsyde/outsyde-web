@@ -41,6 +41,7 @@ export default function HlsVideo({ src, poster, active, muted, loop, onTime }: {
   const activeRef = useRef(active);
   const onTimeRef = useRef<OnTime | undefined>(onTime);
   const clock = useRef<Clock>({ watched: 0, since: 0, loops: 0, lastPos: 0 });
+  const startLoad = useRef<(() => void) | null>(null); // set while an hls.js instance waits to load
 
   useEffect(() => {
     onTimeRef.current = onTime;
@@ -70,11 +71,22 @@ export default function HlsVideo({ src, poster, active, muted, loop, onTime }: {
             playIfActive();
             return;
           }
-          const hls = new Hls({ capLevelToPlayerSize: true });
+          // autoStartLoad false: no segments are fetched until the video is first active.
+          const hls = new Hls({ capLevelToPlayerSize: true, autoStartLoad: false });
+          let started = false;
+          startLoad.current = () => {
+            if (started) return;
+            started = true;
+            hls.startLoad();
+          };
           hls.loadSource(src);
           hls.attachMedia(video);
           hls.on(Hls.Events.MANIFEST_PARSED, playIfActive);
-          destroy = () => hls.destroy();
+          if (activeRef.current) startLoad.current();
+          destroy = () => {
+            startLoad.current = null;
+            hls.destroy();
+          };
         })
         .catch(() => { /* the poster stays visible */ });
     }
@@ -113,6 +125,7 @@ export default function HlsVideo({ src, poster, active, muted, loop, onTime }: {
     const video = ref.current;
     if (!video) return;
     if (active) {
+      startLoad.current?.();
       video.play().catch(() => {});
     } else {
       video.pause();

@@ -2,6 +2,7 @@
 import {
   toFeedPost, toPulseVideo, toStoryGroups, sortPro, mixEventCards, relativeTime,
   toggleReducer, nextPulsePage, eventWindow, likesLabel, roleBadge, profileHref,
+  toggleTap, toggleSettle, type ToggleSync, type ToggleState,
   type FeedPost, type PulseVideo,
 } from "../app/discover/_lib/feedLogic";
 import {
@@ -130,6 +131,47 @@ eq(roleBadge("photographer"), "Photographer", "roleBadge photographer");
 eq(roleBadge("consumer"), null, "roleBadge consumer");
 eq(profileHref({ username: "nails_by_p" }), "/account/nails_by_p", "profileHref username");
 eq(profileHref({ username: null }), null, "profileHref none");
+
+console.log("toggle sync");
+{
+  // Drives toggleTap/toggleSettle and the reducer together, as useToggle does.
+  const run = () => {
+    let sync: ToggleSync = { server: false, wanted: false, inFlight: false, covered: 0, unsent: 0 };
+    let ui: ToggleState = { on: false, count: 0, pending: 0 };
+    const sent: boolean[] = [];
+    let unauthed = 0;
+    return {
+      tap() { ui = toggleReducer(ui, { type: "tap" }); const r = toggleTap(sync); sync = r.sync; if (r.send !== null) sent.push(r.send); },
+      answer(res: { ok: boolean; status: number }) {
+        const r = toggleSettle(sync, res, sent[sent.length - 1]); sync = r.sync;
+        for (const a of r.actions) ui = toggleReducer(ui, a);
+        if (r.unauthed) unauthed++;
+        if (r.send !== null) sent.push(r.send);
+      },
+      get: () => ({ sent, ui, sync, unauthed }),
+    };
+  };
+  let t = run();
+  t.tap(); t.answer({ ok: false, status: 500 }); t.tap();
+  eq([t.get().sent, t.get().ui.on, t.get().ui.count], [[true, true], true, 1], "fail (500) then tap sends true");
+  t = run();
+  t.tap(); t.answer({ ok: false, status: 0 });
+  eq([t.get().ui, t.get().sync.wanted], [{ on: false, count: 0, pending: 0 }, false], "network failure rolls back and resets wanted");
+  t = run();
+  t.tap(); t.tap(); t.answer({ ok: true, status: 200 });
+  eq([t.get().sent, t.get().ui.pending], [[true, false], 1], "tap, then tap while in flight, then 200 sends one more (wanted differs)");
+  t = run();
+  t.tap(); t.tap(); t.tap(); t.answer({ ok: true, status: 200 });
+  eq([t.get().sent, t.get().ui], [[true], { on: true, count: 1, pending: 0 }], "tap, tap, tap while in flight, then 200 sends nothing more when wanted equals server");
+  t = run();
+  t.tap(); t.tap(); t.tap(); t.tap(); t.answer({ ok: true, status: 200 });
+  eq(t.get().sent, [true, false], "tap x4 while in flight, then 200 sends exactly one more");
+  t.answer({ ok: true, status: 200 });
+  eq([t.get().sent.length, t.get().ui, t.get().sync.inFlight], [2, { on: false, count: 0, pending: 0 }, false], "second answer settles with no third request");
+  t = run();
+  t.tap(); t.tap(); t.tap(); t.answer({ ok: false, status: 401 });
+  eq([t.get().sent, t.get().unauthed, t.get().ui, t.get().sync.wanted], [[true], 1, { on: false, count: 0, pending: 0 }, false], "401 sends nothing more and rolls back");
+}
 
 console.log("viewer copy");
 eq(commentErrorCopy(401), SIGN_IN_COMMENT, "401: sign in to comment");

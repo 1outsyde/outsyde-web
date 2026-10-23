@@ -262,3 +262,37 @@ export function roleBadge(role: Role): string | null {
 export function profileHref(author: { username: string | null }): string | null {
   return author.username ? `/account/${encodeURIComponent(author.username)}` : null;
 }
+
+/** Request bookkeeping for a serialized toggle: at most one request in flight. */
+export interface ToggleSync { server: boolean; wanted: boolean; inFlight: boolean; covered: number; unsent: number }
+type SettleAction = Extract<ToggleAction, { type: "settled" | "failed" }>;
+const repeat = (n: number, a: SettleAction): SettleAction[] => Array.from({ length: n }, () => a);
+
+/** A tap: flips the wanted state; returns the state to send, or null while a request is in flight. */
+export function toggleTap(s: ToggleSync): { sync: ToggleSync; send: boolean | null } {
+  const wanted = !s.wanted;
+  if (s.inFlight) return { sync: { ...s, wanted, unsent: s.unsent + 1 }, send: null };
+  return { sync: { ...s, wanted, inFlight: true, covered: s.unsent + 1, unsent: 0 }, send: wanted };
+}
+
+/**
+ * The in-flight request for `target` answered. Returns the reducer actions (one per
+ * tap it settles), the next state to send (or null), and whether it was a 401.
+ * Once nothing is in flight or queued, wanted is reset to the server state.
+ */
+export function toggleSettle(
+  s: ToggleSync,
+  res: { ok: boolean; status: number },
+  target: boolean,
+): { sync: ToggleSync; actions: SettleAction[]; send: boolean | null; unauthed: boolean } {
+  const idle = (server: boolean): ToggleSync => ({ server, wanted: server, inFlight: false, covered: 0, unsent: 0 });
+  if (res.status === 401) {
+    return { sync: idle(s.server), actions: repeat(s.covered + s.unsent, { type: "failed", on: s.server }), send: null, unauthed: true };
+  }
+  const server = res.ok ? target : s.server;
+  const actions = repeat(s.covered, { type: res.ok ? "settled" : "failed", on: server });
+  if (s.unsent > 0 && s.wanted !== server) {
+    return { sync: { server, wanted: s.wanted, inFlight: true, covered: s.unsent, unsent: 0 }, actions, send: s.wanted, unauthed: false };
+  }
+  return { sync: idle(server), actions: [...actions, ...repeat(s.unsent, { type: "settled", on: server })], send: null, unauthed: false };
+}
