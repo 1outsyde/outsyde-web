@@ -19,12 +19,13 @@ export function cleanSlug(v: string): string | null {
   return SLUG_RE.test(s) ? s : null;
 }
 
+/** Own errors use the same flat shape proxyToBackend relays: { success:false, error:"<message>", code:"<CODE>" }. */
 export function notFound(): NextResponse {
-  return NextResponse.json({ success: false, error: { code: "NOT_FOUND", message: "Not found." } }, { status: 404 });
+  return NextResponse.json({ success: false, error: "Not found.", code: "NOT_FOUND" }, { status: 404 });
 }
 
 export function badRequest(code: string, message: string): NextResponse {
-  return NextResponse.json({ success: false, error: { code, message } }, { status: 400 });
+  return NextResponse.json({ success: false, error: message, code }, { status: 400 });
 }
 
 /** Forward with the caller's Bearer token and Cookie (no body). */

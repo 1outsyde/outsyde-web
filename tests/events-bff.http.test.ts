@@ -85,10 +85,10 @@ async function call(base: string, method: string, path: string, opts: { token?: 
     const direct = await call(BACKEND, "GET", `/api/events/slug/${ev.slug}`, { token: hostTok });
     assert(r.status === 200 && JSON.stringify(r.body.event.viewer ?? null) === JSON.stringify(direct.body.event.viewer ?? null), "Bearer is forwarded (viewer matches a direct backend call)", { web: r.body?.event?.viewer, direct: direct.body?.event?.viewer });
     r = await call(WEB, "GET", `/api/events/slug/${P}-missing`);
-    assert(r.status === 404 && r.body?.code === "EVENT_NOT_FOUND", "unknown slug: backend 404 relayed", r);
+    assert(r.status === 404 && r.body?.success === false && r.body?.code === "EVENT_NOT_FOUND" && r.body?.error === "Event not found.", "unknown slug: backend 404 relayed in the flat shape", r);
     for (const bad of ["Bad_Slug", "a.b", "a%20b", "a%2Fb", "x".repeat(81)]) {
       r = await call(WEB, "GET", `/api/events/slug/${bad}`);
-      assert(r.status === 404 && r.body?.success === false && r.body?.error?.code === "NOT_FOUND", `invalid slug "${bad.slice(0, 12)}" is 404 without the backend`, r);
+      assert(r.status === 404 && r.body?.success === false && r.body?.code === "NOT_FOUND" && r.body?.error === "Not found.", `invalid slug "${bad.slice(0, 12)}" is 404 without the backend`, r);
     }
 
     console.log("POST /api/events/:id/rsvp");
@@ -97,11 +97,11 @@ async function call(base: string, method: string, path: string, opts: { token?: 
     r = await call(WEB, "POST", `/api/events/${ev.id}/rsvp`, { token: guestTok, body: { ticketTypeId: ZERO } });
     assert(r.status === 404 && r.body?.code === "TICKET_TYPE_NOT_FOUND", "body is forwarded (backend names the unknown ticket type)", r);
     r = await call(WEB, "POST", `/api/events/${ev.id}/rsvp`, { token: guestTok, raw: "{nope" });
-    assert(r.status === 400 && r.body?.error?.code === "INVALID_JSON", "invalid JSON is 400", r);
+    assert(r.status === 400 && r.body?.code === "INVALID_JSON" && typeof r.body?.error === "string", "invalid JSON is 400", r);
     r = await call(WEB, "POST", `/api/events/${ev.id}/rsvp`, { token: guestTok, raw: "[1]" });
-    assert(r.status === 400 && r.body?.error?.code === "INVALID_JSON", "array body is 400", r);
+    assert(r.status === 400 && r.body?.code === "INVALID_JSON" && typeof r.body?.error === "string", "array body is 400", r);
     r = await call(WEB, "POST", `/api/events/not-a-uuid/rsvp`, { token: guestTok, body: { ticketTypeId: type.id } });
-    assert(r.status === 404 && r.body?.error?.code === "NOT_FOUND", "non-UUID event id is 404 without the backend", r);
+    assert(r.status === 404 && r.body?.code === "NOT_FOUND" && r.body?.error === "Not found.", "non-UUID event id is 404 without the backend", r);
     r = await call(WEB, "POST", `/api/events/${ev.id}/rsvp`, { token: guestTok, body: { ticketTypeId: type.id, quantity: 1, idempotencyKey: `${P}-k1` } });
     assert(r.status >= 200 && r.status < 300 && !!r.body?.order?.id, "RSVP succeeds with method, path, body and Bearer forwarded", r);
     const orderId: string = r.body?.order?.id;
@@ -115,9 +115,9 @@ async function call(base: string, method: string, path: string, opts: { token?: 
     r = await call(WEB, "POST", `/api/events/${ev.id}/checkout`, { token: guestTok, body: { ticketTypeId: type.id, quantity: 1 } });
     assert(r.status === dCheckout.status && r.body?.code === dCheckout.body?.error?.code, "same status and code as a direct backend call", { web: r, direct: dCheckout });
     r = await call(WEB, "POST", `/api/events/${ZERO.slice(0, 35)}x/checkout`, { token: guestTok, body: {} });
-    assert(r.status === 404 && r.body?.error?.code === "NOT_FOUND", "bad id is 404 without the backend", r);
+    assert(r.status === 404 && r.body?.code === "NOT_FOUND" && r.body?.error === "Not found.", "bad id is 404 without the backend", r);
     r = await call(WEB, "POST", `/api/events/${ev.id}/checkout`, { token: guestTok, raw: "" });
-    assert(r.status === 400 && r.body?.error?.code === "INVALID_JSON", "empty body is 400", r);
+    assert(r.status === 400 && r.body?.code === "INVALID_JSON" && typeof r.body?.error === "string", "empty body is 400", r);
 
     console.log("GET /api/events/orders/:orderId");
     r = await call(WEB, "GET", `/api/events/orders/${orderId}`);
@@ -129,12 +129,12 @@ async function call(base: string, method: string, path: string, opts: { token?: 
     assert(r.status === dOther.status && r.status !== 200, "someone else's order is refused like the backend does", { web: r.status, direct: dOther.status });
     for (const bad of ["not-a-uuid", "..%2F..%2Fadmin", `${orderId}%2Fcancel`, "1"]) {
       r = await call(WEB, "GET", `/api/events/orders/${bad}`, { token: guestTok });
-      assert(r.status === 404 && r.body?.error?.code === "NOT_FOUND", `bad order id "${bad.slice(0, 16)}" is 404`, r);
+      assert(r.status === 404 && r.body?.code === "NOT_FOUND" && r.body?.error === "Not found.", `bad order id "${bad.slice(0, 16)}" is 404`, r);
     }
 
     console.log("GET /api/events/me/tickets");
     r = await call(WEB, "GET", `/api/events/me/tickets`);
-    assert(r.status === 401 && r.body?.code === "NO_AUTH", "signed out: 401 passes through", r);
+    assert(r.status === 401 && r.body?.success === false && r.body?.code === "NO_AUTH" && typeof r.body?.error === "string", "signed out: 401 passes through in the flat shape", r);
     r = await call(WEB, "GET", `/api/events/me/tickets`, { token: guestTok });
     const dTix = await call(BACKEND, "GET", `/api/events/me/tickets`, { token: guestTok });
     assert(r.status === 200 && JSON.stringify(r.body) === JSON.stringify(dTix.body) && JSON.stringify(r.body).includes(ev.id), "same body as the backend, includes the RSVP", r);
@@ -145,9 +145,9 @@ async function call(base: string, method: string, path: string, opts: { token?: 
     r = await call(WEB, "POST", `/api/events/orders/${orderId}/cancel`);
     assert(r.status === 401, "cancel signed out: 401", r);
     r = await call(WEB, "POST", `/api/events/orders/not-a-uuid/cancel`, { token: guestTok });
-    assert(r.status === 404 && r.body?.error?.code === "NOT_FOUND", "cancel with bad id is 404", r);
+    assert(r.status === 404 && r.body?.code === "NOT_FOUND" && r.body?.error === "Not found.", "cancel with bad id is 404", r);
     r = await call(WEB, "POST", `/api/events/orders/not-a-uuid/refund`, { token: guestTok });
-    assert(r.status === 404 && r.body?.error?.code === "NOT_FOUND", "refund with bad id is 404", r);
+    assert(r.status === 404 && r.body?.code === "NOT_FOUND" && r.body?.error === "Not found.", "refund with bad id is 404", r);
     const dRefund = await call(BACKEND, "POST", `/api/events/orders/${orderId}/refund`, { token: guestTok });
     r = await call(WEB, "POST", `/api/events/orders/${orderId}/refund`, { token: guestTok });
     assert(r.status === dRefund.status && r.body?.code === dRefund.body?.error?.code, "refund relays the backend answer for a free order", { web: r, direct: dRefund });
@@ -169,7 +169,7 @@ async function call(base: string, method: string, path: string, opts: { token?: 
     assert(r.status === dDefault.status, "hostType defaults to user", { web: r.status, direct: dDefault.status });
     for (const bad of ["admin", "USER", "user&x=1", ""]) {
       r = await call(WEB, "GET", `/api/events/payouts/status?hostType=${encodeURIComponent(bad)}`, { token: hostTok });
-      assert(r.status === 400 && r.body?.error?.code === "INVALID_HOST_TYPE", `hostType="${bad}" is 400 INVALID_HOST_TYPE`, r);
+      assert(r.status === 400 && r.body?.code === "INVALID_HOST_TYPE" && typeof r.body?.error === "string", `hostType="${bad}" is 400 INVALID_HOST_TYPE`, r);
     }
 
     console.log("POST /api/events/payouts/setup-link");
