@@ -7,6 +7,7 @@ import {
   buildQuery, isEventCard, priceLabel, whenLabel, whereLabel,
   type Coords, type EventCard, type Filters, type WhenFilter,
 } from "./eventsLogic";
+import DiscoverTabs from "../discover/_ui/DiscoverTabs";
 
 const HOST_HREF = "/events/new";
 const HOST_LOGIN = "/login?return=/events/new";
@@ -103,6 +104,7 @@ export default function EventsClient() {
 
   return (
     <main className="ev-page">
+      <DiscoverTabs current="events" />
       <link href={FONTS_HREF} rel="stylesheet" />
       <style>{CSS}</style>
       <div className="ev-wrap">
