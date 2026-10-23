@@ -72,7 +72,7 @@ export interface Totals { events: number; salesCents: number; owedCents: number;
 
 export const BUCKETS: { id: BucketId; name: string; hint: string; tone: "urgent" | "soon" | "calm" }[] = [
   { id: "now", name: "Needs you now", hint: "Payouts that are stuck or on hold", tone: "urgent" },
-  { id: "week", name: "Payout due in the next 7 days", hint: "Ended events, soonest payout first", tone: "soon" },
+  { id: "week", name: "Ended, payout not sent yet", hint: "Soonest due first. Overdue ones on top.", tone: "soon" },
   { id: "upcoming", name: "Coming up", hint: "Events that haven't happened yet, soonest first", tone: "calm" },
   { id: "paid", name: "Paid", hint: "Most recent first", tone: "calm" },
   { id: "nothing", name: "Ended, nothing to pay", hint: "Ended with nothing to pay", tone: "calm" },
@@ -337,9 +337,9 @@ export function payoutPill(e: AdminEventRow, now: Date): { text: string; tone: P
     const setup = (p.holdReason != null && SETUP_HOLDS.has(p.holdReason)) || (p.holdReason == null && e.host.payoutReady === false);
     return { text: setup ? PILL.heldSetup : PILL.held, tone: "red" };
   }
-  if (nothingToPay(e)) return { text: e.salesCents === 0 ? PILL.nothingSold : PILL.nothingToPay, tone: "grey" };
   if (hasEnded(e, now)) {
     if (e.refundsPending > 0) return { text: PILL.refund, tone: "grey" };
+    if (nothingToPay(e)) return { text: e.salesCents === 0 ? PILL.nothingSold : PILL.nothingToPay, tone: "grey" };
     return { text: withDate(PILL.due, dueOf(e)), tone: "gold" };
   }
   return { text: withDate(PILL.scheduled, dueOf(e)), tone: "gold" };

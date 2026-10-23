@@ -91,7 +91,7 @@ eq(bucket(upcoming()), "upcoming", "not ended is coming up");
 eq(bucket(upcoming({ payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0, payoutDueAt: null, payoutExpectedAt: null })), "upcoming", "nothing sold and not ended is coming up");
 eq(bucket(ev()), "week", "ended, pending, due in the past is overdue so due this week");
 eq(bucket(ev({ endsAt: day(-0.1), payoutDueAt: day(2.9), payout: { dueAt: day(2.9) } })), "week", "ended just now, due in 3 days");
-eq(bucket(ev({ payoutDueAt: day(7), payout: { dueAt: day(7) } })), "week", "due in exactly 7 days is in");
+eq(bucket(ev({ payoutDueAt: day(7), payout: { dueAt: day(7) } })), "week", "ended, due in 7 days, is in the ended-unpaid bucket");
 eq(bucket(ev({ payoutDueAt: day(30), payout: { dueAt: day(30) } })), "week", "ended and unpaid is in the due bucket even if the date is far out");
 eq(bucket(ev({ salesCents: 4000, refundedCents: 4000, ticketsRefunded: 2, ticketsValid: 0, hostEarnsCents: 0, owedToHostCents: 0, payout: null })), "nothing", "ended, all sales refunded, no payout");
 eq(bucket(ev({ payoutDueAt: day(30), payout: { dueAt: day(30) }, refundsPending: 2 })), "week", "waiting on refunds is in the due bucket");
@@ -100,8 +100,8 @@ eq(bucket(ev({ payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 
 eq(bucket(ev({ endsAt: day(-0.1) })), "week", "ended 2.4 hours ago");
 eq(bucket(upcoming({ startsAt: day(0), endsAt: new Date(NOW.getTime() + 1).toISOString() })), "upcoming", "ends in a millisecond, still coming up");
 eq(bucket(ev({ endsAt: NOW.toISOString() })), "week", "ends exactly now counts as ended");
-eq(BUCKETS.map((b) => b.name), ["Needs you now", "Payout due in the next 7 days", "Coming up", "Paid", "Ended, nothing to pay", "Cancelled"], "bucket order and names");
-eq(BUCKETS.map((b) => b.hint), ["Payouts that are stuck or on hold", "Ended events, soonest payout first", "Events that haven't happened yet, soonest first", "Most recent first", "Ended with nothing to pay", "Everyone refunded"], "bucket hints");
+eq(BUCKETS.map((b) => b.name), ["Needs you now", "Ended, payout not sent yet", "Coming up", "Paid", "Ended, nothing to pay", "Cancelled"], "bucket order and names");
+eq(BUCKETS.map((b) => b.hint), ["Payouts that are stuck or on hold", "Soonest due first. Overdue ones on top.", "Events that haven't happened yet, soonest first", "Most recent first", "Ended with nothing to pay", "Everyone refunded"], "bucket hints");
 
 console.log("groupByBucket and sorting");
 {
@@ -215,7 +215,9 @@ eq(pill(ev({ payout: { status: "held", holdReason: "event_paused" } })), { text:
 eq(pill(ev({ payout: { status: "held", holdReason: null } })), { text: "On hold", tone: "red" }, "held, no reason");
 eq(pill(ev({ refundsPending: 1 })), { text: "Waiting on a refund", tone: "grey" }, "waiting on refunds");
 eq(pill(ev({ payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0 })), { text: "No payout, nothing sold", tone: "grey" }, "nothing sold");
-eq(pill(upcoming({ payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0, payoutDueAt: null, payoutExpectedAt: null })), { text: "No payout, nothing sold", tone: "grey" }, "nothing sold yet, upcoming");
+eq(pill(upcoming({ payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0, payoutDueAt: null, payoutExpectedAt: null })), { text: "Scheduled", tone: "gold" }, "not ended, nothing sold yet: normal scheduled pill, not nothing-to-pay");
+eq(pill(upcoming({ payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0 })), { text: `Scheduled ${shortDate(day(8.1))}`, tone: "gold" }, "not ended, no payout row, has a date");
+eq(pill(ev({ salesCents: 4000, refundedCents: 4000, hostEarnsCents: 0, owedToHostCents: 0, payout: null, refundsPending: 1 })), { text: "Waiting on a refund", tone: "grey" }, "ended, all refunded but a refund still moving: waiting wins");
 {
   const refunded = ev({ salesCents: 4000, refundedCents: 4000, hostEarnsCents: 0, owedToHostCents: 0, payout: null });
   eq(pill(refunded), { text: "No payout, nothing to pay", tone: "grey" }, "ended, all sales refunded: pill agrees with the bucket");
