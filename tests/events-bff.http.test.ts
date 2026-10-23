@@ -493,9 +493,9 @@ async function call(base: string, method: string, path: string, opts: { token?: 
     r = await call(WEB, "DELETE", `/api/events/${draft.id}/ticket-types/${dType.id}`);
     assert(r.status === 401, "ticket type DELETE signed out: 401", r);
     r = await call(WEB, "DELETE", `/api/events/${draft.id}/ticket-types/${dType.id}`, { token: hostTok });
-    assert(r.status >= 200 && r.status < 300, "ticket type DELETE works (DELETE method forwarded)", r);
+    assert(r.status === 200 && r.body?.success === true && r.body?.removed === "deleted", "ticket type DELETE works (DELETE method forwarded, unused type is deleted)", r);
     r = await call(WEB, "GET", `/api/events/${draft.id}/manage`, { token: hostTok });
-    assert(!JSON.stringify(r.body).includes(dType.id) || /archiv|inactive|deleted/i.test(JSON.stringify(r.body)), "manage no longer lists the deleted type as active", r.body?.ticketTypes);
+    assert(r.status === 200 && Array.isArray(r.body?.ticketTypes) && !r.body.ticketTypes.some((t: any) => t.id === dType.id), "manage no longer lists the deleted ticket type", r.body?.ticketTypes);
 
     r = await call(WEB, "POST", `/api/events/${draft.id}/publish`, { token: hostTok });
     assert(r.status === 409 && r.body?.code === "NO_TICKET_TYPES", "publish with no ticket types: backend refusal relayed (agreement already accepted)", r);
@@ -557,8 +557,11 @@ async function call(base: string, method: string, path: string, opts: { token?: 
     assert(r.status === 400, "team add with a bad scope: backend 400 relayed", r);
     r = await call(WEB, "POST", `/api/events/${draft.id}/door/team`, { token: hostTok, body: { username: guestUsername, scope: "event" } });
     assert(r.status >= 200 && r.status < 300 && r.body?.success === true, "team add by username: body forwarded", r);
-    const memberId: string = (await call(WEB, "GET", `/api/events/${draft.id}/door/team`, { token: hostTok })).body?.team?.find?.((m: any) => m.username === guestUsername)?.userId
-      ?? (await q(`SELECT id FROM users WHERE email = $1`, [`${P}-guest@test.local`]))[0].id;
+    const teamAfterAdd = await call(WEB, "GET", `/api/events/${draft.id}/door/team`, { token: hostTok });
+    assert(teamAfterAdd.status === 200 && Array.isArray(teamAfterAdd.body?.event) && Array.isArray(teamAfterAdd.body?.standing), "team list has standing and event arrays", teamAfterAdd.body);
+    const member = teamAfterAdd.body.event.find((m: any) => m.username === guestUsername);
+    assert(!!member && member.userId === guest && typeof member.firstName === "string", "team list shows the added member with userId, first name and username", teamAfterAdd.body);
+    const memberId: string = member?.userId;
     r = await call(WEB, "GET", `/api/events/door/mine`, { token: guestTok });
     assert(r.status === 200 && JSON.stringify(r.body).includes(draft.id), "door/mine now lists the event for the team member", r);
 
@@ -579,7 +582,7 @@ async function call(base: string, method: string, path: string, opts: { token?: 
     r = await call(WEB, "POST", `/api/events/${draft.id}/door/check-in`, { token: guestTok, body: { code: doorTicket.code } });
     assert(r.status === 200 && r.body?.success === true, "check-in by code: 200", r);
     r = await call(WEB, "POST", `/api/events/${draft.id}/door/check-in`, { token: guestTok, body: { code: doorTicket.code } });
-    assert(r.status >= 400 || r.body?.alreadyCheckedIn === true || r.body?.result === "already_checked_in" || /already/i.test(JSON.stringify(r.body)), "second scan is reported as already checked in", r);
+    assert(r.status === 409 && r.body?.code === "ALREADY_CHECKED_IN" && r.body?.ticket?.checkedInAt, "second scan: 409 ALREADY_CHECKED_IN with the ticket and its check in time", r);
     r = await call(WEB, "POST", `/api/events/${draft.id}/door/undo`, { token: guestTok, body: { ticketId: doorTicket.id } });
     assert(r.status === 404 && r.body?.code === "EVENT_NOT_FOUND", "undo by a team member (not the host): backend 404 relayed", r);
     r = await call(WEB, "POST", `/api/events/${draft.id}/door/undo`, { token: hostTok, body: { ticketId: doorTicket.id } });
