@@ -183,6 +183,37 @@ async function call(base: string, method: string, path: string, opts: { token?: 
     r = await call(WEB, "GET", `/api/events/stripe-config`);
     assert(r.status === 200 && typeof r.body?.publishableKey === "string" && r.body.publishableKey.startsWith("pk_"), "returns the publishable key", r);
 
+    // ===== Task 2: public event page /e/[slug] =====
+    console.log("Page /e/[slug]");
+    const html = async (path: string, cookie?: string) => {
+      const res = await fetch(new URL(path, WEB), { headers: cookie ? { Cookie: cookie } : {}, redirect: "manual" });
+      return { status: res.status, text: await res.text() };
+    };
+    const hiddenEv = (await call(BACKEND, "POST", "/api/events", { token: hostTok, body: {
+      title: `${P} Secret Garden`, description: "A quiet night.", startsAt: inDays(9), endsAt: inDays(9, 5), timezone: "America/New_York",
+      venueName: "Hidden Venue Hall", addressLine1: "77 Secretive Street", city: "Freeport", state: "NY", postalCode: "11520",
+      addressVisibility: "ticket_holders", visibility: "unlisted", capacity: 30 } })).body.event;
+    await call(BACKEND, "POST", `/api/events/${hiddenEv.id}/ticket-types`, { token: hostTok, body: { name: "Free RSVP", priceCents: 0, quantity: 10 } });
+    await call(BACKEND, "POST", `/api/events/${hiddenEv.id}/publish`, { token: hostTok });
+    let pg = await html(`/e/${ev.slug}`);
+    assert(pg.status === 200 && pg.text.includes(`<title>${P} Block Party | Outsyde</title>`), "public event page: 200 with the title in <title>", { status: pg.status, title: pg.text.match(/<title>[^<]*<\/title>/)?.[0] });
+    assert(pg.text.includes(`${P} Block Party`) && pg.text.includes("Free RSVP"), "public event page: title and ticket types are in the server HTML");
+    assert(!/<meta name="robots" content="noindex/i.test(pg.text), "public event page is indexable");
+    pg = await html(`/e/${hiddenEv.slug}`);
+    assert(pg.status === 200, "hidden address event page: 200", pg.status);
+    assert(!pg.text.includes("Hidden Venue Hall") && !pg.text.includes("Secretive") && !pg.text.includes("11520"), "hidden address event: no venue, street or postal code anywhere in the HTML");
+    assert(/<meta name="robots" content="noindex/i.test(pg.text), "unlisted event: noindex meta", pg.text.match(/<meta name="robots"[^>]*>/)?.[0]);
+    assert(pg.text.includes("Freeport, NY"), "hidden address event shows city and state");
+    pg = await html(`/e/${P}-no-such-event`);
+    assert(pg.status === 404, "unknown slug with no cookie: 404 status", pg.status);
+    pg = await html(`/e/${P}-no-such-event`, `outsyde_access_token=${guestTok}`);
+    assert(pg.status === 200 && /Loading/.test(pg.text), "unknown slug WITH a cookie: loading shell (client decides)", pg.status);
+    const hiddenTypeId = (await call(WEB, "GET", `/api/events/slug/${hiddenEv.slug}`)).body.ticketTypes[0].id;
+    const pageRsvp = await call(WEB, "POST", `/api/events/${hiddenEv.id}/rsvp`, { token: guestTok, body: { ticketTypeId: hiddenTypeId, quantity: 1, idempotencyKey: `${P}-page1` } });
+    assert(pageRsvp.status === 201 && pageRsvp.body?.order?.tickets?.length === 1, "free RSVP through the page's BFF works (201, ticket issued)", pageRsvp);
+    const holderView = await call(WEB, "GET", `/api/events/slug/${hiddenEv.slug}`, { token: guestTok });
+    assert(holderView.body?.event?.viewerHasTicket === true && holderView.body?.event?.addressLine1 === "77 Secretive Street", "client refetch gives the holder the address", holderView.body?.event);
+
     console.log("Backend unreachable (in process, closed port)");
     process.env.OUTSYDE_BACKEND_URL = "http://127.0.0.1:1";
     const { NextRequest } = await import("next/server");
