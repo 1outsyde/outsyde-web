@@ -5,7 +5,6 @@
 import { zonedInstant, zonedParts } from "../../../events/eventsLogic";
 
 export const NY = "America/New_York";
-const DAY = 86400000;
 
 /* ---------- Types (from the backend list route) ---------- */
 
@@ -76,7 +75,7 @@ export const BUCKETS: { id: BucketId; name: string; hint: string; tone: "urgent"
   { id: "week", name: "Payout due in the next 7 days", hint: "Ended events, soonest payout first", tone: "soon" },
   { id: "upcoming", name: "Coming up", hint: "Events that haven't happened yet, soonest first", tone: "calm" },
   { id: "paid", name: "Paid", hint: "Most recent first", tone: "calm" },
-  { id: "nothing", name: "Ended, nothing to pay", hint: "Free events that already happened", tone: "calm" },
+  { id: "nothing", name: "Ended, nothing to pay", hint: "Ended with nothing to pay", tone: "calm" },
   { id: "cancelled", name: "Cancelled", hint: "Everyone refunded", tone: "calm" },
 ];
 
@@ -106,7 +105,8 @@ const PILL = {
   heldSetup: "On hold, setup needed",
   held: "On hold",
   refund: "Waiting on a refund",
-  free: "No payout, free",
+  nothingSold: "No payout, nothing sold",
+  nothingToPay: "No payout, nothing to pay",
   cancelled: "None, all refunded",
   cancelledReview: "Won't be paid, event cancelled",
 } as const;
@@ -181,8 +181,9 @@ function dueOf(e: AdminEventRow): string | null {
   return e.payout?.dueAt ?? e.payoutDueAt ?? e.payoutExpectedAt ?? null;
 }
 
-function hasMoney(e: AdminEventRow): boolean {
-  return e.payout != null || e.hostEarnsCents > 0 || e.owedToHostCents > 0;
+/** No payout row and nothing earned or owed. The one rule behind both the bucket and the pill. */
+function nothingToPay(e: AdminEventRow): boolean {
+  return e.payout == null && e.hostEarnsCents === 0 && e.owedToHostCents === 0;
 }
 
 export function bucketOf(e: AdminEventRow, now: Date): BucketId {
@@ -191,11 +192,8 @@ export function bucketOf(e: AdminEventRow, now: Date): BucketId {
   if (ps === "review" || ps === "held") return "now";
   if (ps === "paid") return "paid";
   if (!hasEnded(e, now)) return "upcoming";
-  if (!hasMoney(e)) return "nothing";
-  if (e.refundsPending > 0) return "week";
-  const due = ms(dueOf(e));
-  if (!Number.isFinite(due)) return "week";
-  return due <= now.getTime() + 7 * DAY ? "week" : "upcoming";
+  if (nothingToPay(e)) return "nothing";
+  return "week"; // ended and unpaid is always in the due bucket, overdue first
 }
 
 const cmp = (a: number, b: number) => (Number.isFinite(a) ? a : Infinity) - (Number.isFinite(b) ? b : Infinity);
@@ -292,7 +290,7 @@ export function filterOf(e: AdminEventRow, now: Date): Exclude<FilterId, "all"> 
     case "now": return "attention";
     case "week": return "awaiting";
     case "paid": return "paid";
-    case "upcoming": return hasEnded(e, now) ? "awaiting" : "upcoming";
+    case "upcoming": return "upcoming";
     default: return null;
   }
 }
@@ -330,7 +328,7 @@ export function payoutPill(e: AdminEventRow, now: Date): { text: string; tone: P
   };
   if (p?.status === "paid") return { text: withDate(PILL.paid, p.paidAt), tone: "green" };
   if (e.status === "cancelled") {
-    return p?.status === "review"
+    return p?.status === "review" || p?.status === "held"
       ? { text: PILL.cancelledReview, tone: "grey" }
       : { text: PILL.cancelled, tone: "grey" };
   }
@@ -339,7 +337,7 @@ export function payoutPill(e: AdminEventRow, now: Date): { text: string; tone: P
     const setup = (p.holdReason != null && SETUP_HOLDS.has(p.holdReason)) || (p.holdReason == null && e.host.payoutReady === false);
     return { text: setup ? PILL.heldSetup : PILL.held, tone: "red" };
   }
-  if (!p && e.salesCents === 0 && e.hostEarnsCents === 0) return { text: PILL.free, tone: "grey" };
+  if (nothingToPay(e)) return { text: e.salesCents === 0 ? PILL.nothingSold : PILL.nothingToPay, tone: "grey" };
   if (hasEnded(e, now)) {
     if (e.refundsPending > 0) return { text: PILL.refund, tone: "grey" };
     return { text: withDate(PILL.due, dueOf(e)), tone: "gold" };

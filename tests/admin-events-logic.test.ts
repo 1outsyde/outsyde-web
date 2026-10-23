@@ -88,19 +88,20 @@ eq(bucket(ev({ status: "cancelled", payout: { status: "review" } })), "cancelled
 eq(bucket(ev({ status: "cancelled", payout: null, hostEarnsCents: 0, owedToHostCents: 0 })), "cancelled", "cancelled");
 eq(bucket(ev({ payout: { status: "paid", paidAt: day(-1) }, paidToHostCents: 19000, owedToHostCents: 0 })), "paid", "paid");
 eq(bucket(upcoming()), "upcoming", "not ended is coming up");
-eq(bucket(upcoming({ payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0, payoutDueAt: null, payoutExpectedAt: null })), "upcoming", "free and not ended is coming up");
+eq(bucket(upcoming({ payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0, payoutDueAt: null, payoutExpectedAt: null })), "upcoming", "nothing sold and not ended is coming up");
 eq(bucket(ev()), "week", "ended, pending, due in the past is overdue so due this week");
 eq(bucket(ev({ endsAt: day(-0.1), payoutDueAt: day(2.9), payout: { dueAt: day(2.9) } })), "week", "ended just now, due in 3 days");
 eq(bucket(ev({ payoutDueAt: day(7), payout: { dueAt: day(7) } })), "week", "due in exactly 7 days is in");
-eq(bucket(ev({ payoutDueAt: new Date(NOW.getTime() + 7 * 86400000 + 1).toISOString(), payout: { dueAt: new Date(NOW.getTime() + 7 * 86400000 + 1).toISOString() } })), "upcoming", "due a millisecond past 7 days is scheduled for later");
-eq(bucket(ev({ payoutDueAt: day(30), payout: { dueAt: day(30) }, refundsPending: 2 })), "week", "waiting on refunds is in whatever the date");
+eq(bucket(ev({ payoutDueAt: day(30), payout: { dueAt: day(30) } })), "week", "ended and unpaid is in the due bucket even if the date is far out");
+eq(bucket(ev({ salesCents: 4000, refundedCents: 4000, ticketsRefunded: 2, ticketsValid: 0, hostEarnsCents: 0, owedToHostCents: 0, payout: null })), "nothing", "ended, all sales refunded, no payout");
+eq(bucket(ev({ payoutDueAt: day(30), payout: { dueAt: day(30) }, refundsPending: 2 })), "week", "waiting on refunds is in the due bucket");
 eq(bucket(ev({ payout: null, payoutDueAt: day(-1), payoutExpectedAt: day(-1) })), "week", "ended, money earned, payout row not made yet");
-eq(bucket(ev({ payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0, payoutDueAt: null, payoutExpectedAt: null })), "nothing", "ended free event with no payout");
+eq(bucket(ev({ payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0, payoutDueAt: null, payoutExpectedAt: null })), "nothing", "ended, nothing sold, no payout");
 eq(bucket(ev({ endsAt: day(-0.1) })), "week", "ended 2.4 hours ago");
 eq(bucket(upcoming({ startsAt: day(0), endsAt: new Date(NOW.getTime() + 1).toISOString() })), "upcoming", "ends in a millisecond, still coming up");
 eq(bucket(ev({ endsAt: NOW.toISOString() })), "week", "ends exactly now counts as ended");
 eq(BUCKETS.map((b) => b.name), ["Needs you now", "Payout due in the next 7 days", "Coming up", "Paid", "Ended, nothing to pay", "Cancelled"], "bucket order and names");
-eq(BUCKETS.map((b) => b.hint), ["Payouts that are stuck or on hold", "Ended events, soonest payout first", "Events that haven't happened yet, soonest first", "Most recent first", "Free events that already happened", "Everyone refunded"], "bucket hints");
+eq(BUCKETS.map((b) => b.hint), ["Payouts that are stuck or on hold", "Ended events, soonest payout first", "Events that haven't happened yet, soonest first", "Most recent first", "Ended with nothing to pay", "Everyone refunded"], "bucket hints");
 
 console.log("groupByBucket and sorting");
 {
@@ -113,7 +114,7 @@ console.log("groupByBucket and sorting");
   const p2 = ev({ title: "paid new", payout: { status: "paid", paidAt: day(-1) }, owedToHostCents: 0, paidToHostCents: 200 });
   const n1 = ev({ title: "stuck", payout: { status: "review" } });
   const x = ev({ title: "cancelled", status: "cancelled", payout: null });
-  const z = ev({ title: "free ended", payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0 });
+  const z = ev({ title: "nothing sold ended", payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0 });
   const groups = groupByBucket([a, u1, p1, x, b, u2, p2, n1, c, z], NOW);
   eq(groups.map((g) => g.id), ["now", "week", "upcoming", "paid", "nothing", "cancelled"], "all six present in order");
   eq(groups.find((g) => g.id === "week")!.events.map((e) => e.title), ["due early", "due mid", "due late"], "due: soonest payout first");
@@ -169,7 +170,7 @@ console.log("filters");
     ev({ title: "held", payout: { status: "held" } }),
     ev({ title: "paid", payout: { status: "paid", paidAt: day(-1) }, owedToHostCents: 0 }),
     ev({ title: "cx", status: "cancelled", payout: { status: "review" } }),
-    ev({ title: "free done", payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0 }),
+    ev({ title: "nothing sold done", payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0 }),
   ];
   eq(FILTERS.map((f) => f.label), ["All", "Upcoming", "Ended, not paid yet", "Paid", "Needs attention"], "filter labels in order");
   eq(filterCounts(rows, NOW), { all: 7, upcoming: 1, awaiting: 1, paid: 1, attention: 2 }, "counts");
@@ -213,12 +214,18 @@ eq(pill(ev({ payout: { status: "held", holdReason: "stripe_not_ready" }, host: {
 eq(pill(ev({ payout: { status: "held", holdReason: "event_paused" } })), { text: "On hold", tone: "red" }, "held, event paused");
 eq(pill(ev({ payout: { status: "held", holdReason: null } })), { text: "On hold", tone: "red" }, "held, no reason");
 eq(pill(ev({ refundsPending: 1 })), { text: "Waiting on a refund", tone: "grey" }, "waiting on refunds");
-eq(pill(ev({ payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0 })), { text: "No payout, free", tone: "grey" }, "free");
-eq(pill(upcoming({ payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0, payoutDueAt: null, payoutExpectedAt: null })), { text: "No payout, free", tone: "grey" }, "free, upcoming");
+eq(pill(ev({ payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0 })), { text: "No payout, nothing sold", tone: "grey" }, "nothing sold");
+eq(pill(upcoming({ payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0, payoutDueAt: null, payoutExpectedAt: null })), { text: "No payout, nothing sold", tone: "grey" }, "nothing sold yet, upcoming");
+{
+  const refunded = ev({ salesCents: 4000, refundedCents: 4000, hostEarnsCents: 0, owedToHostCents: 0, payout: null });
+  eq(pill(refunded), { text: "No payout, nothing to pay", tone: "grey" }, "ended, all sales refunded: pill agrees with the bucket");
+  eq([bucket(refunded), filterOf(refunded, NOW)], ["nothing", null], "all refunded: bucket and filter agree");
+}
 eq(pill(ev({ status: "cancelled", payout: null })), { text: "None, all refunded", tone: "grey" }, "cancelled");
 eq(pill(ev({ status: "cancelled", payout: { status: "pending" } })), { text: "None, all refunded", tone: "grey" }, "cancelled with pending payout");
 eq(pill(ev({ status: "cancelled", payout: { status: "review" } })), { text: "Won't be paid, event cancelled", tone: "grey" }, "cancelled review");
-eq(pill(ev({ status: "cancelled", payout: { status: "held" } })), { text: "None, all refunded", tone: "grey" }, "cancelled held");
+eq(pill(ev({ status: "cancelled", payout: { status: "held" } })), { text: "Won't be paid, event cancelled", tone: "grey" }, "cancelled held");
+eq(groupByHost([ev({ status: "cancelled", salesCents: 3000, owedToHostCents: 2800, payout: { status: "held" } })])[0].totals.owedCents, 0, "held payout on a cancelled event is not owed");
 eq(pill(upcoming({ payout: null, payoutDueAt: null, payoutExpectedAt: null, salesCents: 500 })), { text: "Scheduled", tone: "gold" }, "scheduled with no date does not print a blank");
 
 console.log("copy");
