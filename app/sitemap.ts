@@ -6,6 +6,7 @@
 // WHERE THIS GOES:  outsyde-web/app/sitemap.ts
 
 import type { MetadataRoute } from "next";
+import { LEGAL_PAGES } from "@/lib/legal-pages";
 
 const BASE = "https://www.goutsyde.com";
 
@@ -37,6 +38,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/shop/dialux",           // Dia Lux storefront
     "/shop/royalelite",       // Royal Elite
     "/coming-soon",
+    ...LEGAL_PAGES.map((p) => p.href), // Terms, Privacy, Refund Policy, Shipping Policy
     ...DIALUX_SLUGS.map((s) => `/shop/dialux/${s}`),
   ];
 

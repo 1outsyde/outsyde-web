@@ -12,6 +12,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { LEGAL_PAGES } from "@/lib/legal-pages";
 
 const SLIDES = 5;
 
@@ -174,7 +175,7 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
 .btn-biz-ghost:hover{border-color:var(--gold);color:var(--gold);}
 
 footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 52px 36px;}
-.footer-grid{display:grid;grid-template-columns:2.2fr 1fr 1fr 1fr;gap:52px;margin-bottom:56px;}
+.footer-grid{display:grid;grid-template-columns:2.2fr 1fr 1fr 1fr 1fr;gap:52px;margin-bottom:56px;}
 .footer-brand-col .ft-logo{display:flex;align-items:center;gap:10px;margin-bottom:18px;}
 .ft-y{width:34px;height:34px;background:var(--gold);border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:19px;color:var(--black);font-weight:600;}
 .ft-name{font-family:var(--serif);font-size:17px;letter-spacing:.12em;color:var(--cream);text-transform:uppercase;}
@@ -526,6 +527,15 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
               <li><a href="/coming-soon">Start Taking Bookings</a></li>
               <li><a href="/coming-soon">Meet the Team</a></li>
               <li><a href="/contact">Contact Us</a></li>
+            </ul>
+          </div>
+
+          <div className="footer-col">
+            <h4>Legal</h4>
+            <ul>
+              {LEGAL_PAGES.map((p) => (
+                <li key={p.href}><a href={p.href}>{p.label}</a></li>
+              ))}
             </ul>
           </div>
         </div>
