@@ -18,7 +18,7 @@ import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import type { EventInfo, TicketType } from "./types";
 import {
-  afterRetrieve, confirmOutcome, entryDecision, holdPhase, lateCopy, paramsKey, parseSaved, phaseForOrder, shouldQuietRestart, storageAfterPhase, storageKey,
+  afterRetrieve, confirmOutcome, entryDecision, holdPhase, lateCopy, paramsKey, parseSaved, phaseForOrder, shouldQuietRestart, unavailableFrom, storageAfterPhase, storageKey,
   type Entry, type Phase, type PiStatus, type Saved,
 } from "./checkoutLogic";
 
@@ -183,24 +183,26 @@ export default function Checkout({ slug, event, type, qty, onPaid, onFinished, o
   const resumeRef = useRef<Saved | null>(null);
   const fromStorageRef = useRef(false);
   const restartedRef = useRef(false);
-  const [stripe, setStripe] = useState<Stripe | null>(null);
-  const [stripeWanted, setStripeWanted] = useState(() => resumeRef.current === null);
-  const [phase, setPhase] = useState<Phase>("starting");
-  const [hold, setHold] = useState<Hold | null>(null);
-  const [holdError, setHoldError] = useState<{ message: string; code: string } | null>(null);
-  const [attempt, setAttempt] = useState(() => {
-    // Same event, ticket and quantity in this tab: reuse the key so a refresh never opens a second hold.
+  // Read the saved entry once, before anything else is derived from it.
+  const [init] = useState<Saved | null>(() => {
     let saved: Saved | null = null;
     try { saved = parseSaved(window.sessionStorage.getItem(sKey)); } catch { /* storage unavailable */ }
     saveRef.current = saved;
     fromStorageRef.current = saved !== null;
     if (saved?.stage === "confirming") resumeRef.current = saved;
-    return { key: saved?.key ?? newKey(), n: 0 };
+    return saved;
   });
+  const [stripe, setStripe] = useState<Stripe | null>(null);
+  const [stripeWanted, setStripeWanted] = useState(() => init?.stage !== "confirming");
+  const [phase, setPhase] = useState<Phase>("starting");
+  const [hold, setHold] = useState<Hold | null>(null);
+  const [holdError, setHoldError] = useState<{ message: string; code: string } | null>(null);
+  // Same event, ticket and quantity in this tab: reuse the key so a refresh never opens a second hold.
+  const [attempt, setAttempt] = useState(() => ({ key: init?.key ?? newKey(), n: 0 }));
   const [now, setNow] = useState(() => Date.now());
   const [order, setOrder] = useState<OrderInfo | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
-  const [pi, setPi] = useState<PiStatus>(() => resumeRef.current?.pi ?? null);
+  const [pi, setPi] = useState<PiStatus>(() => (init?.stage === "confirming" ? init.pi ?? null : null));
   const loginHref = `/login?return=${encodeURIComponent(`/e/${slug}?checkout=${type.id}&qty=${qty}`)}`;
 
   const close = onClose;
@@ -260,7 +262,7 @@ export default function Checkout({ slug, event, type, qty, onPaid, onFinished, o
       const s = key ? await stripeFor(key) : null;
       if (cancelled) return;
       if (!s) {
-        setPhase("unavailable");
+        setPhase((p) => unavailableFrom(p));
         return;
       }
       setStripe(s);

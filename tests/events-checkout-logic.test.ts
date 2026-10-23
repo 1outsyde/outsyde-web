@@ -1,6 +1,6 @@
 /** Unit tests for the paid checkout decisions. No server needed: npx tsx tests/events-checkout-logic.test.ts */
 import {
-  phaseForOrder, holdPhase, entryDecision, paramsKey, confirmOutcome, afterRetrieve, lateCopy, storageKey, parseSaved, storageAfterPhase, shouldQuietRestart,
+  phaseForOrder, holdPhase, entryDecision, paramsKey, confirmOutcome, afterRetrieve, lateCopy, storageKey, parseSaved, storageAfterPhase, shouldQuietRestart, unavailableFrom,
 } from "../app/e/[slug]/checkoutLogic";
 
 let passed = 0, failed = 0;
@@ -101,6 +101,10 @@ eq(shouldQuietRestart("CHECKOUT_CLOSED", true, true), false, "second time: show 
 eq(shouldQuietRestart("CHECKOUT_CLOSED", false, false), false, "fresh key (not from storage): show the message");
 eq(shouldQuietRestart("SOLD_OUT", true, false), false, "other codes never restart");
 eq(shouldQuietRestart("", true, false), false, "no code never restarts");
+
+console.log("failed Stripe load");
+eq(unavailableFrom("starting"), "unavailable", "starting -> unavailable");
+for (const ph of ["confirming", "done", "late", "closed", "refunded", "holding", "paying", "hold-error", "hold-ended"] as const) eq(unavailableFrom(ph), ph, `${ph} is left alone`);
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

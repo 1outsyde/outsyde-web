@@ -147,3 +147,8 @@ export function storageAfterPhase(phase: Phase): "keep" | "clear" {
 export function shouldQuietRestart(code: string, keyFromStorage: boolean, alreadyRestarted: boolean): boolean {
   return keyFromStorage && !alreadyRestarted && (code === "CHECKOUT_CLOSED" || code === "IDEMPOTENCY_KEY_REUSED");
 }
+
+/** A failed Stripe load only matters while the checkout is still starting. It never replaces confirming, done or any later screen. */
+export function unavailableFrom(phase: Phase): Phase {
+  return phase === "starting" ? "unavailable" : phase;
+}
