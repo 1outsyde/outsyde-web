@@ -29,3 +29,55 @@
   color: #F5F0E6;
   border-bottom-color: #E8B930;
 }
+
+/* Sign-in prompt dialog */
+.dialogBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.dialog {
+  width: 100%;
+  max-width: 360px;
+  box-sizing: border-box;
+  background: #141414;
+  border: 1px solid #2A2A2A;
+  border-radius: 16px;
+  padding: 24px;
+  color: #F5F0E6;
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
+}
+.dialogMessage { margin: 0 0 20px; font-size: 16px; line-height: 1.4; }
+.dialogActions { display: flex; gap: 12px; flex-wrap: wrap; }
+.signInBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 24px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: #1A3C34;
+  color: #F5F0E6;
+  font-weight: 700;
+  text-decoration: none;
+}
+.signInBtn:hover { background: #224d43; }
+.dialogClose {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 1px solid #2A2A2A;
+  background: transparent;
+  color: #B8B0A0;
+  font: inherit;
+  cursor: pointer;
+}
+.dialogClose:hover { color: #F5F0E6; }

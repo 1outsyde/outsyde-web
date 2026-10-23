@@ -4,6 +4,10 @@ import {
   toggleReducer, nextPulsePage, eventWindow,
   type FeedPost, type PulseVideo,
 } from "../app/discover/_lib/feedLogic";
+import {
+  commentErrorCopy, SIGN_IN_LIKE, SIGN_IN_COMMENT, SIGN_IN_SAVE, SIGN_IN_FOLLOW, SIGN_IN_FOLLOWING,
+} from "../app/discover/_lib/viewer";
+import { GENERIC_ERROR } from "../app/e/_shared/format";
 import type { EventCard } from "../app/events/eventsLogic";
 
 let passed = 0, failed = 0;
@@ -116,6 +120,15 @@ eq(nextPulsePage(seen, [pv("c")], true).done, false, "more to come");
 
 console.log("eventWindow");
 eq(eventWindow(new Date("2026-10-23T19:00:00Z")), { from: "2026-10-23T19:00:00.000Z", to: "2026-11-06T19:00:00.000Z" }, "14 days");
+
+console.log("viewer copy");
+eq(commentErrorCopy(401), SIGN_IN_COMMENT, "401: sign in to comment");
+eq(commentErrorCopy(400), "Comments can be up to 500 characters.", "400: length copy");
+eq(commentErrorCopy(500), GENERIC_ERROR, "500: generic");
+eq(commentErrorCopy(0), GENERIC_ERROR, "network error: generic");
+for (const c of [SIGN_IN_LIKE, SIGN_IN_COMMENT, SIGN_IN_SAVE, SIGN_IN_FOLLOW, SIGN_IN_FOLLOWING, commentErrorCopy(400)]) {
+  eq(c.includes(" - ") || c.includes("\u2014"), false, `no dash break: ${c}`);
+}
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
