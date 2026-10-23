@@ -250,3 +250,15 @@ export function nextPulsePage(
 export function eventWindow(now: Date): { from: string; to: string } {
   return { from: now.toISOString(), to: new Date(now.getTime() + 14 * 86_400_000).toISOString() };
 }
+
+export function likesLabel(n: number): string {
+  return `${n.toLocaleString("en-US")} ${n === 1 ? "like" : "likes"}`;
+}
+
+export function roleBadge(role: Role): string | null {
+  return role === "vendor" ? "Business" : role === "photographer" ? "Photographer" : null;
+}
+
+export function profileHref(author: { username: string | null }): string | null {
+  return author.username ? `/account/${encodeURIComponent(author.username)}` : null;
+}

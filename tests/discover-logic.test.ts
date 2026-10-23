@@ -1,7 +1,7 @@
 /** Unit tests for the web Discover feed helpers. No server needed: npx tsx tests/discover-logic.test.ts */
 import {
   toFeedPost, toPulseVideo, toStoryGroups, sortPro, mixEventCards, relativeTime,
-  toggleReducer, nextPulsePage, eventWindow,
+  toggleReducer, nextPulsePage, eventWindow, likesLabel, roleBadge, profileHref,
   type FeedPost, type PulseVideo,
 } from "../app/discover/_lib/feedLogic";
 import {
@@ -120,6 +120,16 @@ eq(nextPulsePage(seen, [pv("c")], true).done, false, "more to come");
 
 console.log("eventWindow");
 eq(eventWindow(new Date("2026-10-23T19:00:00Z")), { from: "2026-10-23T19:00:00.000Z", to: "2026-11-06T19:00:00.000Z" }, "14 days");
+
+console.log("card labels");
+eq(likesLabel(0), "0 likes", "likesLabel 0");
+eq(likesLabel(1), "1 like", "likesLabel 1");
+eq(likesLabel(1234), "1,234 likes", "likesLabel 1234");
+eq(roleBadge("vendor"), "Business", "roleBadge vendor");
+eq(roleBadge("photographer"), "Photographer", "roleBadge photographer");
+eq(roleBadge("consumer"), null, "roleBadge consumer");
+eq(profileHref({ username: "nails_by_p" }), "/account/nails_by_p", "profileHref username");
+eq(profileHref({ username: null }), null, "profileHref none");
 
 console.log("viewer copy");
 eq(commentErrorCopy(401), SIGN_IN_COMMENT, "401: sign in to comment");
