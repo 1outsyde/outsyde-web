@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { isPlayableUrl } from "@/lib/coverMedia";
 import { GENERIC_ERROR } from "../../e/_shared/format";
-import { relativeTime } from "../_lib/feedLogic";
+import { mergeLoadedComments, relativeTime, resolvePendingComment } from "../_lib/feedLogic";
 import { clientApi } from "../_lib/clientApi";
 import { commentErrorCopy, SIGN_IN_COMMENT, type Viewer } from "../_lib/viewer";
 import styles from "./discover.module.css";
@@ -67,11 +67,7 @@ function Panel({ postId, onClose, viewer, onSignIn, onAdded }: {
       if (!list) return setLoadError(true);
       const loaded: Row[] = list.map(toRow).filter((r: Row | null): r is Row => r !== null);
       // A comment posted before the list arrived stays (pending, or saved but not in this older list).
-      setRows((prev) => {
-        if (!prev) return loaded;
-        const ids = new Set(loaded.map((r) => r.id));
-        return [...loaded, ...prev.filter((r) => !ids.has(r.id))];
-      });
+      setRows((prev) => mergeLoadedComments(prev, loaded));
     });
     return () => {
       alive = false;
@@ -116,11 +112,11 @@ function Panel({ postId, onClose, viewer, onSignIn, onAdded }: {
     const res = await clientApi.addComment(postId, content);
     if (res.ok) {
       const saved = s(rec(res.body?.comment).id);
-      setRows((r) => (r ?? []).map((x) => (x.id === id ? { ...x, id: saved || id, pending: false } : x)));
+      setRows((r) => resolvePendingComment(r, id, saved));
       onAdded?.();
       return;
     }
-    setRows((r) => (r ?? []).filter((x) => x.id !== id));
+    setRows((r) => resolvePendingComment(r, id, null));
     setText((t) => t || content);
     setError(commentErrorCopy(res.status));
     if (res.status === 401) onSignIn(SIGN_IN_COMMENT);

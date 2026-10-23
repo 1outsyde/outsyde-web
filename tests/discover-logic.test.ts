@@ -2,7 +2,7 @@
 import {
   toFeedPost, toPulseVideo, toStoryGroups, sortPro, mixEventCards, relativeTime,
   toggleReducer, nextPulsePage, eventWindow, likesLabel, roleBadge, profileHref,
-  toggleTap, toggleSettle, type ToggleSync, type ToggleState,
+  toggleTap, toggleSettle, mergeLoadedComments, resolvePendingComment, type ToggleSync, type ToggleState,
   type FeedPost, type PulseVideo,
 } from "../app/discover/_lib/feedLogic";
 import {
@@ -180,6 +180,34 @@ eq(commentErrorCopy(500), GENERIC_ERROR, "500: generic");
 eq(commentErrorCopy(0), GENERIC_ERROR, "network error: generic");
 for (const c of [SIGN_IN_LIKE, SIGN_IN_COMMENT, SIGN_IN_SAVE, SIGN_IN_FOLLOW, SIGN_IN_FOLLOWING, commentErrorCopy(400)]) {
   eq(c.includes(" - ") || c.includes("\u2014"), false, `no dash break: ${c}`);
+}
+
+console.log("comment merge and resolve");
+{
+  type R = { id: string; pending: boolean; text: string };
+  const old: R = { id: "c1", pending: false, text: "Old" };
+  const pend: R = { id: "pending-1", pending: true, text: "Nice." };
+  const savedX: R = { id: "X", pending: false, text: "Nice." };
+  const ids = (rows: R[]) => rows.map((r) => r.id);
+  // (a) GET first, already containing X, then the POST resolves.
+  let rows: R[] = [pend];
+  rows = mergeLoadedComments(rows, [old, savedX]);
+  rows = resolvePendingComment(rows, "pending-1", "X");
+  eq(ids(rows), ["c1", "X"], "(a) GET with X first, then POST: exactly one X");
+  // (b) POST resolves first, then a GET containing X.
+  rows = resolvePendingComment([pend], "pending-1", "X");
+  rows = mergeLoadedComments(rows, [old, savedX]);
+  eq(ids(rows), ["c1", "X"], "(b) POST first, then GET with X: exactly one X");
+  eq(rows.filter((r) => r.id === "X").length, 1, "(b) one X row");
+  // (c) the POST fails.
+  rows = mergeLoadedComments([pend], [old]);
+  const before = rows.filter((r) => r.id !== "pending-1");
+  rows = resolvePendingComment(rows, "pending-1", null);
+  eq(rows, before, "(c) failed POST: pending row removed, loaded rows untouched");
+  // older list without X keeps the saved row; empty saved id keeps the pending id but marks it done.
+  eq(ids(mergeLoadedComments(resolvePendingComment([pend], "pending-1", "X"), [old])), ["c1", "X"], "GET without X keeps the saved row");
+  eq(resolvePendingComment([pend], "pending-1", ""), [{ ...pend, pending: false }], "no saved id: row stays, no longer pending");
+  eq(mergeLoadedComments(null, [old]), [old], "nothing posted: the loaded list");
 }
 
 console.log("toViewer (BFF /api/auth/me body)");

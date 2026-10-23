@@ -296,3 +296,32 @@ export function toggleSettle(
   }
   return { sync: idle(server), actions: [...actions, ...repeat(s.unsent, { type: "settled", on: server })], send: null, unauthed: false };
 }
+
+/**
+ * Comments panel: the first list load arriving after a comment was posted. Loaded rows come first;
+ * a current row stays only if no loaded row has its id (a pending row, or a saved one the older list lacks).
+ * A current row already resolved to id X is therefore never shown next to a loaded X.
+ */
+export function mergeLoadedComments<R extends { id: string }>(current: R[] | null, loaded: R[]): R[] {
+  const ids = new Set<string>();
+  const out: R[] = [];
+  for (const r of [...loaded, ...(current ?? [])]) {
+    if (ids.has(r.id)) continue;
+    ids.add(r.id);
+    out.push(r);
+  }
+  return out;
+}
+
+/**
+ * The POST for a pending comment answered. Saved: the pending row takes the saved id, unless a row with that
+ * id is already there (the list load beat the POST), then the pending row is dropped. Failed (saved null):
+ * the pending row is removed and every other row is untouched.
+ */
+export function resolvePendingComment<R extends { id: string; pending: boolean }>(rows: R[] | null, pendingId: string, saved: string | null): R[] {
+  const list = rows ?? [];
+  if (saved === null) return list.filter((x) => x.id !== pendingId);
+  const id = saved || pendingId;
+  if (id !== pendingId && list.some((x) => x.id === id)) return list.filter((x) => x.id !== pendingId);
+  return list.map((x) => (x.id === pendingId ? { ...x, id, pending: false } : x));
+}
