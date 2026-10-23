@@ -222,10 +222,12 @@ export function toggleReducer(state: ToggleState, action: ToggleAction): ToggleS
     case "tap":
       return { on: !state.on, count: Math.max(0, state.count + (state.on ? -1 : 1)), pending: state.pending + 1 };
     case "settled":
-      return { ...state, pending: Math.max(0, state.pending - 1) };
     case "failed": {
+      // Later taps may still be in flight; only reconcile once the last one answers.
+      const pending = Math.max(0, state.pending - 1);
+      if (pending > 0) return { ...state, pending };
       const delta = action.on === state.on ? 0 : action.on ? 1 : -1;
-      return { on: action.on, count: Math.max(0, state.count + delta), pending: Math.max(0, state.pending - 1) };
+      return { on: action.on, count: Math.max(0, state.count + delta), pending: 0 };
     }
   }
 }

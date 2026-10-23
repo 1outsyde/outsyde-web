@@ -86,6 +86,22 @@ eq(toggleReducer({ on: true, count: 0, pending: 1 }, { type: "failed", on: false
 eq(toggleReducer({ on: true, count: 5, pending: 1 }, { type: "settled", on: true }), { on: true, count: 5, pending: 0 }, "settled");
 eq(toggleReducer({ on: false, count: 0, pending: 0 }, { type: "tap" }).count, 1, "count up");
 eq(toggleReducer({ on: false, count: 0, pending: 1 }, { type: "failed", on: true }), { on: true, count: 1, pending: 0 }, "failed to on adds one");
+eq(toggleReducer({ on: true, count: 1, pending: 1 }, { type: "settled", on: false }), { on: false, count: 0, pending: 0 }, "settled adopts a different server value");
+{
+  let s = toggleReducer({ on: false, count: 0, pending: 0 }, { type: "tap" });
+  s = toggleReducer(s, { type: "tap" });
+  s = toggleReducer(s, { type: "failed", on: false });
+  eq(s, { on: false, count: 0, pending: 1 }, "tap, tap, failed: only pending changes while one is in flight");
+  eq(toggleReducer(s, { type: "settled", on: false }), { on: false, count: 0, pending: 0 }, "then settled reconciles");
+}
+{
+  let s = { on: false, count: 0, pending: 0 };
+  for (let i = 0; i < 3; i++) s = toggleReducer(s, { type: "tap" });
+  s = toggleReducer(s, { type: "failed", on: false });
+  s = toggleReducer(s, { type: "settled", on: false });
+  eq(s, { on: true, count: 1, pending: 1 }, "three taps, two answers: still optimistic");
+  eq(toggleReducer(s, { type: "settled", on: true }), { on: true, count: 1, pending: 0 }, "last answer on:true");
+}
 
 console.log("nextPulsePage");
 const pv = (id: string) => ({ id }) as unknown as PulseVideo;
