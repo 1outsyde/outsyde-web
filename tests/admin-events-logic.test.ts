@@ -89,12 +89,12 @@ eq(bucket(ev({ status: "cancelled", payout: null, hostEarnsCents: 0, owedToHostC
 eq(bucket(ev({ payout: { status: "paid", paidAt: day(-1) }, paidToHostCents: 19000, owedToHostCents: 0 })), "paid", "paid");
 eq(bucket(upcoming()), "upcoming", "not ended is coming up");
 eq(bucket(upcoming({ payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0, payoutDueAt: null, payoutExpectedAt: null })), "upcoming", "nothing sold and not ended is coming up");
-eq(bucket(ev()), "week", "ended, pending, due in the past is overdue so due this week");
+eq(bucket(ev()), "week", "ended, pending, due in the past is overdue, in the ended-unpaid bucket");
 eq(bucket(ev({ endsAt: day(-0.1), payoutDueAt: day(2.9), payout: { dueAt: day(2.9) } })), "week", "ended just now, due in 3 days");
 eq(bucket(ev({ payoutDueAt: day(7), payout: { dueAt: day(7) } })), "week", "ended, due in 7 days, is in the ended-unpaid bucket");
-eq(bucket(ev({ payoutDueAt: day(30), payout: { dueAt: day(30) } })), "week", "ended and unpaid is in the due bucket even if the date is far out");
+eq(bucket(ev({ payoutDueAt: day(30), payout: { dueAt: day(30) } })), "week", "ended and unpaid is in the ended-unpaid bucket even if the date is far out");
 eq(bucket(ev({ salesCents: 4000, refundedCents: 4000, ticketsRefunded: 2, ticketsValid: 0, hostEarnsCents: 0, owedToHostCents: 0, payout: null })), "nothing", "ended, all sales refunded, no payout");
-eq(bucket(ev({ payoutDueAt: day(30), payout: { dueAt: day(30) }, refundsPending: 2 })), "week", "waiting on refunds is in the due bucket");
+eq(bucket(ev({ payoutDueAt: day(30), payout: { dueAt: day(30) }, refundsPending: 2 })), "week", "waiting on refunds is in the ended-unpaid bucket");
 eq(bucket(ev({ payout: null, payoutDueAt: day(-1), payoutExpectedAt: day(-1) })), "week", "ended, money earned, payout row not made yet");
 eq(bucket(ev({ payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0, payoutDueAt: null, payoutExpectedAt: null })), "nothing", "ended, nothing sold, no payout");
 eq(bucket(ev({ endsAt: day(-0.1) })), "week", "ended 2.4 hours ago");
@@ -218,6 +218,16 @@ eq(pill(ev({ payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0 
 eq(pill(upcoming({ payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0, payoutDueAt: null, payoutExpectedAt: null })), { text: "Scheduled", tone: "gold" }, "not ended, nothing sold yet: normal scheduled pill, not nothing-to-pay");
 eq(pill(upcoming({ payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0 })), { text: `Scheduled ${shortDate(day(8.1))}`, tone: "gold" }, "not ended, no payout row, has a date");
 eq(pill(ev({ salesCents: 4000, refundedCents: 4000, hostEarnsCents: 0, owedToHostCents: 0, payout: null, refundsPending: 1 })), { text: "Waiting on a refund", tone: "grey" }, "ended, all refunded but a refund still moving: waiting wins");
+{
+  const moving = ev({ salesCents: 4000, refundedCents: 4000, hostEarnsCents: 0, owedToHostCents: 0, payout: null, refundsPending: 1 });
+  eq([bucket(moving), filterOf(moving, NOW)], ["week", "awaiting"], "refund still moving: ended-unpaid bucket and Ended, not paid yet filter");
+}
+{
+  const early = ev({ title: "no date old", payout: null, payoutDueAt: null, payoutExpectedAt: null, endsAt: day(-5) });
+  const late = ev({ title: "dated", payoutDueAt: day(1), payout: { dueAt: day(1) } });
+  const none = ev({ title: "no date new", payout: null, payoutDueAt: null, payoutExpectedAt: null, endsAt: day(-1) });
+  eq(groupByBucket([late, none, early], NOW)[0].events.map((e) => e.title), ["no date old", "no date new", "dated"], "undated ended events sort by end time, overdue on top");
+}
 {
   const refunded = ev({ salesCents: 4000, refundedCents: 4000, hostEarnsCents: 0, owedToHostCents: 0, payout: null });
   eq(pill(refunded), { text: "No payout, nothing to pay", tone: "grey" }, "ended, all sales refunded: pill agrees with the bucket");

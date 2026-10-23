@@ -181,9 +181,9 @@ function dueOf(e: AdminEventRow): string | null {
   return e.payout?.dueAt ?? e.payoutDueAt ?? e.payoutExpectedAt ?? null;
 }
 
-/** No payout row and nothing earned or owed. The one rule behind both the bucket and the pill. */
+/** No payout row, nothing earned or owed, and no refund still moving. The one rule behind both the bucket and the pill. */
 function nothingToPay(e: AdminEventRow): boolean {
-  return e.payout == null && e.hostEarnsCents === 0 && e.owedToHostCents === 0;
+  return e.payout == null && e.hostEarnsCents === 0 && e.owedToHostCents === 0 && e.refundsPending === 0;
 }
 
 export function bucketOf(e: AdminEventRow, now: Date): BucketId {
@@ -193,7 +193,7 @@ export function bucketOf(e: AdminEventRow, now: Date): BucketId {
   if (ps === "paid") return "paid";
   if (!hasEnded(e, now)) return "upcoming";
   if (nothingToPay(e)) return "nothing";
-  return "week"; // ended and unpaid is always in the due bucket, overdue first
+  return "week"; // ended and unpaid is always in the "Ended, payout not sent yet" bucket, overdue first
 }
 
 const cmp = (a: number, b: number) => (Number.isFinite(a) ? a : Infinity) - (Number.isFinite(b) ? b : Infinity);
@@ -205,7 +205,7 @@ export function sortWithinBucket(id: BucketId, events: AdminEventRow[]): AdminEv
   switch (id) {
     case "now":
     case "week":
-      return by((e) => ms(dueOf(e)), 1);
+      return by((e) => ms(dueOf(e) ?? e.endsAt ?? e.startsAt), 1); // no due date: sort by when it ended
     case "upcoming":
       return by((e) => ms(e.startsAt), 1);
     case "paid":
