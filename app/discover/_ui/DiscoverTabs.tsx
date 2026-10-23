@@ -30,7 +30,7 @@ export default function DiscoverTabs({ current }: { current: DiscoverTab }) {
               className={on ? `${styles.tab} ${styles.tabOn}` : styles.tab}
               aria-current={on ? "page" : undefined}
             >
-              {t.key === "events" && on ? <TicketIcon /> : null}
+              {t.key === "events" ? <TicketIcon /> : null}
               {t.label}
             </a>
           );

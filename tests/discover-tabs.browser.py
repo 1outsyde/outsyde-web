@@ -73,6 +73,7 @@ try:
             check([links.nth(i).get_attribute("href") for i in range(links.count())] == [t[1] for t in TABS], f"{path}: hrefs")
             cur = [t[0] for i, t in enumerate(TABS) if links.nth(i).get_attribute("aria-current") == "page"]
             check(cur == [label], f"{path}: only {label} has aria-current=page", cur)
+            check(links.nth(0).locator("svg").count() == 1, f"{path}: Events tab has the ticket icon")
             h = nav.get_by_role("link").nth(0).bounding_box()["height"]
             check(abs(h - 48) < 1, f"{path}: tab is 48px tall", h)
         ctx.close()
