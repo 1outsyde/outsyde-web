@@ -6,7 +6,7 @@ import {
   type FeedPost, type PulseVideo,
 } from "../app/discover/_lib/feedLogic";
 import {
-  commentErrorCopy, SIGN_IN_LIKE, SIGN_IN_COMMENT, SIGN_IN_SAVE, SIGN_IN_FOLLOW, SIGN_IN_FOLLOWING,
+  commentErrorCopy, toViewer, SIGN_IN_LIKE, SIGN_IN_COMMENT, SIGN_IN_SAVE, SIGN_IN_FOLLOW, SIGN_IN_FOLLOWING,
 } from "../app/discover/_lib/viewer";
 import { GENERIC_ERROR } from "../app/e/_shared/format";
 import type { EventCard } from "../app/events/eventsLogic";
@@ -181,6 +181,15 @@ eq(commentErrorCopy(0), GENERIC_ERROR, "network error: generic");
 for (const c of [SIGN_IN_LIKE, SIGN_IN_COMMENT, SIGN_IN_SAVE, SIGN_IN_FOLLOW, SIGN_IN_FOLLOWING, commentErrorCopy(400)]) {
   eq(c.includes(" - ") || c.includes("\u2014"), false, `no dash break: ${c}`);
 }
+
+console.log("toViewer (BFF /api/auth/me body)");
+eq(toViewer({ authenticated: true, user: { id: "u1", email: "a@b.c", firstName: "Ann", lastName: "Lee", name: "Ann Lee", displayName: "Ann L", username: "ann", profileImageUrl: "https://x/p.jpg" } }),
+  { status: "in", userId: "u1", username: "ann", displayName: "Ann L", photo: "https://x/p.jpg" }, "nested user: id, username, displayName, photo; no names or email");
+eq(toViewer({ authenticated: true, userId: "u2", username: null, displayName: "", profilePhotoUrl: "https://x/q.jpg" }),
+  { status: "in", userId: "u2", username: null, displayName: null, photo: "https://x/q.jpg" }, "flat body still read");
+eq(toViewer({ authenticated: true, user: {} }).status, "out", "no user id: signed out");
+eq(toViewer({ authenticated: false, user: { id: "u1" } }).status, "out", "authenticated false: signed out");
+eq(toViewer(null).status, "out", "null body: signed out");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

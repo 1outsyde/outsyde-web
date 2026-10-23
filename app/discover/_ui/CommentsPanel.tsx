@@ -65,7 +65,13 @@ function Panel({ postId, onClose, viewer, onSignIn, onAdded }: {
       if (!alive) return;
       const list = res.ok && Array.isArray(res.body?.comments) ? res.body.comments : null;
       if (!list) return setLoadError(true);
-      setRows(list.map(toRow).filter((r: Row | null): r is Row => r !== null));
+      const loaded: Row[] = list.map(toRow).filter((r: Row | null): r is Row => r !== null);
+      // A comment posted before the list arrived stays (pending, or saved but not in this older list).
+      setRows((prev) => {
+        if (!prev) return loaded;
+        const ids = new Set(loaded.map((r) => r.id));
+        return [...loaded, ...prev.filter((r) => !ids.has(r.id))];
+      });
     });
     return () => {
       alive = false;

@@ -28,7 +28,25 @@ const OUT: Viewer = { status: "out", userId: null, username: null, displayName: 
 
 const str = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
 
-/** Reads only the five public fields; firstName, lastName and email are never copied. */
+/**
+ * The viewer from the /api/auth/me BFF body. The backend nests the user ({ authenticated, user: { id, ... } });
+ * a flat body is read too. Only the public fields are copied; firstName, lastName and email never are.
+ */
+export function toViewer(body: unknown): Viewer {
+  const b = body && typeof body === "object" ? (body as Record<string, unknown>) : null;
+  if (!b || b.authenticated !== true) return OUT;
+  const u = b.user && typeof b.user === "object" ? (b.user as Record<string, unknown>) : b;
+  const userId = str(u.id) ?? str(u.userId);
+  if (!userId) return OUT;
+  return {
+    status: "in",
+    userId,
+    username: str(u.username),
+    displayName: str(u.displayName),
+    photo: str(u.profileImageUrl) ?? str(u.profilePhotoUrl),
+  };
+}
+
 export function useViewer(): Viewer {
   const [viewer, setViewer] = useState<Viewer>(LOADING);
   useEffect(() => {
@@ -38,16 +56,7 @@ export function useViewer(): Viewer {
       try {
         const res = await fetch("/api/auth/me", { cache: "no-store" });
         if (res.ok) {
-          const b = await res.json().catch(() => null);
-          if (b && b.authenticated === true) {
-            next = {
-              status: "in",
-              userId: str(b.userId),
-              username: str(b.username),
-              displayName: str(b.displayName),
-              photo: str(b.profilePhotoUrl),
-            };
-          }
+          next = toViewer(await res.json().catch(() => null));
         }
       } catch {
         /* network error: treat as signed out */

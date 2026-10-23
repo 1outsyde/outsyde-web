@@ -389,3 +389,247 @@ a.cardName:hover { text-decoration: underline; }
 }
 .sendBtn:hover:not(:disabled) { background: #224d43; }
 .sendBtn:disabled { opacity: 0.5; cursor: default; }
+
+/* Pro page */
+.proPage {
+  min-height: 100vh;
+  background: #0B0B0B;
+  color: #F5F0E6;
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
+}
+.proWrap {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 16px 16px 64px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.feed { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.feedState {
+  border: 1px solid #2A2A2A;
+  background: #141414;
+  border-radius: 16px;
+  padding: 28px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+.feedStateText { margin: 0; font-size: 16px; color: #B8B0A0; }
+.retryBtn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 24px;
+  border-radius: 999px;
+  border: 1px solid #1A3C34;
+  background: #1A3C34;
+  color: #F5F0E6;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.retryBtn:hover { background: #224d43; border-color: #224d43; }
+
+/* Loading skeletons */
+.skeletonList { display: flex; flex-direction: column; gap: 16px; }
+.skeletonCard { background: #141414; border: 1px solid #2A2A2A; border-radius: 16px; overflow: hidden; }
+.skeletonHead { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+.skeletonDot { width: 34px; height: 34px; border-radius: 50%; background: #1F1F1F; }
+.skeletonLine { width: 120px; height: 12px; border-radius: 6px; background: #1F1F1F; }
+.skeletonMedia { aspect-ratio: 4 / 5; background: #1A3C34; opacity: 0.5; animation: skeletonPulse 1.4s ease-in-out infinite; }
+@keyframes skeletonPulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.6; } }
+@media (prefers-reduced-motion: reduce) { .skeletonMedia { animation: none; } }
+
+/* Stories bar */
+.stories { min-width: 0; }
+.storyList {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 4px;
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.storyList::-webkit-scrollbar { display: none; }
+.storyItem { flex: none; }
+.storySlot {
+  width: 72px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #F5F0E6;
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+div.storySlot { cursor: default; }
+.storyRing {
+  width: 64px;
+  height: 64px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid #2A2A2A;
+  padding: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.storyRingNew { border-color: #E8B930; }
+.storyRingYou { border: 2px dashed #6B6B6B; color: #A0A0A0; }
+.storyAvatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #1A3C34;
+  color: #9FC2B5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 20px;
+}
+.storyLabel {
+  max-width: 72px;
+  font-size: 12px;
+  color: #B8B0A0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Story viewer */
+.storyViewer {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #F5F0E6;
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
+}
+.storyStage {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  height: 100%;
+  max-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.storyBars { display: flex; gap: 4px; padding: 10px 12px 0; }
+.storyBar { flex: 1; height: 3px; border-radius: 2px; background: rgba(245, 240, 230, 0.3); overflow: hidden; }
+.storyBarFill { display: block; height: 100%; width: 0; background: #F5F0E6; }
+.storyBarDone { width: 100%; }
+.storyBarRun { animation: storyBar 5s linear forwards; }
+@keyframes storyBar { from { width: 0; } to { width: 100%; } }
+.storyHead { display: flex; align-items: center; gap: 10px; padding: 6px 4px 6px 12px; }
+.storyName { flex: 1; min-width: 0; font-weight: 700; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.storyMedia { position: relative; flex: 1; min-height: 0; background: #1A3C34; }
+.storyMedia video { object-fit: contain; background: #000; }
+.storyImg { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; }
+.storyNav {
+  position: absolute;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  margin-top: -22px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  color: #F5F0E6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.storyNav:disabled { opacity: 0.35; cursor: default; }
+.storyNavPrev { left: 8px; }
+.storyNavNext { right: 8px; }
+
+/* Event card in the feed (spec "Event card look") */
+.eventCard {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  background: #141414;
+  border: 1px solid #2A2A2A;
+  border-radius: 16px;
+  overflow: hidden;
+  color: #F5F0E6;
+  text-decoration: none;
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
+}
+.eventCard:hover { border-color: #38383A; }
+.eventTag {
+  flex: none;
+  background: #E8B930;
+  color: #000;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 1px;
+  padding: 4px 8px;
+  border-radius: 10px;
+}
+.eventCover { position: relative; height: 230px; background: #1A3C34; overflow: hidden; }
+.eventCoverLabel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9FC2B5;
+  font-weight: 600;
+  font-size: 14px;
+}
+.dateBlock {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  width: 50px;
+  height: 56px;
+  border-radius: 12px;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.dateWeekday { font-size: 10px; font-weight: 700; color: #E8B930; letter-spacing: 0.5px; }
+.dateDay { font-family: 'Bebas Neue', sans-serif; font-size: 26px; line-height: 1; }
+.eventFoot { display: flex; align-items: center; gap: 12px; padding: 12px; }
+.eventText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.eventTitle { font-family: 'Bebas Neue', sans-serif; font-size: 22px; line-height: 1.1; overflow-wrap: anywhere; }
+.eventLine { font-size: 12px; color: #A0A0A0; overflow-wrap: anywhere; }
+.ticketsBtn {
+  flex: none;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 20px;
+  background: #E8B930;
+  color: #000;
+  font-weight: 700;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+}
