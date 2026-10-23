@@ -280,6 +280,7 @@ try:
         check(card(pay_dup).get_by_role("button", name="Try again").count() == 1 and card(pay_dup).get_by_role("button", name="Email the host").count() == 0,
               "review for a Stripe duplicate: Try again, no Email the host")
         check(card(pay_can).count() == 1 and card(pay_can).get_by_role("button", name="Email the host").count() == 0, "review on a cancelled event: no Email the host")
+        check(card(pay_can).get_by_role("button", name="Try again").count() == 0, "review on a cancelled event: no Try again (the backend would refuse it)")
 
         # Filter chips: counts match the rows they show.
         exact = ids == {ev_biz, ev_user, ev_up, ev_old, ev_due, ev_pause, ev_dup, ev_can}
@@ -410,6 +411,9 @@ try:
         pc = pg.locator("[data-testid='aem-payout-card']").inner_text()
         check("$58.46" in pc and "acct_••••4f2a" in pc and "acct_1TEST" not in pg.content(), "payout card shows the amount and a masked account", pc)
         check("Payout set to try again by @" in pg.locator("[data-testid='aem-activity']").inner_text(), "activity lists the retry")
+        head_pill = pg.locator("[data-testid='aem-payout-pill']").inner_text().strip()
+        card_pill = pg.locator("[data-testid='aem-payout-card-pill']").inner_text().strip()
+        check(card_pill == head_pill and head_pill.startswith("Due"), "overdue pending payout: card pill matches the header pill", [head_pill, card_pill])
         check(pg.get_by_role("link", name="All events").get_attribute("href") == "/admin/events", "back link to all events")
 
         # Held payout detail: Email the host only. Owed recovery detail: collected row has no actions.
@@ -420,13 +424,38 @@ try:
         pg.goto(WEB + f"/admin/events/{ev_can}")
         pg.locator("[data-testid='aem-payout-card']").wait_for(timeout=60000)
         pcl = pg.locator("[data-testid='aem-payout-card']")
-        check(pcl.get_by_role("button", name="Try again").count() == 1 and pcl.get_by_role("button", name="Email the host").count() == 0, "cancelled event payout card: no Email the host")
+        check(pcl.get_by_role("button", name="Try again").count() == 0 and pcl.get_by_role("button", name="Email the host").count() == 0, "cancelled event payout card: no Try again, no Email the host")
+        check(pg.locator("[data-testid='aem-payout-card-pill']").inner_text().strip() == "Won't be paid, event cancelled", "cancelled event payout card pill: Won't be paid, event cancelled")
         pg.goto(WEB + f"/admin/events/{ev_old}")
         pg.locator("[data-testid='aem-recoveries']").wait_for(timeout=60000)
         rec = pg.locator(f"[data-recovery-id='{rec_old}']")
         check("Marked collected" in rec.inner_text() and rec.get_by_role("button").count() == 0, "collected recovery shows its status with no actions", rec.inner_text())
         check(real(errs) == [], "no console or page errors on the detail pages", errs)
         ctx.close()
+
+        print("admin header widths")
+        title_one_line = "(() => { const t = document.querySelector('.admin-title'); return t.getBoundingClientRect().height < parseFloat(getComputedStyle(t).fontSize) * 1.8; })()"
+        for width in (768, 820, 1024, 1280):
+            wctx, wpg, _ = new_ctx(browser, admin_tok, width)
+            for path in ("/admin/events", "/admin", "/admin/refunds"):
+                wpg.goto(WEB + path)
+                wpg.locator(".admin-title").wait_for(timeout=60000)
+                wpg.wait_for_load_state("networkidle")
+                wpg.wait_for_timeout(300)
+                dims = wpg.evaluate("[document.documentElement.scrollWidth, window.innerWidth]")
+                check(dims[0] <= dims[1], f"{width}px {path}: no horizontal page scroll", dims)
+                check(wpg.evaluate(title_one_line), f"{width}px {path}: OUTSYDE ADMIN stays on one line")
+            wpg.goto(WEB + "/admin/events")
+            wpg.locator(".admin-title").wait_for(timeout=60000)
+            if width < 1024:
+                wpg.get_by_role("button", name="Menu").click()
+                panel = wpg.locator("#admin-nav-panel")
+                check(panel.is_visible() and panel.get_by_role("link", name="Events").count() == 1 and not wpg.locator(".admin-nav-desktop").is_visible(),
+                      f"{width}px: Menu opens the admin links and the desktop row is hidden")
+            else:
+                check(wpg.locator(".admin-nav-desktop").is_visible() and not wpg.get_by_role("button", name="Menu").is_visible(),
+                      f"{width}px: desktop link row shows, no Menu button")
+            wctx.close()
 
         print("not an admin")
         ctx, pg, errs = new_ctx(browser, tok(plain, False), 1280)

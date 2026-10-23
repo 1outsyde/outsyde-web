@@ -15,11 +15,11 @@ export default async function AdminLayout({
 
   return (
     <div style={{ minHeight: "100vh", background: "#000", color: "#F5F0E6" }}>
-      {/* Phone only (below 768px, same width as the AdminNav phone menu): 16px side padding and a
+      {/* Phone and tablet (below 1024px, same width as the AdminNav phone menu): 16px side padding and a
           one line title. !important is needed to beat the inline styles; desktop is untouched. */}
       <style
         dangerouslySetInnerHTML={{
-          __html: `@media (max-width: 767px) {
+          __html: `@media (max-width: 1023px) {
   .admin-header { padding: 0 16px !important; position: relative; }
   .admin-title { white-space: nowrap; flex: none; }
   .admin-main { padding: 20px 16px 32px !important; }

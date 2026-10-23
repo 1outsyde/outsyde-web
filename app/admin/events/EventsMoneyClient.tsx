@@ -321,13 +321,15 @@ export default function EventsMoneyClient() {
                   </div>
                   <div className="aem-attn-what">{a.eventTitle} · {hostLabel(a.host)}</div>
                   <div className="aem-attn-why">{c.why}</div>
-                  <ActionGroup
+                  {id ? <ActionGroup
                     id={id}
                     actions={
                       a.kind === "recovery_owed"
                         ? [{ kind: "collected", tone: "green" }, { kind: "written_off", tone: "ghost" }]
                         : [
-                          ...(a.kind === "payout_review" ? [{ kind: "retry" as const, tone: "gold" as const }] : []),
+                          // The backend refuses a retry unless the event is published (409 EVENT_NOT_PUBLISHED).
+                          ...(a.kind === "payout_review" && (statusById.get(a.eventId) ?? "published") === "published"
+                            ? [{ kind: "retry" as const, tone: "gold" as const }] : []),
                           ...(canEmailHost({
                             status: a.kind === "payout_review" ? "review" : "held",
                             holdReason: a.kind === "payout_held" ? a.reason : null,
@@ -342,7 +344,7 @@ export default function EventsMoneyClient() {
                     onAsk={(k) => { setNotice(null); setConfirmKey(k); }}
                     onCancel={() => setConfirmKey(null)}
                     onConfirm={confirmAction}
-                  />
+                  /> : null}
                 </div>
               );
             })}

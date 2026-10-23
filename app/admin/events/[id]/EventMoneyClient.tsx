@@ -97,15 +97,6 @@ const RECOVERY_STATUS: Record<string, { text: string; tone: string }> = {
   written_off: { text: "Written off", tone: "grey" },
 };
 
-function payoutStatusPill(p: PayoutDetail): { text: string; tone: string } {
-  switch (p.status) {
-    case "review": return { text: "In review", tone: "red" };
-    case "held": return { text: "On hold", tone: "red" };
-    case "paid": return { text: "Paid", tone: "green" };
-    default: return { text: "Scheduled", tone: "gold" };
-  }
-}
-
 type DetailResult =
   | { kind: "ok"; data: Detail & { now: Date } }
   | { kind: "auth"; auth: "unauthorized" | "forbidden" | "notfound" }
@@ -219,7 +210,7 @@ export default function EventMoneyClient({ id }: { id: string }) {
 
   const ask = (k: string) => { setNotice(null); setConfirmKey(k); };
   const cancel = () => setConfirmKey(null);
-  const payoutBad = payout?.status === "review" || payout?.status === "held";
+  const payoutBad = e.status !== "cancelled" && (payout?.status === "review" || payout?.status === "held");
 
   return (
     <Shell>
@@ -356,11 +347,8 @@ export default function EventMoneyClient({ id }: { id: string }) {
           <div className={`aem-payout${payoutBad ? " aem-payout-bad" : ""}`} data-testid="aem-payout-card">
             <div className="aem-payout-top">
               <div className="aem-h2">Payout</div>
-              {payout ? (
-                <span className={`aem-pill aem-pill-${payoutStatusPill(payout).tone}`}>{payoutStatusPill(payout).text}</span>
-              ) : (
-                <span className={`aem-pill aem-pill-${pill.tone}`}>{pill.text}</span>
-              )}
+              {/* Same text as the header pill, so the two always agree. */}
+              <span className={`aem-pill aem-pill-${pill.tone}`} data-testid="aem-payout-card-pill">{pill.text}</span>
             </div>
             {payout ? (
               <>
@@ -380,7 +368,8 @@ export default function EventMoneyClient({ id }: { id: string }) {
                     id={payout.id}
                     size="md"
                     actions={[
-                      ...(payout.status === "review" ? [{ kind: "retry" as const, tone: "gold" as const }] : []),
+                      // The backend refuses a retry unless the event is published (409 EVENT_NOT_PUBLISHED).
+                      ...(payout.status === "review" && e.status === "published" ? [{ kind: "retry" as const, tone: "gold" as const }] : []),
                       ...(canEmailHost({ status: payout.status, holdReason: payout.holdReason, lastError: payout.lastError, eventStatus: e.status })
                         ? [{ kind: "email" as const, tone: "green" as const }] : []),
                     ]}

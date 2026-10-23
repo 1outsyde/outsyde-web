@@ -24,13 +24,13 @@ function isActive(pathname: string, href: string): boolean {
   return href !== "/admin" && pathname.startsWith(`${href}/`);
 }
 
-// Phone menu (below 768px). The desktop link row is unchanged above that width; on a phone it is
+// Phone menu (below 1024px, so phones and tablets: the 9 desktop links don't fit in one row below that). The desktop link row is unchanged above that width; on a phone it is
 // hidden and replaced by the current section name plus a "Menu" button that opens a panel under
 // the admin header. The phone rules for the header itself (padding, one line title) live in
 // app/admin/layout.tsx and use the same width.
 const PHONE_CSS = `
   .admin-nav-phone { display: none; }
-  @media (max-width: 767px) {
+  @media (max-width: 1023px) {
     .admin-nav-desktop { display: none !important; }
     .admin-nav-phone { display: flex; align-items: center; gap: 10px; margin-left: auto; min-width: 0; }
   }
@@ -44,7 +44,7 @@ const PHONE_CSS = `
   .admin-nav-panel a { display: block; padding: 13px 4px; font-size: 15px; letter-spacing: 0.03em; text-decoration: none; color: rgba(245,240,230,0.75); border-bottom: 1px solid rgba(245,240,230,0.06); }
   .admin-nav-panel a:last-child { border-bottom: 0; }
   .admin-nav-panel a[aria-current="page"] { color: #E8B930; }
-  @media (min-width: 768px) {
+  @media (min-width: 1024px) {
     .admin-nav-panel { display: none; }
   }
 `;
