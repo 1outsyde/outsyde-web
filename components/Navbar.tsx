@@ -162,6 +162,7 @@ export default function Navbar() {
           <div className="on-links">
             {!user && (
               <>
+                <a href="/discover" className="on-link">Discover</a>
                 <a href="/shop" className="on-link">Shop</a>
                 <a href="/for-business" className="on-link">For Business</a>
                 <a href="/login" className="on-link-btn on-link-outline">Log In</a>
@@ -171,6 +172,7 @@ export default function Navbar() {
 
             {user && isConsumer && (
               <>
+                <a href="/discover" className="on-link">Discover</a>
                 <a href="/shop" className="on-link">Shop</a>
                 <a href="/account" className="on-link">My Activity</a>
                 <a href="/tickets" className="on-link">Tickets</a>
@@ -183,6 +185,7 @@ export default function Navbar() {
 
             {user && isVendor && (
               <>
+                <a href="/discover" className="on-link">Discover</a>
                 <a href="/account" className="on-link">My Shop</a>
                 <a href="/tickets" className="on-link">Tickets</a>
                 <a href="/vendor-dashboard" className="on-link">Dashboard</a>
@@ -192,6 +195,7 @@ export default function Navbar() {
 
             {user && isPhotographer && !isVendor && (
               <>
+                <a href="/discover" className="on-link">Discover</a>
                 <a href="/tickets" className="on-link">Tickets</a>
                 <a href="/photographer-dashboard" className="on-link">Dashboard</a>
                 <button onClick={handleLogout} className="on-link">Log Out</button>
@@ -200,6 +204,7 @@ export default function Navbar() {
 
             {user && isAdmin && (
               <>
+                <a href="/discover" className="on-link">Discover</a>
                 <a href="/tickets" className="on-link">Tickets</a>
                 <a href="/admin" className="on-link">Admin Panel</a>
                 <button onClick={handleLogout} className="on-link">Log Out</button>
@@ -228,6 +233,7 @@ export default function Navbar() {
         <div className={`on-drawer${menuOpen ? " open" : ""}`} aria-hidden={!menuOpen}>
           {!user && (
             <>
+              <a href="/discover" onClick={() => setMenuOpen(false)}>Discover</a>
               <a href="/shop" onClick={() => setMenuOpen(false)}>Shop</a>
               <a href="/for-business" onClick={() => setMenuOpen(false)}>For Business</a>
               <a href="/login" onClick={() => setMenuOpen(false)}>Log In</a>
@@ -237,6 +243,7 @@ export default function Navbar() {
 
           {user && isConsumer && (
             <>
+              <a href="/discover" onClick={() => setMenuOpen(false)}>Discover</a>
               <a href="/shop" onClick={() => setMenuOpen(false)}>Shop</a>
               <a href="/account" onClick={() => setMenuOpen(false)}>My Activity</a>
               <a href="/tickets" onClick={() => setMenuOpen(false)}>Tickets</a>
@@ -249,6 +256,7 @@ export default function Navbar() {
 
           {user && isVendor && (
             <>
+              <a href="/discover" onClick={() => setMenuOpen(false)}>Discover</a>
               <a href="/account" onClick={() => setMenuOpen(false)}>My Shop</a>
               <a href="/tickets" onClick={() => setMenuOpen(false)}>Tickets</a>
               <a href="/vendor-dashboard" onClick={() => setMenuOpen(false)}>Dashboard</a>
@@ -258,6 +266,7 @@ export default function Navbar() {
 
           {user && isPhotographer && !isVendor && (
             <>
+              <a href="/discover" onClick={() => setMenuOpen(false)}>Discover</a>
               <a href="/tickets" onClick={() => setMenuOpen(false)}>Tickets</a>
               <a href="/photographer-dashboard" onClick={() => setMenuOpen(false)}>Dashboard</a>
               <button onClick={handleLogout}>Log Out</button>
@@ -266,6 +275,7 @@ export default function Navbar() {
 
           {user && isAdmin && (
             <>
+              <a href="/discover" onClick={() => setMenuOpen(false)}>Discover</a>
               <a href="/tickets" onClick={() => setMenuOpen(false)}>Tickets</a>
               <a href="/admin" onClick={() => setMenuOpen(false)}>Admin Panel</a>
               <button onClick={handleLogout}>Log Out</button>
