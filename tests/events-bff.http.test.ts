@@ -15,6 +15,7 @@
  * with OUTSYDE_BACKEND_URL pointed at a closed port, so no second web instance is needed.
  */
 import { createRequire } from "module";
+import http from "http";
 
 const WEB = process.env.EV_WEB_URL;
 const BACKEND = process.env.EV_BACKEND_URL;
@@ -229,6 +230,81 @@ async function call(base: string, method: string, path: string, opts: { token?: 
     await call(WEB, "DELETE", `/api/account/follow/${followId}`, { token: guestTok });
     r = await call(WEB, "GET", `/api/account/follow/${followId}`, { token: guestTok });
     assert(r.status === 200 && r.body?.isFollowing === false, "isFollowing false after unfollowing", r);
+
+
+    // ===== Task 3: paid ticket checkout through the BFF =====
+    console.log("Paid ticket checkout (Stripe stub on the backend's STRIPE_STUB_PORT)");
+    const STUB_PORT = Number(process.env.EV_STRIPE_PORT || "5099");
+    const piStore: Record<string, any> = {};
+    const stub = http.createServer((rq, rs) => {
+      let raw = ""; rq.on("data", (c) => (raw += c));
+      rq.on("end", () => {
+        const send = (code: number, obj: unknown) => { rs.writeHead(code, { "content-type": "application/json" }); rs.end(JSON.stringify(obj)); };
+        const form = new URLSearchParams(raw);
+        if (rq.method === "POST" && rq.url === "/v1/customers") return send(200, { id: `cus_stub_${Date.now()}`, object: "customer" });
+        const custM = rq.url?.match(/^\/v1\/customers\/([^/?]+)/);
+        if (rq.method === "GET" && custM) return send(200, { id: custM[1], object: "customer" });
+        if (rq.method === "POST" && rq.url === "/v1/payment_intents") {
+          const id = `pi_web_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+          piStore[id] = { id, object: "payment_intent", amount: Number(form.get("amount") || 0), amount_received: 0, status: "requires_payment_method", client_secret: `${id}_secret`, metadata: {} };
+          for (const [k, v] of form.entries()) { const m = k.match(/^metadata\[(.+)\]$/); if (m) piStore[id].metadata[m[1]] = v; }
+          return send(200, piStore[id]);
+        }
+        const cancelM = rq.url?.match(/^\/v1\/payment_intents\/([^/?]+)\/cancel/);
+        if (rq.method === "POST" && cancelM) { if (piStore[cancelM[1]]) piStore[cancelM[1]].status = "canceled"; return send(200, piStore[cancelM[1]] ?? { id: cancelM[1], status: "canceled" }); }
+        const piM = rq.url?.match(/^\/v1\/payment_intents\/([^/?]+)$/);
+        if (rq.method === "GET" && piM) return piStore[piM[1]] ? send(200, piStore[piM[1]]) : send(404, { error: { message: "No such payment_intent" } });
+        send(404, { error: { type: "invalid_request_error", message: `stub: no route ${rq.method} ${rq.url}` } });
+      });
+    });
+    await new Promise<void>((x, rej) => { stub.once("error", rej); stub.listen(STUB_PORT, "127.0.0.1", () => x()); });
+    try {
+      const paidEv = (await call(BACKEND, "POST", "/api/events", { token: hostTok, body: { title: `${P} Paid Night`, startsAt: inDays(8), endsAt: inDays(8, 5), timezone: "America/New_York", city: "Freeport", state: "NY", capacity: 40 } })).body.event;
+      const gaRes = await call(BACKEND, "POST", `/api/events/${paidEv.id}/ticket-types`, { token: hostTok, body: { name: "General", priceCents: 2000, quantity: 10, maxPerOrder: 4 } });
+      if (gaRes.status !== 201) throw new Error(`paid type create failed ${JSON.stringify(gaRes)}`);
+      // The publish route refuses paid types while PAID_EVENTS_ENABLED is off, so open the event in SQL.
+      await q(`UPDATE events SET status = 'published', published_at = now() WHERE id = $1`, [paidEv.id]);
+      const paidSlug: string = paidEv.slug;
+      const pageData = await call(WEB, "GET", `/api/events/slug/${paidSlug}`);
+      const ga = pageData.body?.ticketTypes?.find((t: any) => t.name === "General");
+      assert(pageData.status === 200 && ga?.buyerTotalCents === 2259, "paid event is public with a buyer total on the type", pageData.body?.ticketTypes);
+
+      r = await call(WEB, "POST", `/api/events/${paidEv.id}/checkout`, { body: { ticketTypeId: ga.id, quantity: 1, idempotencyKey: `${P}-co1` } });
+      assert(r.status === 401, "checkout without a cookie: 401 (the page sends the person to login)", r);
+      r = await call(WEB, "POST", `/api/events/${paidEv.id}/checkout`, { token: guestTok, body: { ticketTypeId: ga.id, quantity: 1, idempotencyKey: `${P}-co1` } });
+      assert(r.status === 201 && r.body?.success === true && typeof r.body?.clientSecret === "string" && r.body.clientSecret.length > 0, "checkout returns 201 with a clientSecret", r);
+      assert(r.body?.serviceFeeCents === ga.serviceFeeCents && r.body?.totalCents === ga.buyerTotalCents && r.body?.subtotalCents === ga.priceCents, "money lines equal the event page's price, fee and buyerTotalCents for 1 ticket", { co: r.body, ga });
+      assert(r.body?.subtotalCents + r.body?.serviceFeeCents === r.body?.totalCents, "subtotal plus service fee is the total", r.body);
+      assert(typeof r.body?.holdExpiresAt === "string" && Date.parse(r.body.holdExpiresAt) > Date.now() + 5 * 60000 && Date.parse(r.body.holdExpiresAt) <= Date.now() + 11 * 60000, "hold expires in about 10 minutes", r.body?.holdExpiresAt);
+      assert(!JSON.stringify(r.body).match(/percent|rate/i), "response mentions no percentage or rate", r.body);
+      const first = r.body;
+      const same = await call(WEB, "POST", `/api/events/${paidEv.id}/checkout`, { token: guestTok, body: { ticketTypeId: ga.id, quantity: 1, idempotencyKey: `${P}-co1` } });
+      assert(same.status >= 200 && same.status < 300 && same.body?.orderId === first.orderId && same.body?.clientSecret === first.clientSecret, "repeating the same key returns the same open checkout", same);
+      const other = await call(WEB, "POST", `/api/events/${paidEv.id}/checkout`, { token: guestTok, body: { ticketTypeId: ga.id, quantity: 1, idempotencyKey: `${P}-co1-other` } });
+      assert(other.status === 201 && other.body?.orderId !== first.orderId, "a fresh key makes a new hold", other.body);
+      r = await call(WEB, "GET", `/api/events/orders/${first.orderId}`);
+      assert(r.status === 401, "order poll without a cookie: 401", r);
+      r = await call(WEB, "GET", `/api/events/orders/${first.orderId}`, { token: guestTok });
+      assert(r.status === 200 && r.body?.order?.status === "pending", "order poll says pending while waiting for payment", r.body?.order);
+      assert(!(r.body?.order?.tickets?.length > 0), "no tickets are shown while pending", r.body?.order);
+      // Stripe succeeds; the webhook is slow. The backend settles a succeeded payment when the same checkout is repeated.
+      piStore[first.paymentIntentId].status = "succeeded";
+      piStore[first.paymentIntentId].amount_received = piStore[first.paymentIntentId].amount;
+      r = await call(WEB, "GET", `/api/events/orders/${first.orderId}`, { token: guestTok });
+      assert(r.body?.order?.status === "pending", "paid at Stripe but not yet settled: the poll still says pending", r.body?.order);
+      const settled = await call(WEB, "POST", `/api/events/${paidEv.id}/checkout`, { token: guestTok, body: { ticketTypeId: ga.id, quantity: 1, idempotencyKey: `${P}-co1` } });
+      assert(settled.status >= 200 && settled.status < 300 && settled.body?.repeated === true && settled.body?.order?.status === "completed", "repeating the key after paying returns { order, repeated: true }", settled);
+      r = await call(WEB, "GET", `/api/events/orders/${first.orderId}`, { token: guestTok });
+      assert(r.status === 200 && r.body?.order?.status === "completed" && r.body?.order?.tickets?.length === 1, "order poll now says completed with 1 ticket", r.body?.order);
+      r = await call(WEB, "GET", `/api/events/stripe-config`);
+      assert(r.status === 200 && r.body?.publishableKey?.startsWith("pk_"), "stripe-config relay gives the key the checkout loads", r);
+      r = await call(WEB, "POST", `/api/events/${paidEv.id}/checkout`, { token: guestTok, body: { ticketTypeId: ga.id, quantity: 99, idempotencyKey: `${P}-co-big` } });
+      assert(r.status >= 400 && r.status < 500 && typeof r.body?.code === "string" && typeof r.body?.error === "string", "over the per order limit: a 4xx with a code and a message", r);
+      const pageCheckout = await html(`/e/${paidSlug}?checkout=${ga.id}&qty=1`);
+      assert(pageCheckout.status === 200, "event page with checkout params renders (200)", pageCheckout.status);
+    } finally {
+      await new Promise<void>((x) => stub.close(() => x()));
+    }
 
     console.log("Backend unreachable (in process, closed port)");
     process.env.OUTSYDE_BACKEND_URL = "http://127.0.0.1:1";

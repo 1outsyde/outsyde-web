@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { CheckoutHost } from "./Checkout";
 import type { EventInfo, EventPayload, TicketType } from "./types";
 
 const GENERIC_ERROR = "Something went wrong. Try again.";
@@ -521,6 +522,9 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
             </div>
           </div>
         )}
+        <Suspense fallback={null}>
+          <CheckoutHost slug={slug} event={e} ticketTypes={types} onPaid={load} />
+        </Suspense>
         {toast && <div className="ev-toast" role="status">{toast}</div>}
       </div>
     </>
