@@ -108,6 +108,7 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
   const [followBusy, setFollowBusy] = useState(false);
   const [followMsg, setFollowMsg] = useState("");
   const [toast, setToast] = useState("");
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const keyRef = useRef<string | null>(null);
   const ticketsRef = useRef<HTMLDivElement | null>(null);
   const loginHref = `/login?return=${encodeURIComponent(`/e/${slug}`)}`;
@@ -137,6 +138,33 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
   }, [load]);
 
   const e = data?.event ?? null;
+  const followTarget = e && !e.viewerIsHost ? e.host.followId ?? null : null;
+
+  // Follow state doubles as the signed-in probe: 401 means signed out.
+  useEffect(() => {
+    if (!followTarget) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/account/follow/${encodeURIComponent(followTarget)}`, { cache: "no-store" });
+        if (cancelled) return;
+        if (res.status === 401) {
+          setSignedIn(false);
+          return;
+        }
+        if (res.ok) {
+          const body = await res.json().catch(() => null);
+          setSignedIn(true);
+          setFollowing(body?.isFollowing === true);
+        }
+      } catch {
+        /* leave unknown */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [followTarget]);
   const types = useMemo(() => data?.ticketTypes ?? [], [data]);
   const onSale = useMemo(() => types.filter((t) => t.salesStatus === "on_sale"), [types]);
   const selected = onSale.find((t) => t.id === selectedId) ?? (onSale.length === 1 ? onSale[0] : null);
@@ -173,6 +201,10 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
   async function toggleFollow() {
     const id = e?.host.followId;
     if (!id || followBusy) return;
+    if (signedIn === false) {
+      window.location.href = loginHref;
+      return;
+    }
     setFollowBusy(true);
     setFollowMsg("");
     try {
@@ -234,7 +266,12 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
       rsvp(selected);
       return;
     }
-    router.push(`/e/${slug}?checkout=${encodeURIComponent(selected.id)}&qty=${qty}`);
+    const checkoutPath = `/e/${slug}?checkout=${encodeURIComponent(selected.id)}&qty=${qty}`;
+    if (signedIn === false) {
+      window.location.href = `/login?return=${encodeURIComponent(checkoutPath)}`;
+      return;
+    }
+    router.push(checkoutPath);
   }
 
   function pick(t: TicketType) {

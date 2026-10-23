@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { backendAuthHeaders } from '@/lib/admin-auth';
+import { proxyToBackend } from '@/lib/backend-proxy';
 
 const BACKEND = process.env.OUTSYDE_BACKEND_URL;
 
@@ -66,4 +68,21 @@ export async function DELETE(
     { error: data.error ?? 'Failed to unfollow' },
     { status: res.status }
   );
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Does the signed-in viewer follow this id? Backend answers { success, isFollowing }, or 401 when signed out.
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ targetUserId: string }> }
+) {
+  const { targetUserId } = await params;
+  if (!UUID_RE.test(targetUserId)) {
+    return NextResponse.json({ success: false, error: 'Not found.', code: 'NOT_FOUND' }, { status: 404 });
+  }
+  return proxyToBackend(`/api/follows/check/${targetUserId}`, {
+    method: 'GET',
+    headers: backendAuthHeaders(req) as Record<string, string>,
+  });
 }

@@ -214,6 +214,22 @@ async function call(base: string, method: string, path: string, opts: { token?: 
     const holderView = await call(WEB, "GET", `/api/events/slug/${hiddenEv.slug}`, { token: guestTok });
     assert(holderView.body?.event?.viewerHasTicket === true && holderView.body?.event?.addressLine1 === "77 Secretive Street", "client refetch gives the holder the address", holderView.body?.event);
 
+    console.log("GET /api/account/follow/:id (follow state)");
+    const followId: string = holderView.body.event.host.followId;
+    r = await call(WEB, "GET", `/api/account/follow/${followId}`);
+    assert(r.status === 401, "signed out: 401", r);
+    r = await call(WEB, "GET", `/api/account/follow/not-a-uuid`, { token: guestTok });
+    assert(r.status === 404 && r.body?.code === "NOT_FOUND", "bad id is 404", r);
+    r = await call(WEB, "GET", `/api/account/follow/${followId}`, { token: guestTok });
+    assert(r.status === 200 && r.body?.isFollowing === false, "isFollowing false before following", r);
+    r = await call(WEB, "POST", `/api/account/follow/${followId}`, { token: guestTok });
+    assert(r.status >= 200 && r.status < 300, "follow through the BFF works", r);
+    r = await call(WEB, "GET", `/api/account/follow/${followId}`, { token: guestTok });
+    assert(r.status === 200 && r.body?.isFollowing === true, "isFollowing true after following", r);
+    await call(WEB, "DELETE", `/api/account/follow/${followId}`, { token: guestTok });
+    r = await call(WEB, "GET", `/api/account/follow/${followId}`, { token: guestTok });
+    assert(r.status === 200 && r.body?.isFollowing === false, "isFollowing false after unfollowing", r);
+
     console.log("Backend unreachable (in process, closed port)");
     process.env.OUTSYDE_BACKEND_URL = "http://127.0.0.1:1";
     const { NextRequest } = await import("next/server");
