@@ -11,7 +11,7 @@ import { HostShell, useHostApi } from "../../_host/hostApi";
 import { MANAGE_CSS } from "../../_host/manageStyles";
 import { backendMessage, guestHandle, guestName } from "../../_host/manageLogic";
 import { errorCopy, GENERIC_ERROR } from "../../../e/_shared/format";
-import { cleanUsername, isTeamMember, removeConfirmCopy, type Scope, type TeamMember } from "../scan/scanLogic";
+import { cleanUsername, isTeamMember, removeConfirmCopy, usernameMax, type Scope, type TeamMember } from "../../_host/doorLogic";
 
 type Screen = "loading" | "ready" | "notfound" | "error";
 
@@ -36,11 +36,8 @@ export default function TeamClient({ eventId }: { eventId: string }) {
   const load = useCallback(async () => {
     setScreen("loading");
     setLoadError(null);
-    const [t, m] = await Promise.all([
-      call("GET", `/api/events/${eventId}/door/team`),
-      call("GET", `/api/events/${eventId}/manage`),
-    ]);
-    if (!t || !m) return;
+    const t = await call("GET", `/api/events/${eventId}/door/team`);
+    if (!t) return;
     if (t.status === 404) { setScreen("notfound"); return; }
     if (t.status !== 200 || !t.body?.success) {
       setLoadError(errorCopy(t.status, t.body));
@@ -49,8 +46,10 @@ export default function TeamClient({ eventId }: { eventId: string }) {
     }
     setStanding(Array.isArray(t.body.standing) ? (t.body.standing as unknown[]).filter(isTeamMember) : []);
     setEventOnly(Array.isArray(t.body.event) ? (t.body.event as unknown[]).filter(isTeamMember) : []);
-    setTitle(m.status === 200 && typeof m.body?.event?.title === "string" ? m.body.event.title : null);
     setScreen("ready");
+    // Only the host gets this far (door/team is host only), so /manage is asked just for the title.
+    const m = await call("GET", `/api/events/${eventId}/manage`);
+    setTitle(m && m.status === 200 && typeof m.body?.event?.title === "string" ? m.body.event.title : null);
   }, [call, eventId]);
 
   useEffect(() => { load(); }, [load]);
@@ -179,7 +178,7 @@ export default function TeamClient({ eventId }: { eventId: string }) {
         <form className="ed-stack-sm" onSubmit={add} data-testid="team-add">
           <label htmlFor="team-user" className="ed-label">ADD SOMEONE</label>
           <input id="team-user" className="ed-in" value={username} placeholder="@username" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false}
-            maxLength={41} onChange={(e) => { setUsername(e.target.value); setAddError(null); }} />
+            maxLength={usernameMax(username)} onChange={(e) => { setUsername(e.target.value.slice(0, usernameMax(e.target.value))); setAddError(null); }} />
           <div className="ed-box" style={{ padding: 12, gap: 10 }}>
             <div className="ed-seg" role="radiogroup" aria-label="Access">
               <button type="button" role="radio" aria-checked={scope === "standing"} className={scope === "standing" ? "on" : ""} onClick={() => setScope("standing")}>All my events</button>

@@ -12,10 +12,12 @@ import Link from "next/link";
 import { HostShell, useHostApi } from "../../_host/hostApi";
 import { MANAGE_CSS } from "../../_host/manageStyles";
 import { backendMessage, guestLine, guestName, isDoorGuest, type DoorGuest } from "../../_host/manageLogic";
+import { isHostEvent } from "../../_host/editorLogic";
+import { isDoorEvent, scanWindowNote, timeOnly, type DoorEvent } from "../../_host/doorLogic";
 import { errorCopy, GENERIC_ERROR, startLine } from "../../../e/_shared/format";
 import {
-  CODE_LENGTH, LAST_SCAN_COLOR, TONE_BG, cleanTyped, filterGuests, invalidCodeResult, isDoorEvent, lastScanLabel, makeRecent,
-  progressPct, qrToCode, replaceGuest, resultFor, scanWindowNote, timeOnly, type DoorEvent, type ScanResult,
+  CODE_LENGTH, LAST_SCAN_COLOR, TONE_BG, cleanTyped, filterGuests, invalidCodeResult, lastScanLabel, makeRecent,
+  progressPct, qrToCode, replaceGuest, resultFor, scanKey, undoneResult, type ScanResult,
 } from "./scanLogic";
 
 type Screen = "loading" | "ready" | "notfound" | "error";
@@ -86,12 +88,13 @@ export default function Scanner({ eventId }: { eventId: string }) {
   const [screen, setScreen] = useState<Screen>("loading");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [guests, setGuests] = useState<DoorGuest[]>([]);
-  const [info, setInfo] = useState<DoorEvent | null>(null);
+  // From /door/mine, or for the host from /manage when /door/mine doesn't list the event (ended, not published).
+  const [info, setInfo] = useState<(DoorEvent & { status?: string }) | null>(null);
   const [notListed, setNotListed] = useState(false); // /door/mine loaded and this event isn't in it
   const [view, setView] = useState<"scan" | "list">("scan");
   const [result, setResult] = useState<ScanResult | null>(null);
   const [busy, setBusy] = useState(false);
-  const [last, setLast] = useState<ScanResult[]>([]);
+  const [last, setLast] = useState<{ key: string; r: ScanResult }[]>([]);
   const [typing, setTyping] = useState(false);
   const [typed, setTyped] = useState("");
   const [typedNote, setTypedNote] = useState<string | null>(null);
@@ -112,10 +115,14 @@ export default function Scanner({ eventId }: { eventId: string }) {
   const mountedRef = useRef(true);
   const pausedRef = useRef(true); // no decoding while a result shows, a request runs or the list is open
   const recentRef = useRef(makeRecent());
+  const seqRef = useRef(0);
   const onDecodedRef = useRef<(text: string) => void>(() => {});
 
   const support = useSyncExternalStore(noSubscribe, cameraSupport, () => "ok" as const);
   const isHost = info?.role === "host";
+  // Times use the event's zone. Without event details (a team member on an event /door/mine no longer lists) the
+  // browser's zone is used and the page says so.
+  const browserZone = !info;
   const tz = info?.timezone ?? (typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC");
 
   /* ---------- data ---------- */
@@ -153,7 +160,16 @@ export default function Scanner({ eventId }: { eventId: string }) {
     // the page still works, without Undo, and the backend answers every check in.
     const listed = m.status === 200 && Array.isArray(m.body?.events);
     const mine = listed ? (m.body.events as unknown[]).filter(isDoorEvent) : [];
-    const found = mine.find((e) => e.id === eventId) ?? null;
+    let found: (DoorEvent & { status?: string }) | null = mine.find((e) => e.id === eventId) ?? null;
+    if (!found) {
+      // Not listed, or the list failed: the host can still be told apart through /manage (404 for anyone else).
+      const h = await call("GET", `/api/events/${eventId}/manage`);
+      if (!h) return;
+      if (h.status === 200 && isHostEvent(h.body?.event)) {
+        const e = h.body.event;
+        found = { id: e.id, slug: e.slug, title: e.title, startsAt: e.startsAt, endsAt: e.endsAt, timezone: e.timezone, role: "host", status: e.status };
+      }
+    }
     setInfo(found);
     setNotListed(listed && !found);
     setScreen("ready");
@@ -168,7 +184,8 @@ export default function Scanner({ eventId }: { eventId: string }) {
     setResult(r);
     setNotice(null);
     setUndoError(null);
-    setLast((l) => [r, ...l].slice(0, LAST_SCANS));
+    const key = scanKey(r, Date.now(), ++seqRef.current);
+    setLast((l) => [{ key, r }, ...l].slice(0, LAST_SCANS));
     if (r.ticket) setGuests((gs) => replaceGuest(gs, r.ticket as DoorGuest));
   }, []);
 
@@ -222,9 +239,15 @@ export default function Scanner({ eventId }: { eventId: string }) {
     setUndoing(null);
     if (!r) return;
     if (r.status !== 200 || !r.body?.success || !isDoorGuest(r.body.ticket)) { setUndoError(r.status === 0 ? GENERIC_ERROR : backendMessage(r.body)); return; }
-    setGuests((gs) => replaceGuest(gs, r.body.ticket as DoorGuest));
-    setResult(null);
-    setNotice(`Check in undone for ${guestName(r.body.ticket as DoorGuest)}.`);
+    const t2 = r.body.ticket as DoorGuest;
+    if (result?.ticket?.ticketId === t2.ticketId) {
+      // Undo from the result card: keep a card up (scanning stays paused) so the ticket still in front of the
+      // camera isn't checked straight back in. Scanning resumes on Scan next.
+      show(undoneResult(t2));
+    } else {
+      setGuests((gs) => replaceGuest(gs, t2));
+      setNotice(`Check in undone for ${guestName(t2)}.`);
+    }
   }
 
   function next() {
@@ -385,6 +408,7 @@ export default function Scanner({ eventId }: { eventId: string }) {
           <div className="mg-bar" role="img" aria-label={`${checkedIn} of ${guests.length} checked in`}><div style={{ width: `${progressPct(checkedIn, guests.length)}%` }} /></div>
         </div>
 
+        {browserZone && <div className="ed-hint" data-testid="zone-note">Times are shown in your time zone.</div>}
         {windowNote && <div className="ed-banner" role="status" data-testid="window-note">{windowNote}</div>}
         {notice && <p className="ed-ok" role="status">{notice}</p>}
 
@@ -461,8 +485,8 @@ export default function Scanner({ eventId }: { eventId: string }) {
         {!result && view === "scan" && last.length > 0 && (
           <section className="ed-stack-sm" aria-label="Last scans">
             <h2 className="mg-section">LAST SCANS</h2>
-            {last.map((r, i) => (
-              <div key={i} className="sc-last">
+            {last.map(({ key, r }) => (
+              <div key={key} className="sc-last">
                 <div>{r.who || r.detail}</div>
                 <div style={{ color: LAST_SCAN_COLOR[r.tone] }}>{lastScanLabel(r)}</div>
               </div>

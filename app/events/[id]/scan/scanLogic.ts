@@ -1,11 +1,13 @@
 /**
- * Pure helpers for the door scanner (/events/[id]/scan), the door team (/events/[id]/team) and /events/door.
- * No React, no network. Shapes follow outsyde-backend server/events/doorRouter.ts and doorAccess.ts.
+ * Pure helpers for the door scanner (/events/[id]/scan): codes, duplicate suppression, result cards, guest list.
+ * No React, no network. Shapes follow outsyde-backend server/events/doorRouter.ts. Door roles, the scan window
+ * and the door team helpers are in app/events/_host/doorLogic.ts.
  * Unit tests: tests/events-scan-logic.test.ts.
  */
 
-import { fmt, GENERIC_ERROR, type ApiBody } from "../../../e/_shared/format";
+import { GENERIC_ERROR, type ApiBody } from "../../../e/_shared/format";
 import { guestName, type DoorGuest } from "../../_host/manageLogic";
+import { timeOnly } from "../../_host/doorLogic";
 
 /* ---------- ticket codes ---------- */
 
@@ -72,14 +74,14 @@ const whoLine = (g: DoorGuest) => `${guestName(g)} · ${g.ticketTypeName}`;
 const msg = (body: ApiBody, fallback: string) =>
   typeof body?.error === "string" && body.error.trim() ? body.error : fallback;
 
-/** "9:42 PM" in the event's own time zone. */
-export function timeOnly(iso: string, tz: string): string {
-  return fmt(iso, tz, { hour: "numeric", minute: "2-digit" });
-}
-
 /** The invalid code card, shown locally for a QR or typed code that isn't a ticket code (no backend call). */
 export function invalidCodeResult(): ScanResult {
   return { outcome: "INVALID_CODE", tone: "bad", title: "Invalid code", who: "", detail: "That isn't a valid ticket code. Try again or type the code.", ticket: null };
+}
+
+/** After the host undoes a check in: the guest is out again. Scanning stays paused until Scan next. */
+export function undoneResult(t: DoorGuest): ScanResult {
+  return { outcome: "UNDONE", tone: "warn", title: "Check in undone", who: whoLine(t), detail: "This guest is not checked in anymore.", ticket: t };
 }
 
 /**
@@ -132,29 +134,12 @@ export function resultFor(status: number, body: any, tz: string): ScanResult { /
 /** The short label in the "Last scans" list. */
 export function lastScanLabel(r: ScanResult): string {
   if (r.outcome === "CHECKED_IN") return "In";
+  if (r.outcome === "UNDONE") return "Undone";
   if (r.outcome === "ALREADY_CHECKED_IN") return "Already in";
   return r.title;
 }
 
 export const LAST_SCAN_COLOR: Record<Tone, string> = { ok: "#6FD39B", warn: "#F0B54A", bad: "#FF8A7A" };
-
-/* ---------- scan window ---------- */
-
-/** Same rule as backend doorAccess.isWithinScanWindow: opens 6 hours before the start, closes at the end. */
-export const SCAN_OPENS_BEFORE_START_MS = 6 * 60 * 60 * 1000;
-
-/** A plain note when check in isn't open yet or has closed, else null. Times in the event's own time zone. */
-export function scanWindowNote(e: { startsAt: string; endsAt: string; timezone: string }, now: Date = new Date()): string | null {
-  const opens = new Date(e.startsAt).getTime() - SCAN_OPENS_BEFORE_START_MS;
-  const t = now.getTime();
-  if (t < opens) {
-    const iso = new Date(opens).toISOString();
-    const day = fmt(iso, e.timezone, { weekday: "short", month: "short", day: "numeric" });
-    return `Check in opens ${day} at ${timeOnly(iso, e.timezone)}, 6 hours before the start.`;
-  }
-  if (t > new Date(e.endsAt).getTime()) return "Check in has closed for this event.";
-  return null;
-}
 
 /* ---------- guests ---------- */
 
@@ -176,43 +161,7 @@ export function progressPct(checkedIn: number, total: number): number {
   return total > 0 ? Math.max(0, Math.min(100, Math.round((checkedIn / total) * 100))) : 0;
 }
 
-/* ---------- door roles (/door/mine) ---------- */
-
-export type DoorRole = "host" | "standing" | "event";
-
-export interface DoorEvent { id: string; slug: string; title: string; startsAt: string; endsAt: string; timezone: string; role: DoorRole }
-
-export function isDoorEvent(x: unknown): x is DoorEvent {
-  const e = x as DoorEvent | null;
-  return !!e && typeof e.id === "string" && typeof e.title === "string" && typeof e.startsAt === "string"
-    && typeof e.endsAt === "string" && typeof e.timezone === "string" && ["host", "standing", "event"].includes(e.role);
-}
-
-export function roleLabel(role: DoorRole): string {
-  if (role === "host") return "Your event";
-  if (role === "standing") return "Door team";
-  return "Door team, this event";
-}
-
-/* ---------- door team ---------- */
-
-export type Scope = "standing" | "event";
-
-export interface TeamMember { userId: string; firstName: string | null; username: string | null; addedAt: string | null }
-
-export function isTeamMember(x: unknown): x is TeamMember {
-  const m = x as TeamMember | null;
-  return !!m && typeof m.userId === "string";
-}
-
-/** "@marcus" typed or pasted: trimmed, one leading @ removed. */
-export function cleanUsername(input: string): string {
-  return input.trim().replace(/^@/, "").trim();
-}
-
-export function removeConfirmCopy(m: TeamMember, scope: Scope): string {
-  const who = guestName(m);
-  return scope === "standing"
-    ? `Remove ${who} from your door team? They stop being able to scan all your events.`
-    : `Remove ${who} from this event's door team? They stop being able to scan this event.`;
+/** A stable key for the last scans list: ticket id (or outcome) plus when it happened, and a sequence number. */
+export function scanKey(r: ScanResult, at: number, seq: number): string {
+  return `${r.ticket?.ticketId ?? r.outcome}:${at}:${seq}`;
 }

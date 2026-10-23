@@ -1,7 +1,7 @@
 /** Unit tests for the door scanner helpers. No server needed: npx tsx tests/events-scan-logic.test.ts */
 import {
-  qrToCode, cleanTyped, makeRecent, resultFor, invalidCodeResult, lastScanLabel, scanWindowNote, filterGuests, replaceGuest,
-  progressPct, isDoorEvent, roleLabel, cleanUsername, removeConfirmCopy, DUPLICATE_WINDOW_MS,
+  qrToCode, cleanTyped, makeRecent, resultFor, invalidCodeResult, undoneResult, lastScanLabel, scanKey, filterGuests, replaceGuest,
+  progressPct, DUPLICATE_WINDOW_MS,
 } from "../app/events/[id]/scan/scanLogic";
 import type { DoorGuest } from "../app/events/_host/manageLogic";
 
@@ -75,13 +75,12 @@ for (const x of [...all, resultFor(0, null, tz), invalidCodeResult()]) { noDash(
 eq(lastScanLabel(resultFor(200, { success: true, ticket: g() }, tz)), "In", "last scans: In");
 eq(lastScanLabel(resultFor(409, { code: "ALREADY_CHECKED_IN", ticket: g() }, tz)), "Already in", "last scans: Already in");
 eq(lastScanLabel(resultFor(409, { code: "NOT_VALID" }, tz)), "Not valid", "last scans: other title");
-
-// scan window (opens 6 hours before the start, closes at the end, like isWithinScanWindow)
-const ev = { startsAt: "2026-10-25T01:00:00.000Z", endsAt: "2026-10-25T06:00:00.000Z", timezone: tz };
-eq(scanWindowNote(ev, new Date("2026-10-24T18:59:59.000Z")), "Check in opens Sat, Oct 24 at 3:00 PM, 6 hours before the start.", "before the window");
-eq(scanWindowNote(ev, new Date("2026-10-24T19:00:00.000Z")), null, "window opens exactly 6 hours before");
-eq(scanWindowNote(ev, new Date("2026-10-25T06:00:00.000Z")), null, "still open at the end time");
-eq(scanWindowNote(ev, new Date("2026-10-25T06:00:00.001Z")), "Check in has closed for this event.", "closed after the end");
+const undone = undoneResult(g({ checkedInAt: null }));
+eq([undone.outcome, undone.title, undone.who, undone.ticket?.ticketId, lastScanLabel(undone)], ["UNDONE", "Check in undone", "Maya · General admission", "t1", "Undone"], "undone card names the guest");
+noDash(undone.title + undone.detail, "UNDONE");
+eq(scanKey(resultFor(200, { success: true, ticket: g() }, tz), 1000, 1), "t1:1000:1", "scan key: ticket id, time, sequence");
+eq(scanKey(invalidCodeResult(), 1000, 2), "INVALID_CODE:1000:2", "scan key without a ticket uses the outcome");
+eq(scanKey(invalidCodeResult(), 1000, 2) === scanKey(invalidCodeResult(), 1000, 3), false, "same outcome at the same time still gets distinct keys");
 
 // guests
 const list = [g(), g({ ticketId: "t2", firstName: "Jon", username: "jonny", ticketTypeName: "VIP" }), g({ ticketId: "t3", firstName: null, username: "zed", ticketTypeName: "Free RSVP" })];
@@ -92,19 +91,6 @@ eq(filterGuests(list, "vip").map((x) => x.ticketId), ["t2"], "search by ticket t
 eq(replaceGuest(list, g({ ticketId: "t2", firstName: "Jon", checkedInAt: "x" }))[1].checkedInAt, "x", "replace a guest after check in");
 eq(progressPct(48, 200), 24, "progress");
 eq(progressPct(0, 0), 0, "progress with no guests");
-
-// door/mine
-eq(isDoorEvent({ id: "e", slug: "s", title: "T", startsAt: "a", endsAt: "b", timezone: tz, role: "standing" }), true, "door event guard");
-eq(isDoorEvent({ id: "e", title: "T", startsAt: "a", endsAt: "b", timezone: tz, role: "admin" }), false, "unknown role rejected");
-eq([roleLabel("host"), roleLabel("standing"), roleLabel("event")], ["Your event", "Door team", "Door team, this event"], "role labels");
-
-// door team
-eq(cleanUsername("  @marcus "), "marcus", "username: trims and drops the @");
-eq(cleanUsername("marcus"), "marcus", "username unchanged");
-eq(removeConfirmCopy({ userId: "u", firstName: "Marcus", username: "marcus", addedAt: null }, "standing"),
-  "Remove Marcus from your door team? They stop being able to scan all your events.", "remove standing copy");
-eq(removeConfirmCopy({ userId: "u", firstName: null, username: "marcus", addedAt: null }, "event"),
-  "Remove @marcus from this event's door team? They stop being able to scan this event.", "remove event copy");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

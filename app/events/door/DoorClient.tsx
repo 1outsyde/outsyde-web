@@ -8,7 +8,7 @@ import { HostShell, useHostApi } from "../_host/hostApi";
 import { MANAGE_CSS } from "../_host/manageStyles";
 import { whenRange } from "../_host/editorLogic";
 import { errorCopy } from "../../e/_shared/format";
-import { isDoorEvent, roleLabel, scanWindowNote, type DoorEvent } from "../[id]/scan/scanLogic";
+import { isDoorEvent, roleLabel, scanWindowNote, type DoorEvent } from "../_host/doorLogic";
 
 export default function DoorClient() {
   const { call } = useHostApi();
