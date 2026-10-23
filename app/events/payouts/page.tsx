@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-const GENERIC_ERROR = "Something went wrong. Try again.";
+import { GENERIC_ERROR, errorCopy } from "../../e/_shared/format";
 
 type View =
   | { step: "loading" }
@@ -26,11 +26,6 @@ function stripeUrl(value: unknown): string | null {
   }
 }
 
-function messageFrom(body: unknown): string {
-  const b = body as { error?: unknown; code?: unknown } | null;
-  return typeof b?.error === "string" && b.error.trim() && typeof b?.code === "string" ? b.error : GENERIC_ERROR;
-}
-
 export default function EventPayoutsPage() {
   const router = useRouter();
   const [view, setView] = useState<View>({ step: "loading" });
@@ -48,7 +43,7 @@ export default function EventPayoutsPage() {
         return;
       }
       const body = await res.json().catch(() => null);
-      if (!res.ok || !body?.success) { setView({ step: "error", message: messageFrom(body) }); return; }
+      if (!res.ok || !body?.success) { setView({ step: "error", message: errorCopy(res.status, body) }); return; }
       if (body.ready === true) { setView({ step: "ready" }); return; }
       const almost = flag === "done";
       setView({ step: "needs", mode: almost ? "almost" : "setup" });
@@ -76,7 +71,7 @@ export default function EventPayoutsPage() {
       const body = await res.json().catch(() => null);
       const url = res.ok && body?.success ? stripeUrl(body.url) : null;
       if (!url) {
-        setActionError(res.ok && body?.success ? GENERIC_ERROR : messageFrom(body));
+        setActionError(res.ok && body?.success ? GENERIC_ERROR : errorCopy(res.status, body));
         setSending(false);
         return;
       }
@@ -92,6 +87,7 @@ export default function EventPayoutsPage() {
   return (
     <main className="po-page">
       <style>{CSS}</style>
+      <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
       <div className="po-wrap">
         {view.step === "loading" && <div className="po-muted" role="status">Checking your payout setup.</div>}
 

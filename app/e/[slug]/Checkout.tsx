@@ -17,33 +17,20 @@ import Link from "next/link";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import type { EventInfo, TicketType } from "./types";
+import { GENERIC_ERROR, failureCopy, money, newKey, startLine } from "../_shared/format";
 import {
   afterRetrieve, confirmOutcome, entryDecision, holdPhase, lateCopy, paramsKey, parseSaved, phaseForOrder, shouldQuietRestart, unavailableFrom, storageAfterPhase, storageKey,
   type Entry, type Phase, type PiStatus, type Saved,
 } from "./checkoutLogic";
 
-const GENERIC_ERROR = "Something went wrong. Try again.";
 const NO_PAYMENTS = "Payments aren't available right now. Try again later.";
 const POLL_EVERY_MS = 2000;
 const POLL_FOR_MS = 3 * 60 * 1000;
 
-const CODE_COPY: Record<string, string> = {
-  SOLD_OUT: "Sorry, these tickets just sold out.",
-  EVENT_FULL: "Sorry, this event is full.",
-  LIMIT_REACHED: "You already have the most tickets allowed for this event.",
-  SALES_ENDED: "Ticket sales for this event have ended.",
-  SALES_NOT_STARTED: "Ticket sales haven't started yet.",
-  NOT_OPEN_YET: "This event isn't open for tickets yet.",
-  EVENT_STARTED: "This event has already started.",
-  EVENT_CANCELLED: "This event was cancelled.",
-  CHECKOUT_CLOSED: "Ticket sales are closed right now.",
-  PAYMENT_SETUP_FAILED: "We couldn't set up your payment. Try again in a moment.",
-  TRY_AGAIN: "Still setting up your checkout. Try again in a moment.",
-  FREE_TICKET: "This ticket is free. Go back to the event and tap RSVP.",
-  IDEMPOTENCY_KEY_REUSED: "This checkout changed. Start again.",
-};
 /** Failures where the same attempt (same key) can simply be sent again. */
 const RETRY_CODES = new Set(["TRY_AGAIN", "PAYMENT_SETUP_FAILED"]);
+
+const FONTS_CSS = "https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Hanken+Grotesk:wght@400;500;600;700&display=swap";
 
 const appearance = {
   theme: "night" as const,
@@ -60,42 +47,14 @@ const appearance = {
 
 /* ---------- helpers ---------- */
 
-function money(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
-
-function newKey(): string {
-  try {
-    return crypto.randomUUID();
-  } catch {
-    return `k${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
-  }
-}
-
 function clock(ms: number): string {
   const s = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-function when(e: EventInfo): string {
-  let tz = e.timezone;
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: tz });
-  } catch {
-    tz = "UTC";
-  }
-  const d = new Date(e.startsAt);
-  const day = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", month: "short", day: "numeric" }).format(d);
-  const time = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" }).format(d);
-  return `${day} · ${time}`;
-}
-
 type ApiBody = { error?: unknown; code?: unknown } | null;
 function failure(status: number, body: ApiBody): { message: string; code: string } {
-  const code = typeof body?.code === "string" ? body.code : "";
-  if (code && CODE_COPY[code]) return { message: CODE_COPY[code], code };
-  if (status >= 500 || !code) return { message: GENERIC_ERROR, code };
-  return { message: typeof body?.error === "string" && body.error ? body.error : GENERIC_ERROR, code };
+  return failureCopy(status, body);
 }
 
 const stripeCache = new Map<string, Promise<Stripe | null>>();
@@ -472,7 +431,7 @@ export default function Checkout({ slug, event, type, qty, onPaid, onFinished, o
           </button>
           <div style={{ minWidth: 0 }}>
             <h1 className="co-title">{event.title}</h1>
-            <div className="co-sub">{when(event)}</div>
+            <div className="co-sub">{startLine(event)}</div>
           </div>
         </div>
 
@@ -612,7 +571,7 @@ interface PayProps {
 
 function PayPanel(props: PayProps) {
   return (
-    <Elements stripe={props.stripe} options={{ appearance }}>
+    <Elements stripe={props.stripe} options={{ appearance, fonts: [{ cssSrc: FONTS_CSS }] }}>
       <PayForm {...props} />
     </Elements>
   );

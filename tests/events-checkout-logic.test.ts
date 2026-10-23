@@ -1,5 +1,7 @@
 /** Unit tests for the paid checkout decisions. No server needed: npx tsx tests/events-checkout-logic.test.ts */
+import { money as fmtMoney, errorCopy as sharedErr, clampQty as clampQ } from "../app/e/_shared/format";
 import {
+  hasStarted,
   phaseForOrder, holdPhase, entryDecision, paramsKey, confirmOutcome, afterRetrieve, lateCopy, storageKey, parseSaved, storageAfterPhase, shouldQuietRestart, unavailableFrom,
 } from "../app/e/[slug]/checkoutLogic";
 
@@ -11,7 +13,7 @@ function eq(actual: unknown, expected: unknown, name: string) {
 
 const ID = "11111111-2222-3333-4444-555555555555";
 const mkType = (o: Record<string, unknown> = {}) => ({ id: ID, name: "GA", description: null, priceCents: 2000, serviceFeeCents: 259, buyerTotalCents: 2259, salesStatus: "on_sale", remaining: 10, salesStartAt: null, salesEndAt: null, minPerOrder: null, maxPerOrder: 4, perAccountLimit: null, ...o }) as any;
-const ev = { status: "published", endsAt: new Date(Date.now() + 86400000).toISOString() } as any;
+const ev = { status: "published", startsAt: new Date(Date.now() + 86400000).toISOString(), endsAt: new Date(Date.now() + 2 * 86400000).toISOString() } as any;
 const NOW = Date.now();
 
 console.log("phaseForOrder");
@@ -43,7 +45,12 @@ eq(entryDecision(ok, ev, [mkType({ salesStatus: "sold_out" })], NOW), null, "sol
 eq(entryDecision(ok, ev, [mkType({ priceCents: 0 })], NOW), null, "free type ignored");
 eq(entryDecision(ok, { ...ev, status: "draft" }, [mkType()], NOW), null, "draft event ignored");
 eq(entryDecision(ok, { ...ev, status: "cancelled" }, [mkType()], NOW), null, "cancelled event ignored");
-eq(entryDecision(ok, { ...ev, endsAt: new Date(NOW - 1000).toISOString() }, [mkType()], NOW), null, "ended event ignored");
+eq(entryDecision(ok, { ...ev, startsAt: new Date(NOW - 3 * 3600000).toISOString(), endsAt: new Date(NOW - 1000).toISOString() }, [mkType()], NOW), null, "ended event ignored");
+eq(entryDecision(ok, { ...ev, startsAt: new Date(NOW - 3600000).toISOString(), endsAt: new Date(NOW + 2 * 3600000).toISOString() }, [mkType()], NOW), null, "started but not ended event ignored");
+eq(entryDecision(ok, { ...ev, startsAt: new Date(NOW).toISOString() }, [mkType()], NOW), null, "starts exactly now ignored");
+eq(hasStarted({ startsAt: new Date(NOW + 1000).toISOString() }, NOW), false, "future start: not started");
+eq(hasStarted({ startsAt: new Date(NOW - 1000).toISOString() }, NOW), true, "past start: started");
+eq(hasStarted({ startsAt: new Date(NOW).toISOString() }, NOW), true, "start == now: started");
 eq(entryDecision({ checkout: ID, qty: "50" }, ev, [mkType()], NOW)?.qty, 4, "qty clamped to max per order");
 eq(entryDecision({ checkout: ID, qty: "3" }, ev, [mkType({ remaining: 2 })], NOW)?.qty, 2, "qty clamped to remaining");
 eq(entryDecision({ checkout: ID, qty: "1" }, ev, [mkType({ minPerOrder: 2 })], NOW)?.qty, 2, "qty raised to min per order");
@@ -105,6 +112,14 @@ eq(shouldQuietRestart("", true, false), false, "no code never restarts");
 console.log("failed Stripe load");
 eq(unavailableFrom("starting"), "unavailable", "starting -> unavailable");
 for (const ph of ["confirming", "done", "late", "closed", "refunded", "holding", "paying", "hold-error", "hold-ended"] as const) eq(unavailableFrom(ph), ph, `${ph} is left alone`);
+
+console.log("shared format");
+eq(fmtMoney(2000), "$20.00", "whole dollars show cents");
+eq(fmtMoney(1999), "$19.99", "cents");
+eq(sharedErr(500, { code: "SOLD_OUT" }), "These tickets are sold out.", "known code wins");
+eq(sharedErr(502, { error: "Could not reach server." }), "Something went wrong. Try again.", "no code: generic");
+eq(clampQ({ minPerOrder: 2, maxPerOrder: 6, remaining: 4, perAccountLimit: null }, 9), 4, "clamp to the smallest cap");
+eq(clampQ({ minPerOrder: 2, maxPerOrder: 6, remaining: 4, perAccountLimit: null }, 1), 2, "clamp to min");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

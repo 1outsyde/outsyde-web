@@ -4,73 +4,11 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckoutHost } from "./Checkout";
-import type { EventInfo, EventPayload, TicketType } from "./types";
+import type { EventPayload, TicketType } from "./types";
+import { GENERIC_ERROR, errorCopy, fmt, maxQty, minQty, clampQty, money, newKey, rangeLine, revealLine } from "../_shared/format";
+import { hasStarted } from "./checkoutLogic";
 
-const GENERIC_ERROR = "Something went wrong. Try again.";
-
-const CODE_COPY: Record<string, string> = {
-  SOLD_OUT: "Sorry, this ticket just sold out.",
-  LIMIT_REACHED: "You have reached the ticket limit for this event.",
-  SALES_ENDED: "Ticket sales for this event have ended.",
-  EVENT_STARTED: "This event has already started.",
-  CHECKOUT_CLOSED: "Ticket sales are closed right now.",
-};
-
-/* ---------- formatting helpers ---------- */
-
-function safeZone(tz: string): string {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: tz });
-    return tz;
-  } catch {
-    return "UTC";
-  }
-}
-
-function fmt(iso: string, tz: string, opts: Intl.DateTimeFormatOptions): string {
-  return new Intl.DateTimeFormat("en-US", { timeZone: safeZone(tz), ...opts }).format(new Date(iso));
-}
-
-/** "SAT, OCT 25 · 9:00 PM TO 2:00 AM" in the event's own time zone. */
-function whenLine(e: EventInfo): string {
-  const day = fmt(e.startsAt, e.timezone, { weekday: "short", month: "short", day: "numeric" });
-  const t = (iso: string) => fmt(iso, e.timezone, { hour: "numeric", minute: "2-digit" });
-  return `${day} · ${t(e.startsAt)} to ${t(e.endsAt)}`.toUpperCase();
-}
-
-function revealLine(iso: string, tz: string): string {
-  const day = fmt(iso, tz, { weekday: "long", month: "long", day: "numeric" });
-  const time = fmt(iso, tz, { hour: "numeric", minute: "2-digit" });
-  return `Full address on ${day} at ${time}`;
-}
-
-function money(cents: number): string {
-  const d = cents / 100;
-  return `$${Number.isInteger(d) ? d : d.toFixed(2)}`;
-}
-
-function newKey(): string {
-  try {
-    return crypto.randomUUID();
-  } catch {
-    return `k${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
-  }
-}
-
-function errorCopy(status: number, body: { error?: unknown; code?: unknown } | null): string {
-  const code = typeof body?.code === "string" ? body.code : "";
-  if (code && CODE_COPY[code]) return CODE_COPY[code];
-  if (status >= 500 || !code) return GENERIC_ERROR;
-  return typeof body?.error === "string" && body.error ? body.error : GENERIC_ERROR;
-}
-
-function maxQty(t: TicketType): number {
-  const caps = [t.maxPerOrder, t.remaining, t.perAccountLimit].filter((n): n is number => typeof n === "number" && n > 0);
-  return caps.length ? Math.max(1, Math.min(...caps)) : 10;
-}
-function minQty(t: TicketType): number {
-  return Math.min(t.minPerOrder && t.minPerOrder > 0 ? t.minPerOrder : 1, maxQty(t));
-}
+const whenLine = rangeLine;
 
 function statusText(t: TicketType, tz: string): string {
   switch (t.salesStatus) {
@@ -113,6 +51,7 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
   const keyRef = useRef<string | null>(null);
   const ticketsRef = useRef<HTMLDivElement | null>(null);
   const loginHref = `/login?return=${encodeURIComponent(`/e/${slug}`)}`;
+  const preselected = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -170,10 +109,25 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
   const onSale = useMemo(() => types.filter((t) => t.salesStatus === "on_sale"), [types]);
   const selected = onSale.find((t) => t.id === selectedId) ?? (onSale.length === 1 ? onSale[0] : null);
 
+  // Coming back from login after a signed out RSVP: preselect the type and quantity, never submit.
+  useEffect(() => {
+    if (preselected.current || !data) return;
+    preselected.current = true;
+    let sp: URLSearchParams;
+    try { sp = new URLSearchParams(window.location.search); } catch { return; }
+    const id = sp.get("rsvp");
+    if (!id) return;
+    const t = data.ticketTypes.find((x) => x.id === id && x.salesStatus === "on_sale" && x.priceCents === 0);
+    if (!t) return;
+    const n = Number(sp.get("qty"));
+    setSelectedId(t.id);
+    setQty(clampQty(t, Number.isInteger(n) && n > 0 ? n : 1));
+  }, [data]);
+
   // Keep the quantity inside the selected type's limits.
   useEffect(() => {
     if (!selected) return;
-    setQty((q) => Math.min(Math.max(q, minQty(selected)), maxQty(selected)));
+    setQty((q) => clampQty(selected, q));
   }, [selected]);
 
   function showToast(text: string) {
@@ -239,7 +193,7 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
         body: JSON.stringify({ ticketTypeId: t.id, quantity: qty, idempotencyKey: keyRef.current }),
       });
       if (res.status === 401) {
-        window.location.href = loginHref;
+        window.location.href = `/login?return=${encodeURIComponent(`/e/${slug}?rsvp=${encodeURIComponent(t.id)}&qty=${qty}`)}`;
         return;
       }
       const body = await res.json().catch(() => null);
@@ -290,9 +244,10 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
 
   /* ---------- derived ---------- */
   const ended = e ? new Date(e.endsAt).getTime() < Date.now() : false;
+  const started = e ? hasStarted(e, Date.now()) : false;
   const cancelled = e?.status === "cancelled";
   const draft = e?.status === "draft";
-  const canBuy = !!e && !cancelled && !draft && !ended && onSale.length > 0;
+  const canBuy = !!e && !cancelled && !draft && !started && onSale.length > 0;
   const paidOnSale = onSale.filter((t) => t.priceCents > 0 && t.buyerTotalCents != null);
   const lowest = paidOnSale.length ? Math.min(...paidOnSale.map((t) => t.buyerTotalCents as number)) : null;
   const hasFreeOnSale = onSale.some((t) => t.priceCents === 0);
@@ -385,7 +340,7 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
         {cancelled && <div className="ev-banner" style={{ background: "#3B1414", color: "#ff8a80" }}>This event was cancelled.</div>}
 
         <div className="ev-cover">
-          {e.coverImageUrl ? <img src={e.coverImageUrl} alt="" /> : <span>Event cover photo</span>}
+          {e.coverImageUrl ? <img src={e.coverImageUrl} alt="" /> : null}
           <Link href="/" aria-label="Back" className="ev-round" style={{ left: 16, color: "#F5F0E6" }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
           </Link>
@@ -495,6 +450,7 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
 
           {e.description && <div className="ev-desc">{e.description}</div>}
           {ended && !cancelled && <div className="ev-muted">This event has ended.</div>}
+          {started && !ended && !cancelled && !draft && <div className="ev-muted">This event has started.</div>}
           <div className="ev-muted">{refundLine}</div>
         </div>
 

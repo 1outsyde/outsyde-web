@@ -6,7 +6,7 @@ Env (defaults shown): TK_WEB_URL=http://localhost:3100  TK_BACKEND_URL=http://lo
   TK_SHOTS=<dir for screenshots>  (optional)
 Skips (exit 0) when the web or backend server is not up. Needs psql and node on PATH.
 """
-import json, os, subprocess, sys, time, urllib.request
+import re, json, os, subprocess, sys, time, urllib.request
 from urllib.parse import urlparse
 
 WEB = os.environ.get("TK_WEB_URL", "http://localhost:3100")
@@ -87,6 +87,7 @@ def new_ctx(browser, token, width):
     ctx = browser.new_context(viewport={"width": width, "height": 900}, accept_downloads=True)
     if token:
         ctx.add_cookies([{"name": "outsyde_access_token", "value": token, "url": WEB}])
+    ctx.route(re.compile(r"^https?://(?!localhost)"), lambda r: r.abort())
     pg = ctx.new_page()
     errs = []
     pg.on("response", lambda r: errs.append(f"{r.status} {r.url}") if r.status == 404 else None)

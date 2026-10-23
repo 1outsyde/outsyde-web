@@ -1,6 +1,7 @@
 /** Pure decisions for the paid checkout. No React, no browser, so they can be unit tested with tsx. */
 
 import type { EventInfo, TicketType } from "./types";
+import { clampQty } from "../_shared/format";
 
 export type Phase =
   | "starting"
@@ -40,6 +41,11 @@ export function holdPhase(nowMs: number, expiresAtMs: number): "holding" | "hold
   return nowMs >= expiresAtMs ? "hold-ended" : "holding";
 }
 
+/** The backend refuses tickets and RSVPs once the event has started, so the page does too. */
+export function hasStarted(e: { startsAt: string }, nowMs: number): boolean {
+  return new Date(e.startsAt).getTime() <= nowMs;
+}
+
 export interface Entry {
   type: TicketType;
   qty: number;
@@ -51,7 +57,7 @@ export interface Entry {
  */
 export function entryDecision(
   p: { checkout: string | null; qty: string | null },
-  event: Pick<EventInfo, "status" | "endsAt">,
+  event: Pick<EventInfo, "status" | "startsAt">,
   types: TicketType[],
   nowMs: number,
 ): Entry | null {
@@ -60,11 +66,8 @@ export function entryDecision(
   if (!Number.isInteger(qtyN) || qtyN < 1) return null;
   const type = types.find((t) => t.id === p.checkout);
   if (!type || type.salesStatus !== "on_sale" || type.priceCents <= 0) return null;
-  if (event.status !== "published" || new Date(event.endsAt).getTime() < nowMs) return null;
-  const caps = [type.maxPerOrder, type.remaining, type.perAccountLimit].filter((n): n is number => typeof n === "number" && n > 0);
-  const max = caps.length ? Math.max(1, Math.min(...caps)) : 10;
-  const min = Math.min(type.minPerOrder && type.minPerOrder > 0 ? type.minPerOrder : 1, max);
-  return { type, qty: Math.min(Math.max(qtyN, min), max) };
+  if (event.status !== "published" || hasStarted(event, nowMs)) return null;
+  return { type, qty: clampQty(type, qtyN) };
 }
 
 /** Same params, same decision: a refresh of the ticket types never changes an open checkout. */

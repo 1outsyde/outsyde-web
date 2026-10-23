@@ -1,5 +1,9 @@
 /** Pure helpers for the My Tickets page. No React, no network. */
 
+import { startLine, revealLine, GENERIC_ERROR, errorCopy as sharedErrorCopy } from "../e/_shared/format";
+
+export { GENERIC_ERROR };
+
 export interface TicketEvent {
   id: string;
   slug: string;
@@ -42,31 +46,14 @@ export function safeHttpUrl(u: unknown): string | null {
   }
 }
 
-export const GENERIC_ERROR = "Something went wrong. Try again.";
-
-export function errorCopy(body: unknown): string {
-  const msg = (body as { error?: unknown } | null)?.error;
-  return typeof msg === "string" && msg.trim() ? msg : GENERIC_ERROR;
-}
-
-function safeZone(tz: string): string {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: tz });
-    return tz;
-  } catch {
-    return "UTC";
-  }
-}
-
-function fmt(iso: string, tz: string, opts: Intl.DateTimeFormatOptions): string {
-  return new Intl.DateTimeFormat("en-US", { timeZone: safeZone(tz), ...opts }).format(new Date(iso));
+/** Same rule as the event page: status 500 or more, or no code, shows the generic line. */
+export function errorCopy(status: number, body: unknown): string {
+  return sharedErrorCopy(status, body as { error?: unknown; code?: unknown } | null);
 }
 
 /** "Sat, Oct 31 · 9:00 PM" in the event's own time zone. */
 export function whenLine(e: Pick<TicketEvent, "startsAt" | "timezone">): string {
-  const day = fmt(e.startsAt, e.timezone, { weekday: "short", month: "short", day: "numeric" });
-  const time = fmt(e.startsAt, e.timezone, { hour: "numeric", minute: "2-digit" });
-  return `${day} · ${time}`;
+  return startLine(e);
 }
 
 export interface PlaceInfo {
@@ -81,7 +68,7 @@ export function placeInfo(e: TicketEvent): PlaceInfo {
   const cityLine = [e.city, e.state].filter(Boolean).join(", ");
   if (e.addressHidden) {
     const note = e.addressRevealAt
-      ? `Full address on ${fmt(e.addressRevealAt, e.timezone, { weekday: "long", month: "long", day: "numeric" })} at ${fmt(e.addressRevealAt, e.timezone, { hour: "numeric", minute: "2-digit" })}.`
+      ? `${revealLine(e.addressRevealAt, e.timezone)}.`
       : null;
     const lines = cityLine ? [cityLine] : [];
     return { visible: false, lines, note, text: cityLine };

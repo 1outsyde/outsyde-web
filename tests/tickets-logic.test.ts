@@ -74,9 +74,15 @@ eq(safeHttpUrl(""), null, "empty refused");
 eq(safeHttpUrl(null), null, "null refused");
 
 console.log("errorCopy");
-eq(errorCopy({ code: "REFUND_WINDOW_CLOSED", error: "Window closed." }), "Window closed.", "backend message wins");
-eq(errorCopy({ code: "X" }), "Something went wrong. Try again.", "no message: generic");
-eq(errorCopy(null), "Something went wrong. Try again.", "null: generic");
+eq(errorCopy(400, { code: "REFUND_WINDOW_CLOSED", error: "Window closed." }), "Window closed.", "4xx with code: backend message wins");
+eq(errorCopy(400, { code: "X" }), "Something went wrong. Try again.", "no message: generic");
+eq(errorCopy(400, null), "Something went wrong. Try again.", "null: generic");
+eq(errorCopy(500, { code: "X", error: "boom" }), "Something went wrong. Try again.", "500 with code: generic");
+eq(errorCopy(502, { error: "Could not reach server." }), "Something went wrong. Try again.", "502 BFF string: generic");
+eq(errorCopy(500, { error: "Server configuration error." }), "Something went wrong. Try again.", "config error: generic");
+eq(errorCopy(400, { error: "Unexpected response from server" }), "Something went wrong. Try again.", "no code: generic");
+eq(errorCopy(409, { code: "LIMIT_REACHED", error: "x" }), "You already have the most tickets allowed for this event. If you just started a checkout, try again in a few minutes.", "known code: shared copy");
+eq(errorCopy(409, { code: "SOLD_OUT" }), "These tickets are sold out.", "sold out copy");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

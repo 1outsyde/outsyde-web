@@ -46,7 +46,7 @@ export default function TicketsPage() {
       const res = await fetch("/api/events/me/tickets", { cache: "no-store" });
       if (res.status === 401) { router.replace(LOGIN); return; }
       const body = await res.json().catch(() => null);
-      if (!res.ok || !body?.success || !Array.isArray(body.tickets)) { setLoadError(errorCopy(body)); return; }
+      if (!res.ok || !body?.success || !Array.isArray(body.tickets)) { setLoadError(errorCopy(res.status, body)); return; }
       setTickets(body.tickets as MyTicket[]);
     } catch {
       setLoadError(GENERIC_ERROR);
@@ -65,7 +65,7 @@ export default function TicketsPage() {
       const res = await fetch(`/api/events/orders/${t.orderId}`, { cache: "no-store" });
       if (res.status === 401) { router.replace(LOGIN); return; }
       const body = await res.json().catch(() => null);
-      if (!res.ok || !body?.success || typeof body.order?.totalCents !== "number") { setPanel(t.id, { step: "error", message: errorCopy(body) }); return; }
+      if (!res.ok || !body?.success || typeof body.order?.totalCents !== "number") { setPanel(t.id, { step: "error", message: errorCopy(res.status, body) }); return; }
       setPanel(t.id, { step: "ready", orderId: t.orderId, free: body.order.totalCents === 0 });
     } catch {
       setPanel(t.id, { step: "error", message: GENERIC_ERROR });
@@ -78,7 +78,7 @@ export default function TicketsPage() {
       const res = await fetch(`/api/events/orders/${orderId}/${free ? "cancel" : "refund"}`, { method: "POST" });
       if (res.status === 401) { router.replace(LOGIN); return; }
       const body = await res.json().catch(() => null);
-      if (!res.ok || !body?.success) { setPanel(t.id, { step: "error", message: errorCopy(body), orderId, free }); return; }
+      if (!res.ok || !body?.success) { setPanel(t.id, { step: "error", message: errorCopy(res.status, body), orderId, free }); return; }
       setTickets((prev) => (prev ? prev.filter((x) => x.orderId !== orderId) : prev));
       setPanels((prev) => {
         const next = { ...prev };
@@ -172,7 +172,7 @@ export default function TicketsPage() {
                     </article>
 
                     <div style={{ display: "flex", justifyContent: "center" }}>
-                      <button type="button" className="tk-link" onClick={() => openPanel(t)} aria-expanded={!!panel}>Can't make it?</button>
+                      {t.event.status !== "cancelled" && <button type="button" className="tk-link" onClick={() => openPanel(t)} aria-expanded={!!panel}>Can't make it?</button>}
                     </div>
 
                     {panel && (

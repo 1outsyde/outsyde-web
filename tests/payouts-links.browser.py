@@ -6,7 +6,7 @@ Env (defaults shown): PL_WEB_URL=http://localhost:3100  PL_BACKEND_URL=http://lo
 Skips (exit 0) when the web or backend server is not up. Needs psql and node on PATH.
 Never reaches real Stripe: the page's navigation to a Stripe host is intercepted inside the browser.
 """
-import json, os, subprocess, sys, time, urllib.request
+import re, json, os, subprocess, sys, time, urllib.request
 from urllib.parse import urlparse
 
 WEB = os.environ.get("PL_WEB_URL", "http://localhost:3100")
@@ -56,6 +56,7 @@ def new_ctx(browser, tk, width):
     ctx = browser.new_context(viewport={"width": width, "height": 900})
     if tk:
         ctx.add_cookies([{"name": "outsyde_access_token", "value": tk, "url": WEB}])
+    ctx.route(re.compile(r"^https?://(?!localhost)"), lambda r: r.abort())
     pg = ctx.new_page()
     errs = []
     pg.on("pageerror", lambda e: errs.append(str(e)))
