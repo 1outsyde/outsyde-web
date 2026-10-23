@@ -44,6 +44,9 @@ eq(buildQuery({ filters: { ...none, when: "tonight" }, now, tz: NY, cursor: "abc
 
 console.log("whenLabel");
 eq(whenLabel({ startsAt: "2026-10-23T23:30:00Z", timezone: NY }, now), "TONIGHT · 7:30 PM", "same day in the event zone");
+eq(whenLabel({ startsAt: "2026-10-23T20:59:00Z", timezone: NY }, now), "TODAY · 4:59 PM", "today before 5 PM is TODAY");
+eq(whenLabel({ startsAt: "2026-10-23T21:00:00Z", timezone: NY }, now), "TONIGHT · 5:00 PM", "today at 5 PM is TONIGHT");
+eq(whenLabel({ startsAt: "2026-10-23T19:00:00Z", timezone: NY }, now), "TODAY · 3:00 PM", "afternoon is TODAY");
 eq(whenLabel({ startsAt: "2026-10-26T01:00:00Z", timezone: NY }, now), "SUN, OCT 25 · 9:00 PM", "later date");
 eq(whenLabel({ startsAt: "2026-10-26T01:00:00Z", timezone: "America/Los_Angeles" }, now), "SUN, OCT 25 · 6:00 PM", "uses the event's zone");
 

@@ -196,7 +196,7 @@ const CSS = `
 .ev-chip:disabled{opacity:.7;cursor:default}
 .ev-note{margin:0;color:#B8B0A0;font-size:14px;line-height:1.45}
 .ev-muted{margin:0;color:#A0A0A0;font-size:14px;line-height:1.45}
-.ev-link{background:none;border:0;padding:8px 4px;color:#E8B930;font:600 14px 'Hanken Grotesk',sans-serif;cursor:pointer;text-decoration:underline}
+.ev-link{background:none;border:0;padding:0 8px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;color:#E8B930;font:600 14px 'Hanken Grotesk',sans-serif;cursor:pointer;text-decoration:underline}
 .ev-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px}
 .ev-card{display:block;color:#F5F0E6;background:#141414;border:1px solid #2A2A2A;border-radius:18px;overflow:hidden;text-decoration:none;min-width:0}
 .ev-card:hover{border-color:#38383A}

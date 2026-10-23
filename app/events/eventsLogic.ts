@@ -115,12 +115,13 @@ export function buildQuery(opts: {
 
 const ymd = (p: Parts) => `${p.y}-${p.m}-${p.d}`;
 
-/** "TONIGHT · 7:30 PM" for an event starting today, else "SAT, OCT 25 · 9:00 PM", in the event's own time zone. */
+/** "TONIGHT · 7:30 PM" for an event starting today at 5:00 PM or later, "TODAY · 10:00 AM" before 5:00 PM, else "SAT, OCT 25 · 9:00 PM", in the event's own time zone. */
 export function whenLabel(e: { startsAt: string; timezone: string }, now: Date): string {
   const start = new Date(e.startsAt);
   const time = fmt(e.startsAt, e.timezone, { hour: "numeric", minute: "2-digit" });
   if (ymd(zonedParts(start, e.timezone)) === ymd(zonedParts(now, e.timezone))) {
-    return `TONIGHT · ${time}`.toUpperCase();
+    const hour = zonedParts(start, e.timezone).h;
+    return `${hour >= 17 ? "TONIGHT" : "TODAY"} · ${time}`.toUpperCase();
   }
   const day = fmt(e.startsAt, e.timezone, { weekday: "short", month: "short", day: "numeric" });
   return `${day} · ${time}`.toUpperCase();
