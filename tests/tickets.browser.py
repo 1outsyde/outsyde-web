@@ -63,8 +63,14 @@ def mkuser(s):
 def iso(days, hours=0):
     return time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime(time.time() + days * 86400 + hours * 3600))
 
+def accept_agreement(token):
+    # Publishing needs the Event Host Agreement (backend gate): accept the current version first.
+    ag = api("GET", "/api/events/host-agreement", token)["agreement"]
+    return api("POST", "/api/events/host-agreement/accept", token, {"version": ag["version"]})
+
 host, g1, g2 = mkuser("host"), mkuser("g1"), mkuser("g2")
 ht, t1, t2 = tok(host), tok(g1), tok(g2)
+accept_agreement(ht)
 
 def mkevent(title, body_extra=None):
     body = {"title": f"{P} {title}", "startsAt": iso(10), "endsAt": iso(10, 4), "timezone": "America/Los_Angeles",
@@ -178,6 +184,7 @@ finally:
         f"DELETE FROM ticket_account_counts WHERE ticket_type_id IN (SELECT id FROM ticket_types WHERE event_id IN ({ev_ids}))",
         f"DELETE FROM ticket_types WHERE event_id IN ({ev_ids})",
         f"DELETE FROM events WHERE host_user_id='{host}'",
+        f"DELETE FROM host_agreement_acceptances WHERE user_id='{host}'",
         f"DELETE FROM users WHERE email LIKE '{P}-%'",
     ):
         try:

@@ -34,7 +34,7 @@ export default function DoorClient() {
         <h1 className="mg-head-h">SCAN TICKETS</h1>
       </header>
       <div className="mg-body">
-        {events === null && !error && <div className="ed-muted" role="status">Loading your events.</div>}
+        {events === null && !error && <div className="ed-muted" role="status">Loading your events…</div>}
         {error && (
           <div className="ed-err" role="alert">
             {error} <button type="button" className="ed-textbtn ed-inline-btn" onClick={load}>Try again</button>

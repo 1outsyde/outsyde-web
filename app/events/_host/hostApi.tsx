@@ -5,6 +5,7 @@
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { EDITOR_CSS } from "./editorStyles";
+import { FONTS_HREF } from "../../e/_shared/format";
 
 export type ApiResult = { status: number; body: any } | null; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -40,7 +41,7 @@ export function useHostApi() {
 export function HostShell({ css = "", children }: { css?: string; children: React.ReactNode }) {
   return (
     <main className="ed-page">
-      <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+      <link href={FONTS_HREF} rel="stylesheet" />
       {/* One string child: two text children inside <style> break hydration. */}
       <style>{EDITOR_CSS + css}</style>
       <div className="ed-wrap">{children}</div>

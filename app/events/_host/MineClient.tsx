@@ -46,24 +46,28 @@ export default function MineClient() {
     { key: "past", title: "PAST", list: groups.past },
     { key: "cancelled", title: "CANCELLED", list: groups.cancelled },
   ];
+  const shownCount = sections.reduce((n, s) => n + s.list.length, 0);
 
   return (
     <HostShell css={MANAGE_CSS}>
-        <header className="mg-head">
+        <header className="mg-head mg-head-wrap">
           <Link href="/events" className="ed-icon-btn" aria-label="Back to events">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
           </Link>
           <h1 className="mg-head-h">YOUR EVENTS</h1>
-          <Link href="/events/new" className="ed-primary ed-auto">Host an event</Link>
+          <div className="mg-head-actions">
+            <Link href="/events/door" className="ed-outline mg-head-btn">Scan tickets</Link>
+            <Link href="/events/new" className="ed-primary ed-auto">Host an event</Link>
+          </div>
         </header>
         <div className="mg-body">
-          {events === null && !error && <div className="ed-muted" role="status">Loading your events.</div>}
+          {events === null && !error && <div className="ed-muted" role="status">Loading your events…</div>}
           {error && (
             <div className="ed-err" role="alert">
               {error} <button type="button" className="ed-textbtn ed-inline-btn" onClick={load}>Try again</button>
             </div>
           )}
-          {events !== null && events.length === 0 && (
+          {events !== null && shownCount === 0 && (
             <div className="ed-card-msg">
               <h2 className="ed-h1">NO EVENTS YET</h2>
               <p className="ed-text">Host your first event. Free RSVPs and paid tickets both work.</p>

@@ -14,7 +14,7 @@ import { MANAGE_CSS } from "../../_host/manageStyles";
 import { backendMessage, guestLine, guestName, isDoorGuest, type DoorGuest } from "../../_host/manageLogic";
 import { isHostEvent } from "../../_host/editorLogic";
 import { isDoorEvent, scanWindowNote, timeOnly, type DoorEvent } from "../../_host/doorLogic";
-import { errorCopy, GENERIC_ERROR, startLine } from "../../../e/_shared/format";
+import { browserZone, errorCopy, GENERIC_ERROR, startLine } from "../../../e/_shared/format";
 import {
   CODE_LENGTH, LAST_SCAN_COLOR, TONE_BG, cleanTyped, filterGuests, invalidCodeResult, lastScanLabel, makeRecent,
   progressPct, qrToCode, replaceGuest, resultFor, scanKey, undoneResult, type ScanResult,
@@ -113,7 +113,8 @@ export default function Scanner({ eventId }: { eventId: string }) {
   const jsqrRef = useRef<JsQR | null>(null);
   const wantCamRef = useRef(false); // the person turned the camera on (resume when the tab is visible again)
   const mountedRef = useRef(true);
-  const pausedRef = useRef(true); // no decoding while a result shows, a request runs or the list is open
+  const pausedRef = useRef(true); // no decoding while a result shows, a request or an undo runs, or the list is open
+  const resultRef = useRef<ScanResult | null>(null); // the card on screen now (an undo answer is checked against it)
   const recentRef = useRef(makeRecent());
   const seqRef = useRef(0);
   const onDecodedRef = useRef<(text: string) => void>(() => {});
@@ -122,8 +123,8 @@ export default function Scanner({ eventId }: { eventId: string }) {
   const isHost = info?.role === "host";
   // Times use the event's zone. Without event details (a team member on an event /door/mine no longer lists) the
   // browser's zone is used and the page says so.
-  const browserZone = !info;
-  const tz = info?.timezone ?? (typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC");
+  const inBrowserZone = !info;
+  const tz = info?.timezone ?? browserZone();
 
   /* ---------- data ---------- */
 
@@ -181,6 +182,7 @@ export default function Scanner({ eventId }: { eventId: string }) {
 
   const show = useCallback((r: ScanResult) => {
     pausedRef.current = true;
+    resultRef.current = r;
     setResult(r);
     setNotice(null);
     setUndoError(null);
@@ -213,7 +215,7 @@ export default function Scanner({ eventId }: { eventId: string }) {
   }, [busy, result, send, show]);
 
   useEffect(() => { onDecodedRef.current = onDecoded; }, [onDecoded]);
-  useEffect(() => { pausedRef.current = busy || !!result || view !== "scan"; }, [busy, result, view]);
+  useEffect(() => { pausedRef.current = busy || !!result || !!undoing || view !== "scan"; }, [busy, result, undoing, view]);
 
   async function submitTyped(e: React.FormEvent) {
     e.preventDefault();
@@ -233,14 +235,17 @@ export default function Scanner({ eventId }: { eventId: string }) {
 
   async function undo(t: DoorGuest) {
     if (!isHost || undoing) return;
+    pausedRef.current = true;
+    const card = resultRef.current; // the card the undo was pressed on (null from the guest list)
     setUndoing(t.ticketId);
     setUndoError(null);
     const r = await call("POST", `/api/events/${eventId}/door/undo`, { ticketId: t.ticketId });
     setUndoing(null);
     if (!r) return;
-    if (r.status !== 200 || !r.body?.success || !isDoorGuest(r.body.ticket)) { setUndoError(r.status === 0 ? GENERIC_ERROR : backendMessage(r.body)); return; }
+    if (r.status !== 200 || !r.body?.success || !isDoorGuest(r.body.ticket)) { setUndoError(backendMessage(r.status, r.body)); return; }
     const t2 = r.body.ticket as DoorGuest;
-    if (result?.ticket?.ticketId === t2.ticketId) {
+    // Read the card on screen now (a ref, not this render's closure): only that same card becomes "Check in undone".
+    if (card && resultRef.current === card && card.ticket?.ticketId === t2.ticketId) {
       // Undo from the result card: keep a card up (scanning stays paused) so the ticket still in front of the
       // camera isn't checked straight back in. Scanning resumes on Scan next.
       show(undoneResult(t2));
@@ -251,6 +256,8 @@ export default function Scanner({ eventId }: { eventId: string }) {
   }
 
   function next() {
+    if (undoing) return; // the undo answer belongs to this card
+    resultRef.current = null;
     setResult(null);
     setUndoError(null);
     const v = videoRef.current;
@@ -361,7 +368,7 @@ export default function Scanner({ eventId }: { eventId: string }) {
 
   const page = (inner: React.ReactNode) => <HostShell css={MANAGE_CSS + SCAN_CSS}>{inner}</HostShell>;
 
-  if (screen === "loading") return page(<div className="ed-muted" role="status">Loading.</div>);
+  if (screen === "loading") return page(<div className="ed-muted" role="status">Loading…</div>);
 
   if (screen === "notfound") {
     return page(
@@ -408,7 +415,7 @@ export default function Scanner({ eventId }: { eventId: string }) {
           <div className="mg-bar" role="img" aria-label={`${checkedIn} of ${guests.length} checked in`}><div style={{ width: `${progressPct(checkedIn, guests.length)}%` }} /></div>
         </div>
 
-        {browserZone && <div className="ed-hint" data-testid="zone-note">Times are shown in your time zone.</div>}
+        {inBrowserZone && <div className="ed-hint" data-testid="zone-note">Times are shown in your time zone.</div>}
         {windowNote && <div className="ed-banner" role="status" data-testid="window-note">{windowNote}</div>}
         {notice && <p className="ed-ok" role="status">{notice}</p>}
 
@@ -421,12 +428,12 @@ export default function Scanner({ eventId }: { eventId: string }) {
               <p className="sc-result-detail">{result.detail}</p>
             </div>
             {undoError && <p className="ed-err" role="alert">{undoError}</p>}
-            <button type="button" className="ed-primary" style={{ minHeight: 54 }} onClick={next} autoFocus>
+            <button type="button" className="ed-primary" style={{ minHeight: 54 }} onClick={next} disabled={!!undoing} autoFocus>
               {view === "list" ? "Back to guest list" : "Scan next"}
             </button>
             {isHost && result.outcome === "CHECKED_IN" && result.ticket && (
               <button type="button" className="ed-ghost" disabled={!!undoing} onClick={() => undo(result.ticket as DoorGuest)}>
-                {undoing ? "Undoing." : "Undo check in"}
+                {undoing ? "Undoing…" : "Undo check in"}
               </button>
             )}
           </section>
@@ -451,7 +458,7 @@ export default function Scanner({ eventId }: { eventId: string }) {
                 )}
                 {(camState === "off" || camState === "starting" || camState === "failed" || camState === "denied") && (
                   <button type="button" className="ed-pill" style={{ alignSelf: "center", padding: "0 22px" }} disabled={camState === "starting"} onClick={turnOn}>
-                    {camState === "starting" ? "Starting camera." : camState === "off" ? "Start camera" : "Try the camera again"}
+                    {camState === "starting" ? "Starting camera…" : camState === "off" ? "Start camera" : "Try the camera again"}
                   </button>
                 )}
               </div>
@@ -475,7 +482,7 @@ export default function Scanner({ eventId }: { eventId: string }) {
             <div className="sc-row">
               <input id="sc-code" className="ed-in sc-code" value={typed} inputMode="text" autoCapitalize="characters" autoComplete="off" autoCorrect="off" spellCheck={false}
                 maxLength={CODE_LENGTH} placeholder="16 letters and numbers" onChange={(e) => { setTyped(cleanTyped(e.target.value)); setTypedNote(null); }} />
-              <button type="submit" className="ed-pill" style={{ alignSelf: "stretch" }} disabled={busy || typed.length !== CODE_LENGTH}>{busy ? "Checking." : "Check in"}</button>
+              <button type="submit" className="ed-pill" style={{ alignSelf: "stretch" }} disabled={busy || typed.length !== CODE_LENGTH}>{busy ? "Checking…" : "Check in"}</button>
             </div>
             <div className="ed-hint">The code is under the QR code on the guest&apos;s ticket.</div>
             {typedNote && <div className="ed-hint ed-warn" role="status">{typedNote}</div>}
@@ -516,7 +523,7 @@ export default function Scanner({ eventId }: { eventId: string }) {
                       <>
                         <span className="mg-in">In {timeOnly(g.checkedInAt, tz)}</span>
                         {isHost && (
-                          <button type="button" className="mg-small" disabled={!!undoing} onClick={() => undo(g)}>{undoing === g.ticketId ? "Undoing." : "Undo"}</button>
+                          <button type="button" className="mg-small" disabled={!!undoing} onClick={() => undo(g)}>{undoing === g.ticketId ? "Undoing…" : "Undo"}</button>
                         )}
                       </>
                     ) : (

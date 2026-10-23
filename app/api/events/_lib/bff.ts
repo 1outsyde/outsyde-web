@@ -33,6 +33,7 @@ export type ForwardMethod = "GET" | "POST" | "PATCH" | "DELETE";
 /**
  * Forward with the caller's Bearer token and Cookie. An optional query (a string such as "scope=event" or
  * a URLSearchParams) is appended to the path; callers pass only keys they have already validated.
+ * Optional extra headers are added on top (a route opts in to each one, e.g. the accept route's User-Agent).
  */
 export function forward(
   req: NextRequest,
@@ -40,9 +41,11 @@ export function forward(
   path: string,
   body?: unknown,
   query?: string | URLSearchParams,
+  extraHeaders?: Record<string, string>,
 ): Promise<NextResponse> {
   const qs = query === undefined ? "" : query.toString();
-  return proxyToBackend(qs ? `${path}?${qs}` : path, { method, headers: backendAuthHeaders(req) as Record<string, string>, body });
+  const headers = { ...(extraHeaders ?? {}), ...(backendAuthHeaders(req) as Record<string, string>) };
+  return proxyToBackend(qs ? `${path}?${qs}` : path, { method, headers, body });
 }
 
 /** Parse the client's JSON object body; null when it is missing, invalid or not an object. */

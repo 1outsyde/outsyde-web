@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { fmt } from "../../e/_shared/format";
+import { browserZone, fmt } from "../../e/_shared/format";
 import { safeHttpUrl } from "../../tickets/ticketsLogic";
 import { priceLabel, whenLabel, whereLabel } from "../eventsLogic";
 import AgreementText from "./AgreementText";
@@ -31,10 +31,6 @@ export interface ReviewStepProps {
   accepting: boolean;
   onAccept: () => void;
   onRetryAgreement: () => void;
-}
-
-function viewerZone(): string {
-  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; } catch { return "UTC"; }
 }
 
 /** Discover card (mockup 12), also used on the live screen. */
@@ -113,7 +109,7 @@ export default function ReviewStep(p: ReviewStepProps) {
         <section className="ed-agree" aria-labelledby="agree-title">
           <h2 className="ed-agree-title" id="agree-title">{agreement?.title ?? "Event Host Agreement"}</h2>
           {p.agreementNotice && <p className="ed-err" role="alert">{p.agreementNotice}</p>}
-          {!agreement && !p.agreementError && <div className="ed-hint" role="status">Loading the Event Host Agreement.</div>}
+          {!agreement && !p.agreementError && <div className="ed-hint" role="status">Loading the Event Host Agreement…</div>}
           {!agreement && p.agreementError && (
             <div className="ed-stack-sm">
               <p className="ed-err" role="alert">{p.agreementError}</p>
@@ -122,7 +118,7 @@ export default function ReviewStep(p: ReviewStepProps) {
           )}
           {agreement?.accepted && (
             <p className="ed-accepted">
-              You accepted the Event Host Agreement{agreement.acceptedAt ? ` on ${fmt(agreement.acceptedAt, viewerZone(), { month: "long", day: "numeric", year: "numeric" })}` : ""}.{" "}
+              You accepted the Event Host Agreement{agreement.acceptedAt ? ` on ${fmt(agreement.acceptedAt, browserZone(), { month: "long", day: "numeric", year: "numeric" })}` : ""}.{" "}
               <button type="button" className="ed-textbtn ed-gold ed-inline-btn" aria-expanded={showAgain} onClick={() => setShowAgain((v) => !v)}>
                 {showAgain ? "Hide it" : "Read it again"}
               </button>
@@ -152,7 +148,7 @@ export default function ReviewStep(p: ReviewStepProps) {
                 <span>I have read and agree to the Event Host Agreement.</span>
               </label>
               <div className="ed-hint" aria-live="polite">
-                {p.accepting ? "Saving your acceptance." : p.read ? "You can accept it now." : "Scroll to the end of the agreement to accept it."}
+                {p.accepting ? "Saving your acceptance…" : p.read ? "You can accept it now." : "Scroll to the end of the agreement to accept it."}
               </div>
             </>
           )}

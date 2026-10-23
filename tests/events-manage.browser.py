@@ -122,6 +122,8 @@ try:
             check(title in up.inner_text(), "mine lists the event under Upcoming", up.inner_text())
             check(pg.locator("[data-testid=group-drafts]").count() == 0, "no empty Drafts group")
             check(up.locator(f"a[href='/events/{ev['id']}/manage']").count() == 1, "row links to manage")
+            check(pg.locator("header").get_by_role("link", name="Scan tickets").get_attribute("href") == "/events/door", "mine header links Scan tickets to /events/door")
+            check(pg.locator("header").get_by_role("link", name="Host an event").count() == 1, "mine header keeps Host an event")
             check("12 Main St" not in pg.content(), "no street address on mine")
             check(pg.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), f"{width}px: mine has no horizontal overflow")
             if SHOTS: pg.screenshot(path=f"{SHOTS}/mine-{width}.png", full_page=True)
@@ -138,6 +140,11 @@ try:
             check("Surname" not in pg.content() and "test.local" not in pg.content(), "no last name or email on the page")
             check(pg.get_by_role("link", name="Edit", exact=True).get_attribute("href") == f"/events/{ev['id']}/edit", "Edit link")
             check(pg.get_by_role("link", name="View page").get_attribute("href") == f"/e/{ev['slug']}", "View page link")
+            heads = pg.evaluate("[...document.querySelectorAll('h1, h2')].map(h => h.tagName + ':' + h.textContent)")
+            check(heads[0] == "H1:" + title and pg.locator("h1").count() == 1, "the page h1 (the event title) is the first heading", heads)
+            check(pg.locator(".mg-head-label").inner_text() == "MANAGE EVENT" and not any("MANAGE EVENT" in h for h in heads), "MANAGE EVENT is a small label, not a heading", heads)
+            share = pg.get_by_role("button", name="Share link")
+            check(share.count() == 1 and share.get_attribute("style") is None and "mg-share" in (share.get_attribute("class") or ""), "Share link uses a class, no inline styles")
             check(pg.get_by_role("link", name="Door team").get_attribute("href") == f"/events/{ev['id']}/team", "Door team link")
             check(pg.get_by_role("link", name="Scan tickets").get_attribute("href") == f"/events/{ev['id']}/scan", "Scan tickets link")
             check(pg.locator("[data-testid=type-row]").count() == 1, "one ticket type bar")
@@ -162,6 +169,42 @@ try:
             check(pg.get_by_text("1 RSVP cancelled").count() == 1, "notice says the RSVP was cancelled")
             check(pg.get_by_role("button", name="Cancel event").count() == 0, "no Cancel event button once cancelled")
             check(real(errs) == [], "no console or page errors (host)", errs)
+
+            # a paused event has no public page: no View page link
+            pz = api("POST", "/api/events", ht, {"title": f"{P} Paused {width}", "startsAt": iso(12), "endsAt": iso(12, 3), "timezone": "America/New_York", "city": "Freeport", "state": "NY", "capacity": 10})["event"]
+            sql(f"UPDATE events SET status='paused', published_at=now() WHERE id='{pz['id']}'")
+            pg.goto(f"{WEB}/events/{pz['id']}/manage")
+            pg.locator("[data-testid=status]").wait_for(timeout=20000)
+            check(pg.locator("[data-testid=status]").inner_text() == "PAUSED", "paused event shows PAUSED")
+            check(pg.get_by_role("link", name="View page").count() == 0, "paused: no View page link")
+            check(pg.get_by_role("link", name="Edit", exact=True).count() == 1, "paused: Edit still there")
+
+            # discard a draft
+            dtitle = f"{P} Draft Gone {width}"
+            dr = api("POST", "/api/events", ht, {"title": dtitle, "startsAt": iso(14), "endsAt": iso(14, 3), "timezone": "America/New_York", "city": "Freeport", "state": "NY", "capacity": 10})["event"]
+            pg.goto(f"{WEB}/events/{dr['id']}/manage")
+            pg.get_by_role("button", name="Discard draft").wait_for(timeout=20000)
+            check(pg.get_by_role("button", name="Delete draft").count() == 0, "no Delete draft wording")
+            pg.get_by_role("button", name="Discard draft").click()
+            conf = pg.locator("[data-testid=cancel-confirm]")
+            conf.wait_for(timeout=5000)
+            check("Discard this draft? It won't be published." in conf.inner_text(), "discard confirm copy", conf.inner_text())
+            check(pg.get_by_role("button", name="Keep draft").count() == 1, "Keep draft button")
+            pg.get_by_role("button", name="Keep draft").click()
+            check(conf.count() == 0 and sql(f"SELECT status FROM events WHERE id='{dr['id']}'") == "draft", "Keep draft closes the confirm, still a draft")
+            pg.get_by_role("button", name="Discard draft").click()
+            pg.get_by_role("button", name="Yes, discard draft").click()
+            done = pg.locator("[data-testid=draft-discarded]")
+            done.wait_for(timeout=20000)
+            check("Draft discarded." in done.inner_text(), "Draft discarded. shown", done.inner_text())
+            check(done.get_by_role("link", name="Back to your events").get_attribute("href") == "/events/mine", "link back to /events/mine")
+            check(sql(f"SELECT status FROM events WHERE id='{dr['id']}'") == "cancelled", "DB: draft cancelled")
+            pg.goto(WEB + "/events/mine")
+            pg.locator("[data-testid=group-cancelled]").wait_for(timeout=20000)
+            body = pg.locator(".mg-body").inner_text()
+            check(dtitle not in body, "mine leaves out the discarded draft (never published)", body)
+            check(title in pg.locator("[data-testid=group-cancelled]").inner_text(), "mine still lists the cancelled published event")
+            check(real(errs) == [], "no console or page errors (paused, discard)", errs)
             ctx.close()
 
             # stranger

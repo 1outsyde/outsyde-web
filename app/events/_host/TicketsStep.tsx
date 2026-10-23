@@ -36,7 +36,7 @@ export default function TicketsStep({ event, types, form, setForm, payout, onSta
             <div>To sell paid tickets, add where we send your earnings. You get paid 3 days after the event.</div>
             {payout.canStart ? (
               <button type="button" className="ed-pill" onClick={onStartPayouts} disabled={payout.sending}>
-                {payout.sending ? "Opening Stripe" : "Set up payouts"}
+                {payout.sending ? "Opening Stripe…" : "Set up payouts"}
               </button>
             ) : (
               <div className="ed-hint">{profilePayoutNote(event.hostType)}</div>
@@ -62,7 +62,7 @@ export default function TicketsStep({ event, types, form, setForm, payout, onSta
                   <div className="ed-type-actions">
                     <button type="button" className="ed-textbtn" onClick={() => onEdit(t)} aria-label={`Edit ${t.name}`}>Edit</button>
                     <button type="button" className="ed-textbtn" onClick={() => onRemove(t)} disabled={removingId === t.id} aria-label={`Remove ${t.name}`}>
-                      {removingId === t.id ? "Removing" : "Remove"}
+                      {removingId === t.id ? "Removing…" : "Remove"}
                     </button>
                   </div>
                 </div>

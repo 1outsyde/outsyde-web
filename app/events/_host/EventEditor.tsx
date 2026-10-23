@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { GENERIC_ERROR, errorCopy, fmt, stripeUrl } from "../../e/_shared/format";
+import { GENERIC_ERROR, browserZone, errorCopy, fmt, stripeUrl } from "../../e/_shared/format";
 import { safeHttpUrl } from "../../tickets/ticketsLogic";
 import DetailsStep from "./DetailsStep";
 import TicketsStep, { type PayoutBanner } from "./TicketsStep";
@@ -33,10 +33,6 @@ const STEPS: Record<Step, { n: number; title: string }> = {
 };
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 const UPLOAD_FAILED = "We couldn't upload that photo. Try again, or continue without one for now.";
-
-function browserZone(): string {
-  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; } catch { return "UTC"; }
-}
 
 function toAgreement(a: unknown): Agreement | null {
   const x = a as Record<string, unknown> | null;
@@ -384,7 +380,7 @@ export default function EventEditor({ eventId: routeId }: { eventId?: string }) 
     </>
   );
 
-  if (screen === "loading") return page(<div className="ed-muted" role="status">Loading.</div>);
+  if (screen === "loading") return page(<div className="ed-muted" role="status">Loading…</div>);
 
   if (screen === "error") {
     return page(
@@ -418,7 +414,7 @@ export default function EventEditor({ eventId: routeId }: { eventId?: string }) 
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="9" cy="9" r="2" /><path d="M21 15l-5-5L5 21" /></svg>
               </span>
             )}
-            <span className="ed-cover-title">{uploading ? "Uploading" : startCover ? "Change cover photo" : "Add a cover photo"}</span>
+            <span className="ed-cover-title">{uploading ? "Uploading…" : startCover ? "Change cover photo" : "Add a cover photo"}</span>
             <span className="ed-hint ed-cover-sub">This is what people see in Discover. You can change it later.</span>
             <input type="file" accept="image/*" className="ed-hidden-file" disabled={uploading}
               onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) uploadCover(f); }} />
@@ -521,18 +517,18 @@ export default function EventEditor({ eventId: routeId }: { eventId?: string }) 
         )}
         {step === "details" && (
           <button type="button" className="ed-primary" onClick={() => next("tickets")} disabled={busy || uploading}>
-            {busy ? "Saving" : "Next: tickets"}
+            {busy ? "Saving…" : "Next: tickets"}
           </button>
         )}
         {step === "tickets" && (
           <button type="button" className="ed-primary" onClick={() => next("review")} disabled={busy}>
-            {busy ? "Saving" : "Next: review"}
+            {busy ? "Saving…" : "Next: review"}
           </button>
         )}
         {step === "review" && !published && (
           <>
             <button type="button" className="ed-primary" onClick={publish} disabled={busy || !agreement?.accepted}>
-              {busy ? "Publishing" : "Publish event"}
+              {busy ? "Publishing…" : "Publish event"}
             </button>
             <button type="button" className="ed-ghost" onClick={saveDraft} disabled={busy}>Save as draft</button>
           </>

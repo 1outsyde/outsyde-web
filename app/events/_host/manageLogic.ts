@@ -27,7 +27,7 @@ export function groupMine(events: HostEvent[], now: Date = new Date()): MineGrou
   const g: MineGroups = { drafts: [], upcoming: [], past: [], cancelled: [] };
   for (const e of events) {
     if (e.status === "draft") g.drafts.push(e);
-    else if (e.status === "cancelled") g.cancelled.push(e);
+    else if (e.status === "cancelled") { if (e.publishedAt) g.cancelled.push(e); } // a discarded draft (never published) is left out
     else if (endMs(e) >= t) g.upcoming.push(e);
     else g.past.push(e);
   }
@@ -225,7 +225,7 @@ export function canScan(e: Pick<HostEvent, "status" | "endsAt">, now: Date = new
 export const CANCEL_CONFIRM_COPY =
   "Cancel this event? Every guest who paid is refunded in full, and free RSVPs are cancelled. You can't undo this.";
 
-export const DRAFT_DELETE_COPY = "Delete this draft? It won't be published.";
+export const DRAFT_DISCARD_COPY = "Discard this draft? It won't be published.";
 
 export function cancelNotice(guests: unknown): string {
   const g = guests as { freeCancelled?: unknown; refunding?: unknown } | null;
@@ -237,7 +237,14 @@ export function cancelNotice(guests: unknown): string {
   return bits.length ? `This event is cancelled. ${bits.join(", ")}.` : "This event is cancelled.";
 }
 
-/** The backend's own message when it sent one, else the generic line. Never a raw code. */
-export function backendMessage(body: ApiBody): string {
+/**
+ * Error rule for host actions (cancel, refund, door team add and remove, check in undo): show the backend's
+ * full message, which names the exact reason ("This event has already started."). A failed network call
+ * (status 0), a server error (500 or more) or a body without a message gets the generic line. Never a raw code.
+ * Everywhere else (loading lists, buyer pages) use errorCopy from app/e/_shared/format.ts, which maps known
+ * codes to fixed copy.
+ */
+export function backendMessage(status: number, body: ApiBody): string {
+  if (status === 0 || status >= 500) return GENERIC_ERROR;
   return typeof body?.error === "string" && body.error.trim() ? body.error : GENERIC_ERROR;
 }

@@ -48,5 +48,10 @@ export const MANAGE_CSS = `
 .mg-evrow-title { font-family: 'Bebas Neue', sans-serif; font-size: 22px; line-height: 1; overflow-wrap: anywhere; }
 .mg-evrow-side { font-size: 12px; color: #B8B0A0; flex: 0 0 auto; text-align: right; }
 .mg-group { display: flex; flex-direction: column; gap: 8px; }
+.mg-head-label { flex: 1 1 auto; min-width: 0; font-size: 12px; font-weight: 700; letter-spacing: 1px; color: #B8B0A0; }
+.mg-head.mg-head-wrap { flex-wrap: wrap; row-gap: 8px; }
+.mg-head-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.ed-outline.mg-head-btn { min-height: 44px; padding: 0 18px; }
+.ed-outline.mg-share { background: transparent; color: #F5F0E6; cursor: pointer; font: 600 14px 'Hanken Grotesk', sans-serif; }
 @media (min-width: 640px) { .mg-body { padding-left: 24px; padding-right: 24px; } }
 `;

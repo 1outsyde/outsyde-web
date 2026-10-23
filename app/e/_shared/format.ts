@@ -22,8 +22,10 @@ export const CODE_COPY: Record<string, string> = {
 export type ApiBody = { error?: unknown; code?: unknown } | null | undefined;
 
 /**
- * One rule for every page: a known code gets its copy; a server error (status 500 or more) or a body
- * without a code gets the generic line; otherwise the backend's own message.
+ * Mapped error copy, used for page loads and buyer flows: a known code gets its copy; a server error
+ * (status 500 or more) or a body without a code gets the generic line; otherwise the backend's own message.
+ * Host actions (cancel, refund, door team, undo) use backendMessage in app/events/_host/manageLogic.ts instead,
+ * which always shows the backend's full text.
  */
 export function failureCopy(status: number, body: ApiBody): { message: string; code: string } {
   const code = typeof body?.code === "string" ? body.code : "";
@@ -61,6 +63,14 @@ export function newKey(): string {
   } catch {
     return `k${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
   }
+}
+
+/** The site fonts (Bebas Neue for titles, Hanken Grotesk for text), loaded with a <link> by the event and host pages. */
+export const FONTS_HREF = "https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Hanken+Grotesk:wght@400;500;600;700&display=swap";
+
+/** The browser's IANA time zone, "UTC" when it can't be read (server render, old browsers). */
+export function browserZone(): string {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; } catch { return "UTC"; }
 }
 
 export function safeZone(tz: string): string {

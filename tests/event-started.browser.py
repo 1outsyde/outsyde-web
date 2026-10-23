@@ -1,7 +1,7 @@
 """LOCAL ONLY. An event that started 1 hour ago and ends in 2 hours: no Get tickets or RSVP, shows the started line. Also checks /events/payouts HTML has the fonts link."""
 import re, sys, time, json, subprocess, urllib.request
 exec(open("tests/tickets.browser.py").read().split("host, g1, g2")[0])
-host = mkuser("host"); ht = tok(host)
+host = mkuser("host"); ht = tok(host); accept_agreement(ht)
 ev, ty = None, None
 body = {"title": f"{P} started", "startsAt": iso(10), "endsAt": iso(10, 4), "timezone": "America/New_York", "venueName": "The Hall", "addressLine1": "12 Main St", "city": "Freeport", "state": "NY", "postalCode": "11520", "capacity": 30}
 ev = api("POST", "/api/events", ht, body)["event"]
@@ -19,5 +19,5 @@ with sync_playwright() as pw:
     b.close()
 html = urllib.request.urlopen(WEB + "/events/payouts").read().decode()
 check("fonts.googleapis" in html, "payouts HTML has the Google Fonts link")
-sql(f"DELETE FROM ticket_types WHERE event_id='{ev['id']}'"); sql(f"DELETE FROM events WHERE id='{ev['id']}'"); sql(f"DELETE FROM users WHERE email LIKE '{P}-%'")
+sql(f"DELETE FROM ticket_types WHERE event_id='{ev['id']}'"); sql(f"DELETE FROM events WHERE id='{ev['id']}'"); sql(f"DELETE FROM host_agreement_acceptances WHERE user_id='{host}'"); sql(f"DELETE FROM users WHERE email LIKE '{P}-%'")
 print(f"\n{passed} passed, {failed} failed"); sys.exit(1 if failed else 0)

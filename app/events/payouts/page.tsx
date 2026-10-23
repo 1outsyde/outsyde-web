@@ -75,7 +75,7 @@ export default function EventPayoutsPage() {
       <style>{CSS}</style>
       <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
       <div className="po-wrap">
-        {view.step === "loading" && <div className="po-muted" role="status">Checking your payout setup.</div>}
+        {view.step === "loading" && <div className="po-muted" role="status">Checking your payout setup…</div>}
 
         {view.step === "error" && (
           <div className="po-card" role="alert">
@@ -90,7 +90,8 @@ export default function EventPayoutsPage() {
             <h1 className="po-h1">Payouts are set up</h1>
             <p className="po-text">Ticket money is paid to your bank 3 days after your event ends.</p>
             <div className="po-row">
-              <Link href="/tickets" className="po-btn">My tickets</Link>
+              <Link href="/events/mine" className="po-btn">Your events</Link>
+              <Link href="/tickets" className="po-link">My tickets</Link>
               <Link href="/" className="po-link">Back to home</Link>
             </div>
           </div>
@@ -107,8 +108,9 @@ export default function EventPayoutsPage() {
             {actionError && <p className="po-err" role="alert">{actionError}</p>}
             <div className="po-row">
               <button type="button" className="po-btn" onClick={startSetup} disabled={sending}>
-                {sending ? "Opening Stripe." : needs.mode === "almost" ? "Finish payout setup" : "Set up payouts"}
+                {sending ? "Opening Stripe…" : needs.mode === "almost" ? "Finish payout setup" : "Set up payouts"}
               </button>
+              <Link href="/events/mine" className="po-link">Your events</Link>
               <Link href="/" className="po-link">Back to home</Link>
             </div>
           </div>

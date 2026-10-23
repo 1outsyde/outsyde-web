@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { GENERIC_ERROR, errorCopy } from "../e/_shared/format";
+import { FONTS_HREF, GENERIC_ERROR, browserZone, errorCopy } from "../e/_shared/format";
 import {
   buildQuery, isEventCard, priceLabel, whenLabel, whereLabel,
   type Coords, type EventCard, type Filters, type WhenFilter,
@@ -13,10 +13,6 @@ const HOST_LOGIN = "/login?return=/events/new";
 const TINTS = ["#1A3C34", "#2A2418", "#1F2A3C", "#3C1A2E", "#2E3C1A", "#3C2E1A"];
 
 type Auth = "loading" | "in" | "out";
-
-function browserZone(): string {
-  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; } catch { return "UTC"; }
-}
 
 export default function EventsClient() {
   const [filters, setFilters] = useState<Filters>({ near: false, free: false, when: null });
@@ -107,7 +103,7 @@ export default function EventsClient() {
 
   return (
     <main className="ev-page">
-      <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+      <link href={FONTS_HREF} rel="stylesheet" />
       <style>{CSS}</style>
       <div className="ev-wrap">
         <div className="ev-top">
@@ -115,12 +111,13 @@ export default function EventsClient() {
           <div className="ev-actions">
             <Link href="/tickets" className="ev-btn ghost">My Tickets</Link>
             {auth === "in" && <Link href="/events/mine" className="ev-btn ghost">Your events</Link>}
+            {auth === "in" && <Link href="/events/door" className="ev-btn ghost">Scan tickets</Link>}
             <Link href={auth === "out" ? HOST_LOGIN : HOST_HREF} className="ev-btn gold">Host an event</Link>
           </div>
         </div>
 
         <div className="ev-chips" role="group" aria-label="Filter events">
-          {chip(locating ? "Finding you" : "Near me", filters.near, toggleNear, locating)}
+          {chip(locating ? "Finding you…" : "Near me", filters.near, toggleNear, locating)}
           {chip("Tonight", filters.when === "tonight", () => toggleWhen("tonight"))}
           {chip("This weekend", filters.when === "weekend", () => toggleWhen("weekend"))}
           {chip("Free", filters.free, () => setFilters((f) => ({ ...f, free: !f.free })))}
@@ -133,7 +130,7 @@ export default function EventsClient() {
           </p>
         )}
 
-        {events === null && <p className="ev-muted">Loading events.</p>}
+        {events === null && <p className="ev-muted" role="status">Loading events…</p>}
 
         {events !== null && events.length === 0 && !error && (
           <div className="ev-empty">
@@ -171,7 +168,7 @@ export default function EventsClient() {
         {cursor && (
           <div className="ev-more">
             <button type="button" className="ev-btn ghost" onClick={() => load(filters, coords, cursor)} disabled={more}>
-              {more ? "Loading" : "Load more"}
+              {more ? "Loading…" : "Load more"}
             </button>
           </div>
         )}

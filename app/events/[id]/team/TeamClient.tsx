@@ -65,7 +65,7 @@ export default function TeamClient({ eventId }: { eventId: string }) {
     setAdding(false);
     if (!r) return;
     if (r.status !== 201 || !r.body?.success || !isTeamMember(r.body.member)) {
-      setAddError(r.status === 0 || r.status >= 500 ? GENERIC_ERROR : backendMessage(r.body));
+      setAddError(backendMessage(r.status, r.body));
       return;
     }
     const m = r.body.member as TeamMember;
@@ -92,12 +92,12 @@ export default function TeamClient({ eventId }: { eventId: string }) {
       setNotice(`${guestName(m)} was removed from the door team.`);
       return;
     }
-    setRemoveError(r.status === 0 || r.status >= 500 ? GENERIC_ERROR : backendMessage(r.body));
+    setRemoveError(backendMessage(r.status, r.body));
   }
 
   const page = (inner: React.ReactNode) => <HostShell css={MANAGE_CSS}>{inner}</HostShell>;
 
-  if (screen === "loading") return page(<div className="ed-muted" role="status">Loading.</div>);
+  if (screen === "loading") return page(<div className="ed-muted" role="status">Loading…</div>);
 
   if (screen === "notfound") {
     return page(
@@ -145,7 +145,7 @@ export default function TeamClient({ eventId }: { eventId: string }) {
                   <p>{removeConfirmCopy(m, s)}</p>
                   {removeError && <p className="ed-err" role="alert">{removeError}</p>}
                   <div className="mg-confirm-actions">
-                    <button type="button" className="mg-danger" disabled={removing} onClick={() => remove(m, s)}>{removing ? "Removing." : "Yes, remove"}</button>
+                    <button type="button" className="mg-danger" disabled={removing} onClick={() => remove(m, s)}>{removing ? "Removing…" : "Yes, remove"}</button>
                     <button type="button" className="mg-small" disabled={removing} onClick={() => { setConfirm(null); setRemoveError(null); }}>Keep</button>
                   </div>
                 </div>
@@ -188,7 +188,7 @@ export default function TeamClient({ eventId }: { eventId: string }) {
               {scope === "standing" ? "They can scan every event you host until you remove them." : "They can scan this event until it ends."}
             </div>
             <button type="submit" className="ed-primary" style={{ minHeight: 44, fontSize: 14 }} disabled={adding || !cleanUsername(username)}>
-              {adding ? "Adding." : "Add to door team"}
+              {adding ? "Adding…" : "Add to door team"}
             </button>
           </div>
           {addError && <p className="ed-err" role="alert" data-testid="add-error">{addError}</p>}

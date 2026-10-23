@@ -1,7 +1,7 @@
 /** Unit tests for the host page helpers. No server needed: npx tsx tests/events-manage-logic.test.ts */
 import {
   groupMine, eventHref, statusLabel, whenWhere, takenLine, typeRows, typeRowText, payoutCard, earningsHint, refundedLine,
-  refundableOrders, orderLine, canScan, statusKind, isEnded, DRAFT_DELETE_COPY, refundConfirmCopy, canCancel, cancelNotice, backendMessage, guestName, guestLine, checkedInCount,
+  refundableOrders, orderLine, canScan, statusKind, isEnded, DRAFT_DISCARD_COPY, refundConfirmCopy, canCancel, cancelNotice, backendMessage, guestName, guestLine, checkedInCount,
   isSummary, type Summary, type HostOrder, type DoorGuest,
 } from "../app/events/_host/manageLogic";
 import type { HostEvent, HostTicketType } from "../app/events/_host/editorLogic";
@@ -28,13 +28,14 @@ const g = groupMine([
   ev({ id: "u1" }),
   ev({ id: "p1", startsAt: "2026-10-01T01:00:00.000Z", endsAt: "2026-10-01T05:00:00.000Z" }),
   ev({ id: "p2", startsAt: "2026-10-10T01:00:00.000Z", endsAt: "2026-10-10T05:00:00.000Z" }),
-  ev({ id: "c1", status: "cancelled" }),
+  ev({ id: "c1", status: "cancelled", publishedAt: "2026-10-01T00:00:00.000Z" }),
+  ev({ id: "c2", status: "cancelled", publishedAt: null }),
   ev({ id: "live", startsAt: "2026-10-23T10:00:00.000Z", endsAt: "2026-10-23T16:00:00.000Z" }),
 ], NOW);
 eq(g.drafts.map((e) => e.id), ["d1"], "drafts");
 eq(g.upcoming.map((e) => e.id), ["live", "u1", "u2"], "upcoming: running now counts, soonest first");
 eq(g.past.map((e) => e.id), ["p2", "p1"], "past: newest first");
-eq(g.cancelled.map((e) => e.id), ["c1"], "cancelled");
+eq(g.cancelled.map((e) => e.id), ["c1"], "cancelled: only events that were published (a discarded draft is left out)");
 eq(eventHref({ id: "x", status: "draft" }), "/events/x/edit", "draft links to edit");
 eq(eventHref({ id: "x", status: "published" }), "/events/x/manage", "published links to manage");
 eq(eventHref({ id: "x", status: "cancelled" }), "/events/x/manage", "cancelled links to manage");
@@ -107,14 +108,17 @@ eq(canScan({ status: "published", endsAt: PAST }, NOW), false, "cannot scan an e
 eq(canScan({ status: "cancelled", endsAt: FUTURE }, NOW), false, "cannot scan a cancelled event");
 eq(statusKind({ status: "published", endsAt: PAST }, NOW), "ended", "kind ended");
 eq(isEnded({ endsAt: FUTURE }, NOW), false, "not ended");
-eq(DRAFT_DELETE_COPY.includes("refund") || DRAFT_DELETE_COPY.includes("guest"), false, "draft copy has no guests or refunds");
+eq(DRAFT_DISCARD_COPY, "Discard this draft? It won't be published.", "discard draft copy");
+eq(DRAFT_DISCARD_COPY.includes("refund") || DRAFT_DISCARD_COPY.includes("guest"), false, "draft copy has no guests or refunds");
 eq(guestLine(guest({ firstName: null })), "Free RSVP", "no first name: handle not repeated");
 eq(canCancel({ status: "draft", endsAt: PAST }, NOW), true, "can cancel draft");
 eq(canCancel({ status: "cancelled", endsAt: FUTURE }, NOW), false, "cannot cancel twice");
 eq(cancelNotice({ freeCancelled: 1, refunding: 2 }), "This event is cancelled. 1 RSVP cancelled, 2 refunds started.", "cancel notice");
 eq(cancelNotice(undefined), "This event is cancelled.", "cancel notice with no guests");
-eq(backendMessage({ error: "This event has already started.", code: "EVENT_STARTED" }), "This event has already started.", "backend message shown");
-eq(backendMessage({ code: "X" }), "Something went wrong. Try again.", "generic when no message");
+eq(backendMessage(409, { error: "This event has already started.", code: "EVENT_STARTED" }), "This event has already started.", "backend message shown");
+eq(backendMessage(400, { code: "X" }), "Something went wrong. Try again.", "generic when no message");
+eq(backendMessage(500, { error: "Internal details", code: "SERVER_ERROR" }), "Something went wrong. Try again.", "server error: generic line");
+eq(backendMessage(0, null), "Something went wrong. Try again.", "network failure: generic line");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

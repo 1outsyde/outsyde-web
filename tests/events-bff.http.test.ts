@@ -30,8 +30,9 @@ function assert(cond: boolean, name: string, detail?: unknown) {
 const isLocal = (u: string) => ["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(u).hostname);
 
 type Res = { status: number; body: any };
-async function call(base: string, method: string, path: string, opts: { token?: string; cookie?: string; body?: unknown; raw?: string } = {}): Promise<Res> {
+async function call(base: string, method: string, path: string, opts: { token?: string; cookie?: string; body?: unknown; raw?: string; ua?: string } = {}): Promise<Res> {
   const headers: Record<string, string> = {};
+  if (opts.ua) headers["User-Agent"] = opts.ua;
   if (opts.token) { if (base === BACKEND) headers.Authorization = `Bearer ${opts.token}`; else headers.Cookie = `outsyde_access_token=${opts.token}`; }
   if (opts.cookie) headers.Cookie = opts.cookie;
   let body: string | undefined;
@@ -426,8 +427,11 @@ async function call(base: string, method: string, path: string, opts: { token?: 
     assert(r.status === 201 && r.body?.ticketType?.name === "Free RSVP", "ticket type create through the BFF: 201", r);
     r = await call(WEB, "POST", `/api/events/${h2Ev.id}/publish`, { token: host2Tok });
     assert(r.status === 409 && r.body?.code === "HOST_AGREEMENT_REQUIRED", "publish before accepting: 409 HOST_AGREEMENT_REQUIRED relayed", r);
-    r = await call(WEB, "POST", `/api/events/host-agreement/accept`, { token: host2Tok, body: { version: agVersion } });
+    const host2Ua = `OutsydeTestBrowser/1.0 (${P})`;
+    r = await call(WEB, "POST", `/api/events/host-agreement/accept`, { token: host2Tok, body: { version: agVersion }, ua: host2Ua });
     assert(r.status === 200 && r.body?.agreement?.accepted === true && !!r.body.agreement.acceptedAt, "accept the current version: 200 accepted", r);
+    const uaRows = await q(`SELECT user_agent FROM host_agreement_acceptances WHERE user_id = $1 AND version = $2`, [host2, agVersion]);
+    assert(uaRows.length === 1 && uaRows[0].user_agent === host2Ua, "accept through the BFF stores the person's browser User-Agent", uaRows);
     r = await call(WEB, "GET", `/api/events/host-agreement`, { token: host2Tok });
     assert(r.body?.agreement?.accepted === true && r.body.agreement.acceptedVersion === agVersion, "read now shows accepted", r.body?.agreement);
 

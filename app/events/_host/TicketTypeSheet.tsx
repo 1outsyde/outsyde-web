@@ -143,7 +143,7 @@ export default function TicketTypeSheet({ initial, editing, others, timezone, on
 
           {error && <p className="ed-err" role="alert">{error}</p>}
           <button type="submit" className="ed-primary" disabled={saving}>
-            {saving ? "Saving" : editing ? "Save ticket" : "Add ticket"}
+            {saving ? "Saving…" : editing ? "Save ticket" : "Add ticket"}
           </button>
         </form>
       </div>

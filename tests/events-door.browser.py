@@ -295,7 +295,21 @@ try:
         res = pg.locator("[data-testid=result]")
         res.wait_for(timeout=20000)
         check(res.get_attribute("data-outcome") == "CHECKED_IN", "host: camera checked Kai in", res.inner_text())
+        # hold the undo request: while it is in flight Scan next is disabled and scanning stays paused
+        held = []
+        pg.route("**/door/undo", lambda r: held.append(r))
         pg.get_by_role("button", name="Undo check in").click()
+        for _ in range(100):
+            if held: break
+            pg.wait_for_timeout(50)
+        check(len(held) == 1, "undo request sent (held)")
+        check(pg.get_by_role("button", name="Scan next").is_disabled(), "undo in flight: Scan next is disabled")
+        check(pg.get_by_role("button", name="Undoing…").is_disabled(), "undo in flight: the button says Undoing… and is disabled")
+        pg.get_by_role("button", name="Scan next").click(force=True)
+        pg.wait_for_timeout(3600)
+        check(res.get_attribute("data-outcome") == "CHECKED_IN" and len(sends) == 1, "undo in flight: the card stays and nothing is scanned", [res.get_attribute("data-outcome"), len(sends)])
+        held[0].continue_()
+        pg.unroute("**/door/undo")
         pg.wait_for_function("document.querySelector('[data-testid=result]')?.dataset.outcome === 'UNDONE'", timeout=10000)
         check("Check in undone" in res.inner_text() and "Kai · Free RSVP" in res.inner_text(), "undo shows a Check in undone card for the guest", res.inner_text())
         check(pg.get_by_role("button", name="Scan next").count() == 1, "the undone card has Scan next")

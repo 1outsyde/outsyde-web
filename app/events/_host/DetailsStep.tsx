@@ -48,7 +48,7 @@ export default function DetailsStep({ form, setForm, hosts, hostLocked, startLoc
             // eslint-disable-next-line @next/next/no-img-element
             ? <img src={cover} alt="" />
             : <span className="ed-thumb-plus" aria-hidden="true">+</span>}
-          <span className="ed-thumb-text">{uploading ? "Uploading" : cover ? "Change" : "Cover"}</span>
+          <span className="ed-thumb-text">{uploading ? "Uploading…" : cover ? "Change" : "Cover"}</span>
           <input
             type="file" accept="image/*" className="ed-hidden-file" disabled={uploading}
             onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) onPickCover(f); }}
