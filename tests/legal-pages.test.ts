@@ -29,5 +29,24 @@ const byOld = Object.fromEntries(LEGAL_REDIRECTS.map((r) => [r.source, r.destina
 assert(byOld["/terms-and-conditions"] === "/terms" && byOld["/english-privacy-policy"] === "/privacy", "terms and privacy map correctly", byOld);
 assert(byOld["/english-refund-policy"] === "/refund-policy" && byOld["/english-shipping-policy"] === "/shipping-policy", "refund and shipping map correctly", byOld);
 
-console.log(`\n${passed} passed, ${failed} failed`);
-if (failed) process.exit(1);
+// Sitemap lists every legal page and keeps the existing routes.
+import sitemap from "../app/sitemap";
+const urls = sitemap().map((e) => e.url);
+for (const h of hrefs) assert(urls.includes(`https://www.goutsyde.com${h}`), `sitemap lists ${h}`, urls);
+assert(urls.includes("https://www.goutsyde.com/coming-soon") && urls.includes("https://www.goutsyde.com/shop"), "sitemap keeps existing routes");
+assert(new Set(urls).size === urls.length, "sitemap has no duplicate URLs");
+
+// next.config redirects: every old URL, permanent (308).
+import nextConfig from "../next.config";
+(async () => {
+  const redirects = nextConfig.redirects ? await nextConfig.redirects() : [];
+  for (const r of LEGAL_REDIRECTS) {
+    const hit = redirects.find((x) => x.source === r.source);
+    assert(!!hit && hit.destination === r.destination && (hit as { permanent?: boolean }).permanent === true, `308 ${r.source} → ${r.destination}`, hit);
+  }
+  const headers = nextConfig.headers ? await nextConfig.headers() : [];
+  assert(headers.length === 3, "existing headers() untouched", headers.length);
+
+  console.log(`\n${passed} passed, ${failed} failed`);
+  if (failed) process.exit(1);
+})();

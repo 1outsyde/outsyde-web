@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { LEGAL_REDIRECTS } from "./lib/legal-pages";
 
 const nextConfig: NextConfig = {
   images: {
@@ -28,6 +29,10 @@ const nextConfig: NextConfig = {
         hostname: 'stream.mux.com',
       },
     ],
+  },
+  async redirects() {
+    // Old Wix legal URLs that Google still crawls → the new legal pages (308).
+    return LEGAL_REDIRECTS.map((r) => ({ ...r, permanent: true }));
   },
   async headers() {
     return [
