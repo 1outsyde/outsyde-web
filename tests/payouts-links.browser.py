@@ -117,6 +117,7 @@ try:
         pg.goto(WEB + "/events/payouts?stripe=done")
         pg.get_by_role("heading", name="Almost there").wait_for(timeout=15000)
         check(pg.get_by_text("Stripe still needs a few details before you can get paid.").count() == 1 and pg.get_by_role("button", name="Finish payout setup").count() == 1, "not ready with stripe=done: Almost there and Finish payout setup")
+        check(pg.locator(".po-card").get_by_role("link", name="Your events").get_attribute("href") == "/events/mine", "needs setup: Your events link to /events/mine")
         pg.goto(WEB + "/events/payouts?stripe=refresh")
         pg.get_by_role("heading", name="Set up payouts").wait_for(timeout=15000)
         check(pg.get_by_role("button", name="Set up payouts").count() == 1, "stripe=refresh: Set up payouts")
@@ -127,6 +128,7 @@ try:
         check(pg.get_by_text("Ticket money is paid to your bank 3 days after your event ends.").count() == 1
               and pg.get_by_role("link", name="My tickets").get_attribute("href") == "/tickets"
               and pg.get_by_role("link", name="Back to home").get_attribute("href") == "/", "ready: heading, line, My tickets and home links")
+        check(pg.locator(".po-card").get_by_role("link", name="Your events").get_attribute("href") == "/events/mine", "ready: Your events link to /events/mine")
         pg.unroute("**/api/events/payouts/status*")
         pg.route("**/api/events/payouts/status*", lambda r: r.fulfill(status=500, content_type="application/json", body=json.dumps({"success": False, "error": "boom"})))
         pg.goto(WEB + "/events/payouts")

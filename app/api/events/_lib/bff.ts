@@ -28,15 +28,50 @@ export function badRequest(code: string, message: string): NextResponse {
   return NextResponse.json({ success: false, error: message, code }, { status: 400 });
 }
 
-/** Forward with the caller's Bearer token and Cookie (no body). */
-export function forward(req: NextRequest, method: "GET" | "POST", path: string, body?: unknown): Promise<NextResponse> {
-  return proxyToBackend(path, { method, headers: backendAuthHeaders(req) as Record<string, string>, body });
+export type ForwardMethod = "GET" | "POST" | "PATCH" | "DELETE";
+
+/**
+ * Forward with the caller's Bearer token and Cookie. An optional query (a string such as "scope=event" or
+ * a URLSearchParams) is appended to the path; callers pass only keys they have already validated.
+ * Optional extra headers are added on top (a route opts in to each one, e.g. the accept route's User-Agent).
+ */
+export function forward(
+  req: NextRequest,
+  method: ForwardMethod,
+  path: string,
+  body?: unknown,
+  query?: string | URLSearchParams,
+  extraHeaders?: Record<string, string>,
+): Promise<NextResponse> {
+  const qs = query === undefined ? "" : query.toString();
+  const headers = { ...(extraHeaders ?? {}), ...(backendAuthHeaders(req) as Record<string, string>) };
+  return proxyToBackend(qs ? `${path}?${qs}` : path, { method, headers, body });
 }
 
 /** Parse the client's JSON object body; null when it is missing, invalid or not an object. */
 export async function readJsonObject(req: NextRequest): Promise<Record<string, unknown> | null> {
   try {
     const parsed: unknown = await req.json();
+    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Like readJsonObject, for routes whose body is optional: an empty body gives undefined (forward nothing),
+ * a JSON object gives the object, anything else gives null (answer with invalidBody()).
+ */
+export async function readOptionalJsonObject(req: NextRequest): Promise<Record<string, unknown> | undefined | null> {
+  let text: string;
+  try {
+    text = await req.text();
+  } catch {
+    return null;
+  }
+  if (text.trim() === "") return undefined;
+  try {
+    const parsed: unknown = JSON.parse(text);
     return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
   } catch {
     return null;
