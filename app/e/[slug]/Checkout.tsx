@@ -11,16 +11,19 @@
  * GET /api/events/orders/:id says "completed", never from the Stripe result alone.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import type { EventInfo, TicketType } from "./types";
+import {
+  afterRetrieve, confirmOutcome, entryDecision, holdPhase, lateCopy, paramsKey, parseSaved, phaseForOrder, storageKey,
+  type Entry, type Phase, type PiStatus, type Saved,
+} from "./checkoutLogic";
 
 const GENERIC_ERROR = "Something went wrong. Try again.";
 const NO_PAYMENTS = "Payments aren't available right now. Try again later.";
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const POLL_EVERY_MS = 2000;
 const POLL_FOR_MS = 3 * 60 * 1000;
 
@@ -119,56 +122,114 @@ interface OrderInfo {
   tickets?: unknown[];
 }
 
-type Phase =
-  | "starting" // loading Stripe, then creating the hold
-  | "unavailable" // Stripe could not load
-  | "holding" // hold exists, waiting for the card
-  | "hold-error" // the hold could not be created
-  | "hold-ended" // the timer reached zero
-  | "paying" // confirmCardPayment in flight
-  | "confirming" // polling the order
-  | "done" // order completed
-  | "closed" // order expired or cancelled
-  | "refunded"
-  | "late"; // paid, but not completed within 3 minutes
-
 /* ---------- entry: reads the URL ---------- */
 
 export function CheckoutHost({ slug, event, ticketTypes, onPaid }: { slug: string; event: EventInfo; ticketTypes: TicketType[]; onPaid?: () => void }) {
+  const router = useRouter();
   const params = useSearchParams();
-  const id = params.get("checkout");
-  const qtyRaw = params.get("qty");
-  if (!id || !UUID_RE.test(id) || !qtyRaw || !/^\d{1,3}$/.test(qtyRaw)) return null;
-  const qtyN = Number(qtyRaw);
-  if (!Number.isInteger(qtyN) || qtyN < 1) return null;
-  const type = ticketTypes.find((t) => t.id === id);
-  // Nothing can be bought on a draft, cancelled or finished event, or for a free or off sale type.
-  if (!type || type.salesStatus !== "on_sale" || type.priceCents <= 0) return null;
-  if (event.status !== "published" || new Date(event.endsAt).getTime() < Date.now()) return null;
-  const caps = [type.maxPerOrder, type.remaining, type.perAccountLimit].filter((n): n is number => typeof n === "number" && n > 0);
-  const max = caps.length ? Math.max(1, Math.min(...caps)) : 10;
-  const min = Math.min(type.minPerOrder && type.minPerOrder > 0 ? type.minPerOrder : 1, max);
-  const qty = Math.min(Math.max(qtyN, min), max);
-  return <Checkout key={`${id}:${qty}`} slug={slug} event={event} type={type} qty={qty} onPaid={onPaid} />;
+  const p = { checkout: params.get("checkout"), qty: params.get("qty") };
+  const k = paramsKey(p);
+  // The decision is made once per set of params and frozen while the checkout is open: a refresh of the
+  // ticket types (remaining counts the buyer's own seats after paying) must never remount or close it.
+  const [active, setActive] = useState<{ k: string; entry: Entry } | null>(null);
+  const finished = useRef(false);
+  const dismissed = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!p.checkout) dismissed.current = null;
+    const entry = entryDecision(p, event, ticketTypes, Date.now());
+    if (!active) {
+      if (entry && dismissed.current !== k) setActive({ k, entry });
+      return;
+    }
+    if (k !== active.k) {
+      if (p.checkout) {
+        finished.current = false;
+        setActive(entry && dismissed.current !== k ? { k, entry } : null);
+      } else if (!finished.current) {
+        setActive(null);
+      }
+    }
+  });
+
+  if (!active) return null;
+  return (
+    <Checkout
+      key={active.k}
+      slug={slug}
+      event={event}
+      type={active.entry.type}
+      qty={active.entry.qty}
+      onPaid={onPaid}
+      onFinished={() => {
+        finished.current = true;
+        router.replace(`/e/${slug}`, { scroll: false });
+      }}
+      onClose={() => {
+        dismissed.current = k;
+        finished.current = false;
+        setActive(null);
+        router.replace(`/e/${slug}`, { scroll: false });
+      }}
+    />
+  );
 }
 
 /* ---------- checkout ---------- */
 
-export default function Checkout({ slug, event, type, qty, onPaid }: { slug: string; event: EventInfo; type: TicketType; qty: number; onPaid?: () => void }) {
-  const router = useRouter();
+export default function Checkout({ slug, event, type, qty, onPaid, onFinished, onClose }: { slug: string; event: EventInfo; type: TicketType; qty: number; onPaid?: () => void; onFinished?: () => void; onClose: () => void }) {
+  const sKey = storageKey(event.id, type.id, qty);
+  const saveRef = useRef<Saved | null>(null);
+  const resumeRef = useRef<Saved | null>(null);
   const [stripe, setStripe] = useState<Stripe | null>(null);
   const [phase, setPhase] = useState<Phase>("starting");
   const [hold, setHold] = useState<Hold | null>(null);
   const [holdError, setHoldError] = useState<{ message: string; code: string } | null>(null);
-  const [attempt, setAttempt] = useState(() => ({ key: newKey(), n: 0 }));
+  const [attempt, setAttempt] = useState(() => {
+    // Same event, ticket and quantity in this tab: reuse the key so a refresh never opens a second hold.
+    let saved: Saved | null = null;
+    try { saved = parseSaved(window.sessionStorage.getItem(sKey)); } catch { /* storage unavailable */ }
+    saveRef.current = saved;
+    if (saved?.stage === "confirming") resumeRef.current = saved;
+    return { key: saved?.key ?? newKey(), n: 0 };
+  });
   const [now, setNow] = useState(() => Date.now());
   const [order, setOrder] = useState<OrderInfo | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [pi, setPi] = useState<PiStatus>(() => resumeRef.current?.pi ?? null);
   const loginHref = `/login?return=${encodeURIComponent(`/e/${slug}?checkout=${type.id}&qty=${qty}`)}`;
 
-  const close = useCallback(() => {
-    router.replace(`/e/${slug}`, { scroll: false });
-  }, [router, slug]);
+  const close = onClose;
+
+  function save(next: Saved | null) {
+    saveRef.current = next;
+    try {
+      if (next) window.sessionStorage.setItem(sKey, JSON.stringify(next));
+      else window.sessionStorage.removeItem(sKey);
+    } catch { /* storage unavailable */ }
+  }
+  useEffect(() => {
+    if (!saveRef.current) save({ key: attempt.key, stage: "holding" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Back on a payment already made: no new hold, go straight to polling that order.
+  useEffect(() => {
+    const r = resumeRef.current;
+    if (r?.orderId) {
+      setOrderId(r.orderId);
+      setPhase("confirming");
+    }
+  }, []);
+
+  function goConfirming(status: PiStatus, id: string | null) {
+    setPi(status);
+    if (id) {
+      setOrderId(id);
+      save({ key: attempt.key, orderId: id, stage: "confirming", pi: status });
+    }
+    setPhase("confirming");
+  }
 
   // Full screen: keep the page behind from scrolling.
   useEffect(() => {
@@ -181,6 +242,7 @@ export default function Checkout({ slug, event, type, qty, onPaid }: { slug: str
 
   // Load Stripe once. A missing key or a failed script means no Pay button at all.
   useEffect(() => {
+    if (resumeRef.current) return;
     let cancelled = false;
     (async () => {
       let key = "";
@@ -206,7 +268,7 @@ export default function Checkout({ slug, event, type, qty, onPaid }: { slug: str
 
   // Create the hold (once Stripe is ready). The same key is reused for retries of the same attempt.
   useEffect(() => {
-    if (!stripe) return;
+    if (!stripe || resumeRef.current) return;
     let cancelled = false;
     setPhase("starting");
     setHoldError(null);
@@ -232,8 +294,14 @@ export default function Checkout({ slug, event, type, qty, onPaid }: { slug: str
         // Already paid under this key: go straight to the order.
         if (body?.order) {
           setOrder(body.order);
-          setOrderId(typeof body.order.id === "string" ? body.order.id : null);
-          setPhase(phaseForOrder(body.order, "confirming"));
+          const oid = typeof body.order.id === "string" ? body.order.id : null;
+          const next = phaseForOrder(body.order.status, "confirming");
+          if (next === "closed") save(null);
+          if (next === "confirming") goConfirming("succeeded", oid);
+          else {
+            setOrderId(oid);
+            setPhase(next);
+          }
           return;
         }
         if (
@@ -257,6 +325,7 @@ export default function Checkout({ slug, event, type, qty, onPaid }: { slug: str
           totalCents: body.totalCents,
         });
         setOrderId(body.orderId);
+        save({ key: attempt.key, orderId: body.orderId, stage: "holding" });
         setNow(Date.now());
         setPhase("holding");
       } catch {
@@ -277,7 +346,7 @@ export default function Checkout({ slug, event, type, qty, onPaid }: { slug: str
     const tick = () => {
       const t = Date.now();
       setNow(t);
-      if (t >= hold.holdExpiresAt) setPhase("hold-ended");
+      if (holdPhase(t, hold.holdExpiresAt) === "hold-ended") setPhase("hold-ended");
     };
     tick();
     const h = setInterval(tick, 1000);
@@ -301,8 +370,9 @@ export default function Checkout({ slug, event, type, qty, onPaid }: { slug: str
         const body = await res.json().catch(() => null);
         if (cancelled) return;
         if (res.ok && body?.order) {
-          const next = phaseForOrder(body.order, "confirming");
+          const next = phaseForOrder(body.order.status, "confirming");
           if (next !== "confirming") {
+            if (next === "closed") save(null);
             setOrder(body.order);
             setPhase(next);
             return;
@@ -328,12 +398,19 @@ export default function Checkout({ slug, event, type, qty, onPaid }: { slug: str
 
   useEffect(() => {
     if (phase === "done") onPaid?.();
+    // The page behind keeps its own state; take the checkout params out of the URL so a refresh can't reopen it.
+    if (phase === "done" || phase === "late") onFinished?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
   function startAgain() {
+    resumeRef.current = null;
+    const key = newKey();
+    save({ key, stage: "holding" });
     setHold(null);
-    setAttempt({ key: newKey(), n: 0 });
+    setOrderId(null);
+    setPi(null);
+    setAttempt({ key, n: 0 });
   }
   function retrySame() {
     setAttempt((a) => ({ key: a.key, n: a.n + 1 }));
@@ -407,7 +484,7 @@ export default function Checkout({ slug, event, type, qty, onPaid }: { slug: str
               <p>{holdError.message}</p>
               {RETRY_CODES.has(holdError.code) || holdError.code === "" ? (
                 <button type="button" className="co-ghost" onClick={retrySame}>Try again</button>
-              ) : holdError.code === "IDEMPOTENCY_KEY_REUSED" ? (
+              ) : holdError.code === "IDEMPOTENCY_KEY_REUSED" || holdError.code === "CHECKOUT_CLOSED" ? (
                 <button type="button" className="co-ghost" onClick={startAgain}>Start again</button>
               ) : null}
               <button type="button" className="co-ghost" onClick={close}>Back to event</button>
@@ -437,7 +514,8 @@ export default function Checkout({ slug, event, type, qty, onPaid }: { slug: str
             onChange={close}
             onPaying={() => setPhase("paying")}
             onFailed={() => setPhase("holding")}
-            onPaid={() => setPhase("confirming")}
+            onPaid={(status) => goConfirming(status, hold.orderId)}
+            onRetrySame={retrySame}
           />
         )}
 
@@ -489,8 +567,8 @@ export default function Checkout({ slug, event, type, qty, onPaid }: { slug: str
         {phase === "late" && (
           <div className="co-body">
             <div className="co-msg" role="status">
-              <h2>Payment received</h2>
-              <p>Your payment went through. Your tickets will appear in My Tickets in a few minutes.</p>
+              <h2>{pi === "succeeded" ? "Payment received" : "Almost there"}</h2>
+              <p>{lateCopy(pi)}</p>
               <Link href="/tickets" className="co-gold">View my tickets</Link>
             </div>
           </div>
@@ -498,22 +576,6 @@ export default function Checkout({ slug, event, type, qty, onPaid }: { slug: str
       </div>
     </div>
   );
-}
-
-/** Map an order's status to the next phase; `pending` keeps the caller's phase. */
-function phaseForOrder(o: OrderInfo, keep: Phase): Phase {
-  switch (o.status) {
-    case "completed":
-      return "done";
-    case "expired":
-    case "cancelled":
-      return "closed";
-    case "refunding":
-    case "refunded":
-      return "refunded";
-    default:
-      return keep;
-  }
 }
 
 /* ---------- pay form (inside Elements) ---------- */
@@ -528,7 +590,8 @@ interface PayProps {
   onChange: () => void;
   onPaying: () => void;
   onFailed: () => void;
-  onPaid: () => void;
+  onPaid: (pi: "succeeded" | "processing") => void;
+  onRetrySame: () => void;
 }
 
 function PayPanel(props: PayProps) {
@@ -539,7 +602,7 @@ function PayPanel(props: PayProps) {
   );
 }
 
-function PayForm({ hold, type, qty, remaining, paying, onChange, onPaying, onFailed, onPaid }: PayProps) {
+function PayForm({ hold, type, qty, remaining, paying, onChange, onPaying, onFailed, onPaid, onRetrySame }: PayProps) {
   const stripe = useStripe();
   const elements = useElements();
   const [cardError, setCardError] = useState("");
@@ -554,22 +617,34 @@ function PayForm({ hold, type, qty, remaining, paying, onChange, onPaying, onFai
     setError("");
     onPaying();
     try {
-      const result = await stripe.confirmCardPayment(hold.clientSecret, { payment_method: { card } });
-      if (result.error) {
-        setError(result.error.message || "Your card couldn't be charged. Check the details and try again.");
+      let out;
+      try {
+        const result = await stripe.confirmCardPayment(hold.clientSecret, { payment_method: { card } });
+        out = { result, outcome: confirmOutcome({ error: result.error as { code?: string; payment_intent?: { status?: string } } | undefined, paymentIntentStatus: result.paymentIntent?.status }) };
+      } catch {
+        out = { result: null, outcome: confirmOutcome({ thrown: true }) };
+      }
+      const o = out.outcome;
+      if (o.next === "confirming") {
+        onPaid(o.pi);
+      } else if (o.next === "check-payment") {
+        // The charge may have gone through. Ask Stripe, then ask the backend again with the same key.
+        let st: string | undefined;
+        try {
+          st = (await stripe.retrievePaymentIntent(hold.clientSecret)).paymentIntent?.status;
+        } catch { /* fall through to the backend */ }
+        const a = afterRetrieve(st);
+        if (a === "confirming-succeeded") onPaid("succeeded");
+        else if (a === "confirming-processing") onPaid("processing");
+        else onRetrySame();
+      } else {
+        setError(
+          o.showStripeError
+            ? out.result?.error?.message || "Your card couldn't be charged. Check the details and try again."
+            : "Your card couldn't be charged. Try again.",
+        );
         onFailed();
-        return;
       }
-      const status = result.paymentIntent?.status;
-      if (status === "succeeded" || status === "processing") {
-        onPaid();
-        return;
-      }
-      setError("Your card couldn't be charged. Try again.");
-      onFailed();
-    } catch {
-      setError(GENERIC_ERROR);
-      onFailed();
     } finally {
       inFlight.current = false;
     }
