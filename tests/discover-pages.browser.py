@@ -6,7 +6,7 @@ Env (defaults shown): DP_WEB_URL=http://localhost:3101  DP_BACKEND_URL=http://lo
 Skips (exit 0) when the web or backend server is not up. Needs psql and node on PATH.
 Seeds users, posts and a story with SQL, and one published free event through the local backend (create,
 free ticket type, accept the host agreement, publish). Removes everything it created.
-Sections: Pro (/discover). Tasks 7 and 8 add Following and Pulse.
+Sections: Pro (/discover), Following (/discover/following). Task 8 adds Pulse.
 """
 import re, json, os, subprocess, sys, time, urllib.request
 from urllib.parse import urlparse
@@ -288,6 +288,117 @@ def section_pro(browser):
     ctx.close()
 
 
+# ---------------------------------------------------------------------------------------------------------------
+def section_following(browser):
+    print("== Following (/discover/following)")
+    viewer = user("fv", "Follow Viewer")
+    loner = user("fl", "Follow Loner")
+    author = user("fa", "Followed Author")
+    for i in range(35):
+        seed_post(author, f"{P} fa {i}", 10 + i)
+    sql(f"INSERT INTO follows (follower_user_id, target_user_id) VALUES ('{viewer}','{author}')")
+
+    def art_count(pg):
+        return pg.evaluate("(sel) => document.querySelectorAll(sel + ' > article').length", FEED)
+
+    # ---- signed out: prompt, link, and no feed request
+    print("signed out")
+    ctx, pg, errs, reqs = new_ctx(browser)
+    resp = pg.goto(WEB + "/discover/following")
+    check(resp is not None and resp.status == 200, "/discover/following returns 200", resp and resp.status)
+    check(pg.title() == "Following | Outsyde", "page title", pg.title())
+    pg.get_by_text("Sign in to see posts from people you follow.").wait_for(timeout=60000)
+    check(True, "signed out: sign-in text shows")
+    link = pg.get_by_role("link", name="Sign in", exact=True)
+    check(link.count() == 1 and link.get_attribute("href") == "/login?return=/discover/following", "signed out: Sign in link to login with return", link.count())
+    pg.wait_for_timeout(1000)
+    check(not any("/api/discover/feed" in r for r in reqs), "signed out: zero requests to /api/discover/feed", [r for r in reqs if "/api/discover/feed" in r])
+    nav = pg.get_by_role("navigation", name="Discover")
+    cur = nav.locator("a[aria-current='page']")
+    check(cur.count() == 1 and cur.inner_text().strip() == "Following", "tab row: Following is current", cur.count())
+    check(pg.locator("link[rel='stylesheet'][href*='fonts.googleapis.com']").count() >= 1, "fonts stylesheet linked")
+    check(real(errs) == [], "signed out: no console or page errors", errs)
+    ctx.close()
+
+    # ---- signed in, following one author with 35 posts
+    print("signed in, following an author")
+    cookies, sid = auth_cookies(sql, BDIR, viewer, WEB)
+    sids.append(sid)
+    ctx, pg, errs, reqs = new_ctx(browser, cookies)
+    pg.goto(WEB + "/discover/following")
+    wait_posts(pg, 30)
+    pg.wait_for_timeout(300)
+    check(art_count(pg) == 30, "30 posts render first", art_count(pg))
+    feed_reqs = lambda: [r for r in reqs if "/api/discover/feed" in r]
+    check(len(feed_reqs()) == 1 and "scope=following" in feed_reqs()[0] and "limit=30" in feed_reqs()[0] and "offset=" not in feed_reqs()[0],
+          "first request: scope=following, limit=30, no offset", feed_reqs())
+    check(not any("lat=" in r or "lng=" in r or "city=" in r for r in feed_reqs()), "no location on the feed call", feed_reqs())
+    pg.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+    wait_posts(pg, 35)
+    pg.wait_for_timeout(300)
+    caps = pg.evaluate("""([sel, p]) => Array.from(document.querySelectorAll(sel + ' > article')).map((a) => {
+        const m = a.innerText.match(new RegExp(p + ' fa [0-9]+')); return m ? m[0] : null; })""", [FEED, P])
+    check(art_count(pg) == 35, "scrolling to the bottom loads 5 more (35 total)", art_count(pg))
+    check(None not in caps and len(set(caps)) == 35, "all 35 articles are unique", len(set(caps)))
+    check(any("offset=30" in r for r in feed_reqs()), "second request sends offset=30", feed_reqs())
+    pg.evaluate("window.scrollTo(0, 0)"); pg.wait_for_timeout(300)
+    pg.evaluate("window.scrollTo(0, document.body.scrollHeight)"); pg.wait_for_timeout(1200)
+    check(len(feed_reqs()) == 2, "no more feed requests after hasMore is false", feed_reqs())
+    cur = pg.get_by_role("navigation", name="Discover").locator("a[aria-current='page']")
+    check(cur.count() == 1 and cur.inner_text().strip() == "Following", "tab row: Following is current (signed in)")
+    check(real(errs) == [], "signed in: no console or page errors", errs)
+    ctx.close()
+
+    # ---- load more fails, then Retry; the loaded posts stay
+    print("load more error")
+    ctx, pg, errs, reqs = new_ctx(browser, cookies)
+    pg.goto(WEB + "/discover/following")
+    wait_posts(pg, 30)
+    more = re.compile(r"/api/discover/feed.*offset=30")
+    ctx.route(more, lambda r: r.fulfill(status=500, content_type="application/json", body='{"success":false}'))
+    pg.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+    pg.get_by_text("Couldn't load more. Try again.").wait_for(timeout=30000)
+    check(art_count(pg) == 30, "load more error keeps the 30 loaded posts", art_count(pg))
+    ctx.unroute(more)
+    pg.get_by_role("button", name="Retry").click()
+    wait_posts(pg, 35)
+    check(art_count(pg) == 35 and pg.get_by_text("Couldn't load more. Try again.").count() == 0, "Retry loads the last 5")
+    ctx.close()
+
+    # ---- first page error, then Retry
+    print("first page error")
+    ctx, pg, errs, reqs = new_ctx(browser, cookies)
+    ctx.route("**/api/discover/feed**", lambda r: r.fulfill(status=500, content_type="application/json", body='{"success":false}'))
+    pg.goto(WEB + "/discover/following")
+    pg.get_by_text("Couldn't load posts. Try again.").wait_for(timeout=60000)
+    check(True, "first page error shows the error line")
+    ctx.unroute("**/api/discover/feed**")
+    pg.get_by_role("button", name="Retry").click()
+    wait_posts(pg, 30)
+    check(True, "Retry loads the posts")
+    ctx.close()
+
+    # ---- signed in, following nobody
+    print("signed in, following nobody")
+    cookies2, sid2 = auth_cookies(sql, BDIR, loner, WEB)
+    sids.append(sid2)
+    ctx, pg, errs, reqs = new_ctx(browser, cookies2)
+    pg.goto(WEB + "/discover/following")
+    pg.get_by_text("Follow people to see their posts here.").wait_for(timeout=60000)
+    check(True, "following nobody: empty copy shows")
+    find = pg.get_by_role("link", name="Find people on Pro")
+    check(find.count() == 1 and find.get_attribute("href") == "/discover", "empty state links to /discover")
+    check(pg.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth"), "1280px: no horizontal scroll")
+    ctx.close()
+
+    print("390px")
+    ctx, pg, errs, reqs = new_ctx(browser, cookies, width=390)
+    pg.goto(WEB + "/discover/following")
+    wait_posts(pg, 30)
+    check(pg.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth"), "390px: no horizontal scroll")
+    ctx.close()
+
+
 def cleanup():
     ids = ",".join(f"'{u}'" for u in created_users)
     if not ids:
@@ -322,6 +433,7 @@ try:
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
         section_pro(browser)
+        section_following(browser)
         browser.close()
 except Exception as e:
     failed += 1
