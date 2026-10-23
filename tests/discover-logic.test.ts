@@ -2,7 +2,7 @@
 import {
   toFeedPost, toPulseVideo, toStoryGroups, sortPro, mixEventCards, relativeTime,
   toggleReducer, nextPulsePage, eventWindow, likesLabel, roleBadge, profileHref,
-  toggleTap, toggleSettle, mergeLoadedComments, resolvePendingComment, type ToggleSync, type ToggleState,
+  toggleTap, toggleSettle, mergeLoadedComments, resolvePendingComment, appendPage, isCurrent, parseFollowingPage, type ToggleSync, type ToggleState,
   type FeedPost, type PulseVideo,
 } from "../app/discover/_lib/feedLogic";
 import {
@@ -218,6 +218,16 @@ eq(toViewer({ authenticated: true, userId: "u2", username: null, displayName: ""
 eq(toViewer({ authenticated: true, user: {} }).status, "out", "no user id: signed out");
 eq(toViewer({ authenticated: false, user: { id: "u1" } }).status, "out", "authenticated false: signed out");
 eq(toViewer(null).status, "out", "null body: signed out");
+
+console.log("following paging");
+eq(appendPage([{ id: "a" }, { id: "b" }], [{ id: "b" }, { id: "c" }, { id: "c" }, { id: "d" }]).map((p) => p.id), ["a", "b", "c", "d"], "overlapping page appended without duplicates, order kept");
+eq(isCurrent(2, 3), false, "response from an older run is ignored");
+eq(isCurrent(3, 3), true, "response from the latest run is used");
+const bad = { posts: [{ id: "x" }, null, 5], nextOffset: 30, hasMore: true };
+eq(parseFollowingPage(bad, undefined), { posts: [], nextOffset: 30, hasMore: true }, "all invalid posts: offset still advances, paging continues");
+eq(parseFollowingPage({ posts: [], nextOffset: 30, hasMore: true }, 30).hasMore, false, "stuck offset ends paging");
+eq(parseFollowingPage({ posts: [], nextOffset: 60, hasMore: "yes" }, 30).hasMore, false, "hasMore must be exactly true");
+eq(parseFollowingPage(null, undefined), { posts: [], nextOffset: undefined, hasMore: false }, "null body: empty, done");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

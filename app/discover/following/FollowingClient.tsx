@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FONTS_HREF } from "../../e/_shared/format";
-import { toFeedPost, type FeedPost } from "../_lib/feedLogic";
+import { appendPage, isCurrent, parseFollowingPage, type FeedPost } from "../_lib/feedLogic";
 import { clientApi } from "../_lib/clientApi";
 import { SIGN_IN_FOLLOWING, useViewer } from "../_lib/viewer";
 import DiscoverTabs from "../_ui/DiscoverTabs";
@@ -50,26 +50,18 @@ export default function FollowingClient() {
     const first = offset === undefined;
     busy.current = true;
     const res = await clientApi.feed({ limit: PAGE_SIZE, scope: "following", offset });
-    if (id !== seq.current) return; // a newer load owns the state
+    if (!isCurrent(id, seq.current)) return; // a newer load owns the state
     busy.current = false;
     const data = res.body?.data;
-    const raw = data?.posts ?? res.body?.posts;
-    if (!res.ok || !Array.isArray(raw)) {
+    if (!res.ok || !Array.isArray(data?.posts)) {
       if (res.status === 401) onSignIn(SIGN_IN_FOLLOWING);
       if (first) setPhase("firstError");
       else setPaging((p) => ({ ...p, loadingMore: false, moreError: true }));
       return;
     }
-    const mapped = (raw as unknown[]).map(toFeedPost).filter((p): p is FeedPost => p !== null);
-    const next = typeof data?.nextOffset === "number" ? data.nextOffset : undefined;
-    // Keep going only while the server says so AND the offset moves forward (no loop on a stuck cursor).
-    const moves = next !== undefined && next > (offset ?? 0);
-    setPosts((prev) => {
-      const base = first ? [] : prev;
-      const seen = new Set(base.map((p) => p.id));
-      return [...base, ...mapped.filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)))];
-    });
-    setPaging({ offset: next, hasMore: data?.hasMore === true && moves, moreError: false, loadingMore: false });
+    const page = parseFollowingPage(data, offset);
+    setPosts((prev) => appendPage(first ? [] : prev, page.posts));
+    setPaging({ offset: page.nextOffset, hasMore: page.hasMore, moreError: false, loadingMore: false });
     setPhase("ready");
   }, [onSignIn]);
 
@@ -77,9 +69,10 @@ export default function FollowingClient() {
     if (viewer.status !== "in") return;
     const run = seq;
     const flag = busy;
-    queueMicrotask(() => load(undefined));
-    return () => { run.current++; flag.current = false; };
-  }, [viewer.status, load]);
+    let cancelled = false;
+    queueMicrotask(() => { if (!cancelled) load(undefined); });
+    return () => { cancelled = true; run.current++; flag.current = false; };
+  }, [viewer.status, viewer.userId, load]);
 
   const retryFirst = useCallback(() => { setPhase("first"); load(undefined); }, [load]);
 

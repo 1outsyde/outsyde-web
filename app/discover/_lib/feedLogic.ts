@@ -325,3 +325,34 @@ export function resolvePendingComment<R extends { id: string; pending: boolean }
   if (id !== pendingId && list.some((x) => x.id === id)) return list.filter((x) => x.id !== pendingId);
   return list.map((x) => (x.id === pendingId ? { ...x, id, pending: false } : x));
 }
+
+/** Append a page to the loaded posts, keeping order and dropping any id already loaded (or repeated in the page). */
+export function appendPage<T extends { id: string }>(existing: T[], incoming: T[]): T[] {
+  const seen = new Set(existing.map((p) => p.id));
+  const out = existing.slice();
+  for (const p of incoming) {
+    if (seen.has(p.id)) continue;
+    seen.add(p.id);
+    out.push(p);
+  }
+  return out;
+}
+
+/** A response belongs to the latest request only when its run number still equals the counter. */
+export function isCurrent(run: number, counter: number): boolean {
+  return run === counter;
+}
+
+/**
+ * One following page from the feed `data` body. Posts that cannot be shown are dropped, but the offset still
+ * comes from the server, so a page of only invalid posts advances. More pages only while hasMore is exactly
+ * true and the offset moved forward (a stuck offset ends paging instead of looping).
+ */
+export function parseFollowingPage(data: unknown, requestedOffset: number | undefined): { posts: FeedPost[]; nextOffset: number | undefined; hasMore: boolean } {
+  const d = data && typeof data === "object" ? (data as Record<string, unknown>) : {};
+  const raw = Array.isArray(d.posts) ? (d.posts as unknown[]) : [];
+  const posts = raw.map(toFeedPost).filter((p): p is FeedPost => p !== null);
+  const nextOffset = typeof d.nextOffset === "number" ? d.nextOffset : undefined;
+  const moves = nextOffset !== undefined && nextOffset > (requestedOffset ?? 0);
+  return { posts, nextOffset, hasMore: d.hasMore === true && moves };
+}
