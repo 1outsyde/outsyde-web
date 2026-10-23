@@ -36,6 +36,20 @@ export function errorCopy(status: number, body: ApiBody): string {
   return failureCopy(status, body).message;
 }
 
+/** Only a Stripe hosted page (https, stripe.com or a subdomain) is a valid place to send someone for payout setup. */
+export function stripeUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  try {
+    const u = new URL(value);
+    const host = u.hostname.toLowerCase();
+    if (u.protocol !== "https:") return null;
+    if (host !== "stripe.com" && !host.endsWith(".stripe.com")) return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
 /** Cents as "$20.00". Always two decimals. */
 export function money(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;

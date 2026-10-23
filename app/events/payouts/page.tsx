@@ -4,27 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { GENERIC_ERROR, errorCopy } from "../../e/_shared/format";
+import { GENERIC_ERROR, errorCopy, stripeUrl } from "../../e/_shared/format";
 
 type View =
   | { step: "loading" }
   | { step: "error"; message: string }
   | { step: "ready" }
   | { step: "needs"; mode: "almost" | "setup" };
-
-// Only a Stripe hosted page is a valid place to send someone for onboarding.
-function stripeUrl(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  try {
-    const u = new URL(value);
-    const host = u.hostname.toLowerCase();
-    if (u.protocol !== "https:") return null;
-    if (host !== "stripe.com" && !host.endsWith(".stripe.com")) return null;
-    return u.toString();
-  } catch {
-    return null;
-  }
-}
 
 export default function EventPayoutsPage() {
   const router = useRouter();
