@@ -162,7 +162,8 @@ export default function StoryViewer({ groups, start, signedIn, onShown, onClose 
             <img key={story.id} className={styles.storyImg} src={story.mediaUrl} alt="" />
           )}
         </div>
-        <button type="button" className={`${styles.storyNav} ${styles.storyNavPrev}`} aria-label="Previous story" onClick={prev} disabled={isFirst}>
+        <button type="button" className={`${styles.storyNav} ${styles.storyNavPrev}`} aria-label="Previous story"
+          aria-disabled={isFirst} onClick={() => { if (!isFirst) prev(); }}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
         </button>
         <button type="button" className={`${styles.storyNav} ${styles.storyNavNext}`} aria-label="Next story" onClick={next}>

@@ -1,34 +1,4 @@
 /* Shared styles for every Discover component. Class names are local to this module. */
-.tabsHeader {
-  background: linear-gradient(#1A3C34, transparent);
-  border-bottom: 1px solid #1F1F1F;
-  font-family: 'Hanken Grotesk', system-ui, sans-serif;
-}
-.tabs {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 24px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 28px;
-}
-.tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 48px;
-  box-sizing: border-box;
-  font-weight: 700;
-  font-size: 18px;
-  color: #B8B0A0;
-  text-decoration: none;
-  border-bottom: 2px solid transparent;
-}
-.tab:hover { color: #F5F0E6; }
-.tabOn {
-  color: #F5F0E6;
-  border-bottom-color: #E8B930;
-}
 
 /* Sign-in prompt dialog */
 .dialogBackdrop {
@@ -563,7 +533,7 @@ div.storySlot { cursor: default; }
   justify-content: center;
   cursor: pointer;
 }
-.storyNav:disabled { opacity: 0.35; cursor: default; }
+.storyNav[aria-disabled="true"] { opacity: 0.35; cursor: default; }
 .storyNavPrev { left: 8px; }
 .storyNavNext { right: 8px; }
 

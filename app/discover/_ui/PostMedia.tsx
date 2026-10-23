@@ -1,9 +1,10 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- plain lazy <img> as on /events (controller ruling); feed media comes from many hosts */
 
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
 import type { PostMedia as Media } from "../_lib/feedLogic";
 import HlsVideo from "./HlsVideo";
+import { useMediaSuspended } from "./mediaSuspend";
 import styles from "./discover.module.css";
 
 // Only one feed video plays at a time: the newest one to come into view takes over.
@@ -12,31 +13,44 @@ let activeFeedVideo: (() => void) | null = null;
 function FeedVideo({ url, poster }: { url: string | null; poster: string | null }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const [inView, setInView] = useState(false);
+  const [near, setNear] = useState(false);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const [muted, setMuted] = useState(true);
+  // The story viewer covers the feed: nothing here plays, and this video gives up ownership.
+  const suspended = useMediaSuspended();
+  const failed = url !== null && failedUrl === url;
+  const playing = inView && !suspended && !failed;
 
+  // Two observers: one says when the box is mostly on screen (play), the other when it is within
+  // about one screen of the viewport (mount the player, so hls.js only starts for nearby videos).
   useEffect(() => {
     const box = boxRef.current;
     if (!box || !url) return;
-    const release = () => setInView(false);
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        const visible = entry.isIntersecting && entry.intersectionRatio >= 0.6;
-        if (visible) {
-          if (activeFeedVideo && activeFeedVideo !== release) activeFeedVideo();
-          activeFeedVideo = release;
-        } else if (activeFeedVideo === release) {
-          activeFeedVideo = null;
-        }
-        setInView(visible);
-      },
+    const view = new IntersectionObserver(
+      ([entry]) => setInView(entry.isIntersecting && entry.intersectionRatio >= 0.6),
       { threshold: [0, 0.6] },
     );
-    io.observe(box);
+    const around = new IntersectionObserver(([entry]) => setNear(entry.isIntersecting), { rootMargin: "100% 0px" });
+    view.observe(box);
+    around.observe(box);
     return () => {
-      io.disconnect();
-      if (activeFeedVideo === release) activeFeedVideo = null;
+      view.disconnect();
+      around.disconnect();
     };
   }, [url]);
+
+  // Ownership follows playing: taking over pauses the previous owner, and a suspended or hidden video lets go.
+  useEffect(() => {
+    if (!playing) return;
+    const release = () => setInView(false);
+    if (activeFeedVideo) activeFeedVideo();
+    activeFeedVideo = release;
+    return () => {
+      if (activeFeedVideo === release) activeFeedVideo = null;
+    };
+  }, [playing]);
+
+  const onError = useCallback(() => setFailedUrl(url), [url]);
 
   if (!url) {
     return poster ? (
@@ -45,25 +59,35 @@ function FeedVideo({ url, poster }: { url: string | null; poster: string | null 
       <div className={styles.mediaPlaceholder}>Video processing</div>
     );
   }
+  const mounted = (near || inView) && !failed;
   return (
-    <div ref={boxRef} className={styles.mediaFill}>
-      <HlsVideo src={url} poster={poster} active={inView} muted={muted} loop />
-      <button
-        type="button"
-        className={styles.soundBtn}
-        aria-label={muted ? "Turn sound on" : "Turn sound off"}
-        onClick={(e) => {
-          e.stopPropagation();
-          setMuted((m) => !m);
-        }}
-        onPointerUp={(e) => e.stopPropagation()}
-        onDoubleClick={(e) => e.stopPropagation()}
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M11 5 6 9H2v6h4l5 4z" />
-          {muted ? <path d="m23 9-6 6M17 9l6 6" /> : <path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14" />}
-        </svg>
-      </button>
+    <div ref={boxRef} className={styles.mediaFill} data-feed-video={failed ? "failed" : mounted ? "mounted" : "idle"}>
+      {mounted ? (
+        <HlsVideo src={url} poster={poster} active={playing} muted={muted} loop onError={onError} />
+      ) : poster ? (
+        <img className={styles.mediaImg} src={poster} alt="" loading="lazy" draggable={false} />
+      ) : (
+        <div className={styles.mediaPlaceholder} />
+      )}
+      {failed ? <span className={styles.pulseUnavailable}>Video unavailable</span> : null}
+      {mounted ? (
+        <button
+          type="button"
+          className={styles.soundBtn}
+          aria-label={muted ? "Turn sound on" : "Turn sound off"}
+          onClick={(e) => {
+            e.stopPropagation();
+            setMuted((m) => !m);
+          }}
+          onPointerUp={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M11 5 6 9H2v6h4l5 4z" />
+            {muted ? <path d="m23 9-6 6M17 9l6 6" /> : <path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14" />}
+          </svg>
+        </button>
+      ) : null}
     </div>
   );
 }

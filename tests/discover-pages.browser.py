@@ -7,7 +7,7 @@ Skips (exit 0) when the web or backend server is not up. Needs psql and node on 
 Seeds users, posts and a story with SQL, and one published free event through the local backend (create,
 free ticket type, accept the host agreement, publish). Removes everything it created.
 Sections: Pro (/discover), Following (/discover/following), Pulse (/discover/pulse).
-Pulse makes a tiny H.264 HLS stream with ffmpeg (needs ffmpeg on PATH) and copies it under public/__discover_test/
+Pro (feed video and stories) and Pulse make a tiny H.264 HLS stream with ffmpeg (needs ffmpeg on PATH) and copies it under public/__discover_test/
 for the run only; the folder is removed at the end.
 """
 import re, json, os, shutil, subprocess, sys, tempfile, time, urllib.request
@@ -289,6 +289,91 @@ def section_pro(browser):
     check(real(errs) == [], "no console or page errors", errs)
     ctx.close()
 
+    pro_video(browser, alice, bob)
+
+
+def video_state(pg, caption):
+    """paused, currentTime and mount state of the feed video in the post with this caption (None when no <video>)."""
+    return pg.evaluate("""([sel, cap]) => { const a = Array.from(document.querySelectorAll(sel + ' > article')).find((n) => n.innerText.includes(cap));
+        if (!a) return null; const box = a.querySelector('[data-feed-video]'); const v = a.querySelector('video');
+        return { mount: box ? box.dataset.feedVideo : null, video: !!v, paused: v ? v.paused : null, t: v ? v.currentTime : -1,
+                 top: a.getBoundingClientRect().top, vh: innerHeight }; }""", [FEED, caption])
+
+def playing_videos(pg):
+    return pg.evaluate("() => Array.from(document.querySelectorAll('video')).filter((v) => !v.paused).length")
+
+def pro_video(browser, alice, bob):
+    """Feed videos: mounted only near the viewport, paused while a story plays, resumed after, and a failed one is labelled."""
+    print("feed video and stories")
+    src = make_hls()
+    vid_cap, bad_cap = f"{P} feedvid", f"{P} badvid"
+    # The playing video is the signed-in viewer's own post, so it comes first (in view under the stories bar); the broken
+    # one is the oldest post, so it sits at the bottom, well below the first screen.
+    me = user("vv", "Video Viewer")
+    sql(f"""INSERT INTO feed_posts (author_id, author_type, post_type, content, media_url, media_type, thumbnail_url, created_at, updated_at)
+        VALUES ('{me}','consumer','video','{vid_cap}','{src}?feed=1','video','{PIXEL}', now() - interval '1 minute', now())""")
+    sql(f"""INSERT INTO feed_posts (author_id, author_type, post_type, content, media_url, media_type, thumbnail_url, created_at, updated_at)
+        VALUES ('{bob}','consumer','video','{bad_cap}','{WEB}/__discover_test/{P}/missing.m3u8','video','{PIXEL}', now() - interval '1000 minutes', now())""")
+    sql(f"""INSERT INTO stories (author_id, media_url, media_type, thumbnail_url, expires_at)
+        VALUES ('{bob}','{src}?story=1','video','{PIXEL}', now() + interval '1 day')""")
+
+    cookies, sid = auth_cookies(sql, BDIR, me, WEB)
+    sids.append(sid)
+    ctx, pg, errs, reqs = new_ctx(browser, cookies)
+    ctx.add_init_script(NO_NATIVE_HLS)
+    pg.goto(WEB + "/discover")
+    wait_posts(pg, 14)
+    check(vid_cap in pg.locator(f"{FEED} > article").nth(0).inner_text(), "the feed video post is first in the feed")
+    pg.wait_for_function("""([sel, cap]) => { const a = Array.from(document.querySelectorAll(sel + ' > article')).find((n) => n.innerText.includes(cap));
+        const v = a && a.querySelector('video'); return v && !v.paused && v.currentTime > 0; }""", arg=[FEED, vid_cap], timeout=30000)
+    check(True, "feed video in view plays")
+    st = video_state(pg, bad_cap)
+    check(st is not None and st["top"] > 2.2 * st["vh"], "the other feed video starts more than two screens down", st)
+    check(st is not None and st["mount"] == "idle" and not st["video"], "far feed video: no player mounted yet, poster shows", st)
+    check(not any("missing.m3u8" in r for r in reqs), "far feed video: no manifest request", [r for r in reqs if "missing.m3u8" in r])
+
+    # Open the video story: at most one <video> plays at any moment, and the feed video is paused.
+    pg.locator("section[aria-label='Stories']").get_by_role("button", name=re.compile("Bob Poster")).click()
+    dlg = pg.get_by_role("dialog", name=re.compile("Bob Poster"))
+    dlg.wait_for(timeout=10000)
+    pg.wait_for_function("() => { const v = document.querySelector('[role=dialog] video'); return v && !v.paused && v.currentTime > 0; }", timeout=30000)
+    samples = []
+    for _ in range(6):
+        samples.append((playing_videos(pg), (video_state(pg, vid_cap) or {}).get("paused"), video_state(pg, vid_cap) if os.environ.get("DP_DEBUG") else None))
+        pg.wait_for_timeout(150)
+    check(all(s[0] <= 1 for s in samples), "story open: at most one video plays", samples)
+    check(all(s[1] is True for s in samples), "story open: the feed video is paused", samples)
+    pg.get_by_role("button", name="Close story").click()
+    dlg.wait_for(state="detached", timeout=5000)
+    pg.wait_for_function("""([sel, cap]) => { const a = Array.from(document.querySelectorAll(sel + ' > article')).find((n) => n.innerText.includes(cap));
+        const v = a && a.querySelector('video'); return v && !v.paused; }""", arg=[FEED, vid_cap], timeout=15000)
+    check(playing_videos(pg) == 1, "story closed: the feed video plays again", playing_videos(pg))
+
+    # Previous on the first story keeps focus inside the viewer.
+    pg.locator("section[aria-label='Stories']").get_by_role("button").first.click()
+    dlg = pg.get_by_role("dialog")
+    dlg.wait_for(timeout=10000)
+    prev = dlg.get_by_role("button", name="Previous story")
+    check(prev.get_attribute("aria-disabled") == "true", "first story: Previous is aria-disabled", prev.get_attribute("aria-disabled"))
+    prev.focus()
+    prev.click()
+    pg.wait_for_timeout(200)
+    focus = pg.evaluate("() => [document.activeElement.getAttribute('aria-label'), !!document.activeElement.closest('[role=dialog]')]")
+    check(focus == ["Previous story", True], "Previous on the first story keeps focus in the viewer", focus)
+    pg.keyboard.press("Tab")
+    inside = pg.evaluate("() => !!document.activeElement.closest('[role=dialog]')")
+    check(inside, "Tab from Previous stays inside the viewer", inside)
+    pg.keyboard.press("Escape")
+    dlg.wait_for(state="detached", timeout=5000)
+
+    # A feed video that cannot load shows its poster and "Video unavailable".
+    pg.evaluate("([sel, cap]) => Array.from(document.querySelectorAll(sel + ' > article')).find((n) => n.innerText.includes(cap)).scrollIntoView({ block: 'center' })", [FEED, bad_cap])
+    bad = post(pg, bad_cap)
+    bad.get_by_text("Video unavailable").wait_for(timeout=30000)
+    check(bad.locator("video").count() == 0 and bad.locator(f"img[src='{PIXEL}']").count() >= 1, "failed feed video: poster and Video unavailable label", bad.inner_text())
+    check(real(errs) == [], "feed video: no console or page errors", errs)
+    ctx.close()
+
 
 # ---------------------------------------------------------------------------------------------------------------
 def section_following(browser):
@@ -416,7 +501,8 @@ def make_hls():
                            capture_output=True, text=True)
         if r.returncode: raise RuntimeError("ffmpeg failed: " + r.stderr[:300])
         dest = os.path.join(PUBLIC_TEST, P)
-        shutil.copytree(tmp, dest)
+        if not os.path.exists(os.path.join(dest, "v.m3u8")):  # Pro and Pulse share one stream per run
+            shutil.copytree(tmp, dest, dirs_exist_ok=True)
         return f"{WEB}/__discover_test/{P}/v.m3u8"
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

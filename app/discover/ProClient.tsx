@@ -9,6 +9,7 @@ import { useViewer } from "./_lib/viewer";
 import DiscoverTabs from "./_ui/DiscoverTabs";
 import EventFeedCard from "./_ui/EventFeedCard";
 import { FollowStateProvider } from "./_ui/followState";
+import { MediaSuspendProvider } from "./_ui/mediaSuspend";
 import PostCard from "./_ui/PostCard";
 import SignInPrompt from "./_ui/SignInPrompt";
 import StoriesBar from "./_ui/StoriesBar";
@@ -141,15 +142,18 @@ export default function ProClient() {
           </div>
         ) : (
           <FollowStateProvider>
-            <section aria-label="Posts" className={styles.feed}>
-              {items.map((item) =>
-                item.type === "post" ? (
-                  <PostCard key={item.post.id} post={item.post} viewerId={viewerId} viewer={viewer} onSignIn={onSignIn} />
-                ) : (
-                  <EventFeedCard key={`event-${item.event.id}`} event={item.event} now={now} />
-                ),
-              )}
-            </section>
+            {/* While a story is open, feed videos behind the viewer pause; the one in view resumes on close. */}
+            <MediaSuspendProvider value={openStories !== null}>
+              <section aria-label="Posts" className={styles.feed}>
+                {items.map((item) =>
+                  item.type === "post" ? (
+                    <PostCard key={item.post.id} post={item.post} viewerId={viewerId} viewer={viewer} onSignIn={onSignIn} />
+                  ) : (
+                    <EventFeedCard key={`event-${item.event.id}`} event={item.event} now={now} />
+                  ),
+                )}
+              </section>
+            </MediaSuspendProvider>
           </FollowStateProvider>
         )}
       </div>

@@ -1,4 +1,4 @@
-import styles from "./discover.module.css";
+import styles from "./DiscoverTabs.module.css";
 
 export type DiscoverTab = "events" | "following" | "pro" | "pulse";
 
