@@ -18,7 +18,7 @@ import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import type { EventInfo, TicketType } from "./types";
 import {
-  afterRetrieve, confirmOutcome, entryDecision, holdPhase, lateCopy, paramsKey, parseSaved, phaseForOrder, storageKey,
+  afterRetrieve, confirmOutcome, entryDecision, holdPhase, lateCopy, paramsKey, parseSaved, phaseForOrder, shouldQuietRestart, storageAfterPhase, storageKey,
   type Entry, type Phase, type PiStatus, type Saved,
 } from "./checkoutLogic";
 
@@ -181,7 +181,10 @@ export default function Checkout({ slug, event, type, qty, onPaid, onFinished, o
   const sKey = storageKey(event.id, type.id, qty);
   const saveRef = useRef<Saved | null>(null);
   const resumeRef = useRef<Saved | null>(null);
+  const fromStorageRef = useRef(false);
+  const restartedRef = useRef(false);
   const [stripe, setStripe] = useState<Stripe | null>(null);
+  const [stripeWanted, setStripeWanted] = useState(() => resumeRef.current === null);
   const [phase, setPhase] = useState<Phase>("starting");
   const [hold, setHold] = useState<Hold | null>(null);
   const [holdError, setHoldError] = useState<{ message: string; code: string } | null>(null);
@@ -190,6 +193,7 @@ export default function Checkout({ slug, event, type, qty, onPaid, onFinished, o
     let saved: Saved | null = null;
     try { saved = parseSaved(window.sessionStorage.getItem(sKey)); } catch { /* storage unavailable */ }
     saveRef.current = saved;
+    fromStorageRef.current = saved !== null;
     if (saved?.stage === "confirming") resumeRef.current = saved;
     return { key: saved?.key ?? newKey(), n: 0 };
   });
@@ -242,7 +246,7 @@ export default function Checkout({ slug, event, type, qty, onPaid, onFinished, o
 
   // Load Stripe once. A missing key or a failed script means no Pay button at all.
   useEffect(() => {
-    if (resumeRef.current) return;
+    if (!stripeWanted || stripe) return;
     let cancelled = false;
     (async () => {
       let key = "";
@@ -264,7 +268,8 @@ export default function Checkout({ slug, event, type, qty, onPaid, onFinished, o
     return () => {
       cancelled = true;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stripeWanted]);
 
   // Create the hold (once Stripe is ready). The same key is reused for retries of the same attempt.
   useEffect(() => {
@@ -287,7 +292,12 @@ export default function Checkout({ slug, event, type, qty, onPaid, onFinished, o
         const body = await res.json().catch(() => null);
         if (cancelled) return;
         if (!res.ok) {
-          setHoldError(failure(res.status, body));
+          const f = failure(res.status, body);
+          if (shouldQuietRestart(f.code, fromStorageRef.current, restartedRef.current)) {
+            startAgain();
+            return;
+          }
+          setHoldError(f);
           setPhase("hold-error");
           return;
         }
@@ -296,7 +306,7 @@ export default function Checkout({ slug, event, type, qty, onPaid, onFinished, o
           setOrder(body.order);
           const oid = typeof body.order.id === "string" ? body.order.id : null;
           const next = phaseForOrder(body.order.status, "confirming");
-          if (next === "closed") save(null);
+          if (storageAfterPhase(next) === "clear") save(null);
           if (next === "confirming") goConfirming("succeeded", oid);
           else {
             setOrderId(oid);
@@ -372,7 +382,7 @@ export default function Checkout({ slug, event, type, qty, onPaid, onFinished, o
         if (res.ok && body?.order) {
           const next = phaseForOrder(body.order.status, "confirming");
           if (next !== "confirming") {
-            if (next === "closed") save(null);
+            if (storageAfterPhase(next) === "clear") save(null);
             setOrder(body.order);
             setPhase(next);
             return;
@@ -404,7 +414,10 @@ export default function Checkout({ slug, event, type, qty, onPaid, onFinished, o
   }, [phase]);
 
   function startAgain() {
+    restartedRef.current = true;
     resumeRef.current = null;
+    setStripeWanted(true);
+    setPhase("starting");
     const key = newKey();
     save({ key, stage: "holding" });
     setHold(null);
@@ -560,6 +573,7 @@ export default function Checkout({ slug, event, type, qty, onPaid, onFinished, o
               <h2>Order refunded</h2>
               <p>This order was refunded. Check My Tickets for details.</p>
               <Link href="/tickets" className="co-ghost">My tickets</Link>
+              <button type="button" className="co-ghost" onClick={close}>Back to event</button>
             </div>
           </div>
         )}

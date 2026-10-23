@@ -1,6 +1,6 @@
 /** Unit tests for the paid checkout decisions. No server needed: npx tsx tests/events-checkout-logic.test.ts */
 import {
-  phaseForOrder, holdPhase, entryDecision, paramsKey, confirmOutcome, afterRetrieve, lateCopy, storageKey, parseSaved,
+  phaseForOrder, holdPhase, entryDecision, paramsKey, confirmOutcome, afterRetrieve, lateCopy, storageKey, parseSaved, storageAfterPhase, shouldQuietRestart,
 } from "../app/e/[slug]/checkoutLogic";
 
 let passed = 0, failed = 0;
@@ -86,6 +86,21 @@ eq(parseSaved("{nope"), null, "bad JSON ignored");
 eq(parseSaved(JSON.stringify({ key: "k", stage: "holding" })), { key: "k", orderId: undefined, stage: "holding", pi: null }, "holding saved");
 eq(parseSaved(JSON.stringify({ key: "k", stage: "confirming" })), null, "confirming without an order id is ignored");
 eq(parseSaved(JSON.stringify({ key: "k", stage: "confirming", orderId: "o", pi: "processing" }))?.pi, "processing", "confirming keeps pi");
+
+console.log("saved entry per phase");
+for (const ph of ["done", "refunded", "closed"] as const) eq(storageAfterPhase(ph), "clear", `${ph} clears the saved entry`);
+for (const ph of ["holding", "confirming", "late", "paying", "starting", "hold-error", "hold-ended", "unavailable"] as const) eq(storageAfterPhase(ph), "keep", `${ph} keeps the saved entry`);
+eq(storageAfterPhase(phaseForOrder("completed", "confirming")), "clear", "repeat key returning a completed order clears");
+eq(storageAfterPhase(phaseForOrder("refunded", "confirming")), "clear", "repeat key returning a refunded order clears");
+eq(storageAfterPhase(phaseForOrder("pending", "confirming")), "keep", "pending order keeps");
+
+console.log("one time quiet restart");
+eq(shouldQuietRestart("CHECKOUT_CLOSED", true, false), true, "stored key + CHECKOUT_CLOSED -> restart quietly");
+eq(shouldQuietRestart("IDEMPOTENCY_KEY_REUSED", true, false), true, "stored key + IDEMPOTENCY_KEY_REUSED -> restart quietly");
+eq(shouldQuietRestart("CHECKOUT_CLOSED", true, true), false, "second time: show the message");
+eq(shouldQuietRestart("CHECKOUT_CLOSED", false, false), false, "fresh key (not from storage): show the message");
+eq(shouldQuietRestart("SOLD_OUT", true, false), false, "other codes never restart");
+eq(shouldQuietRestart("", true, false), false, "no code never restarts");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

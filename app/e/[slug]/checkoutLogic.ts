@@ -134,3 +134,16 @@ export function parseSaved(raw: string | null): Saved | null {
     return null;
   }
 }
+
+/** What the saved entry does when a phase is reached. Final orders are cleared so the same ticket and qty can be bought again. */
+export function storageAfterPhase(phase: Phase): "keep" | "clear" {
+  return phase === "done" || phase === "refunded" || phase === "closed" ? "clear" : "keep";
+}
+
+/**
+ * A key that came from storage can point at an order that has since expired or been settled under other rules.
+ * Then, once, start again with a new key instead of showing "sales are closed". A real closed sale shows its message.
+ */
+export function shouldQuietRestart(code: string, keyFromStorage: boolean, alreadyRestarted: boolean): boolean {
+  return keyFromStorage && !alreadyRestarted && (code === "CHECKOUT_CLOSED" || code === "IDEMPOTENCY_KEY_REUSED");
+}
