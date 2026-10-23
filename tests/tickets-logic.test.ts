@@ -1,5 +1,5 @@
 /** Unit tests for the My Tickets helpers. No server needed: npx tsx tests/tickets-logic.test.ts */
-import { escapeIcs, buildIcs, icsFileName, splitSections, groupByEvent, placeInfo, whenLine, directionsUrl, errorCopy } from "../app/tickets/ticketsLogic";
+import { safeHttpUrl, escapeIcs, buildIcs, icsFileName, splitSections, groupByEvent, placeInfo, whenLine, directionsUrl, errorCopy } from "../app/tickets/ticketsLogic";
 
 let passed = 0, failed = 0;
 function eq(actual: unknown, expected: unknown, name: string) {
@@ -16,7 +16,7 @@ const mkEvent = (o: Record<string, unknown> = {}) => ({
 const mkTicket = (id: string, ev: any, o: Record<string, unknown> = {}) => ({ id, code: "ABC123", status: "valid", orderId: "o1", checkedInAt: null, ticketTypeName: "GA", qrUrl: "http://x/q.png", event: ev, ...o }) as any;
 
 console.log("escapeIcs");
-eq(escapeIcs("a,b;c\\d\ne"), "a\\,b\;c\\\\d\\ne", "escapes comma, semicolon, backslash, newline");
+eq(escapeIcs("a,b;c\\d\ne"), "a\\,b\\;c\\\\d\\ne", "escapes comma, semicolon, backslash, newline");
 eq(escapeIcs("a\r\nb"), "a\\nb", "CRLF becomes \\n");
 
 console.log("buildIcs");
@@ -26,7 +26,8 @@ eq(ics.includes("UID:t1\r\n"), true, "UID is the ticket id");
 eq(ics.includes("DTSTART:20261101T010000Z\r\n"), true, "DTSTART in UTC");
 eq(ics.includes("DTEND:20261101T060000Z\r\n"), true, "DTEND in UTC");
 eq(ics.includes("DTSTAMP:20261023T120000Z\r\n"), true, "DTSTAMP");
-eq(ics.includes("SUMMARY:Fun\\, Games\; More\r\n"), true, "SUMMARY escaped");
+eq(ics.includes("SUMMARY:Fun\\, Games\\; More\r\n"), true, "SUMMARY escaped");
+eq(ics.includes("Games\\; More") && !ics.includes("Games; More"), true, "a title with a semicolon comes out as backslash semicolon in the .ics text");
 eq(ics.includes("URL:https://goutsyde.com/e/block-party\r\n"), true, "URL");
 eq(ics.includes("LOCATION:The Hall\\, 12 Main St\\, Freeport\\, NY\r\n"), true, "visible address in LOCATION");
 eq(ics.startsWith("BEGIN:VCALENDAR\r\n") && ics.trimEnd().endsWith("END:VCALENDAR"), true, "calendar wrapper");
@@ -62,6 +63,15 @@ eq(whenLine(mkEvent({ timezone: "Not/AZone" })), "Sun, Nov 1 · 1:00 AM", "bad z
 eq(directionsUrl(mkEvent()), "https://www.google.com/maps/search/?api=1&query=The%20Hall%2C%2012%20Main%20St%2C%20Freeport%2C%20NY", "directions url");
 eq(directionsUrl(mkEvent({ addressHidden: true })), null, "no directions when hidden");
 eq(directionsUrl(mkEvent({ addressLine1: null })), null, "no directions without a street");
+
+console.log("safeHttpUrl");
+eq(safeHttpUrl("http://a.com/x.png"), "http://a.com/x.png", "http ok");
+eq(safeHttpUrl("https://a.com/x.png"), "https://a.com/x.png", "https ok");
+eq(safeHttpUrl("javascript:alert(1)"), null, "javascript: refused");
+eq(safeHttpUrl("data:image/png;base64,AAAA"), null, "data: refused");
+eq(safeHttpUrl("/relative/x.png"), null, "relative refused");
+eq(safeHttpUrl(""), null, "empty refused");
+eq(safeHttpUrl(null), null, "null refused");
 
 console.log("errorCopy");
 eq(errorCopy({ code: "REFUND_WINDOW_CLOSED", error: "Window closed." }), "Window closed.", "backend message wins");

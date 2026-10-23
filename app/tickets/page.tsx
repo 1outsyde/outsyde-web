@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  buildIcs, directionsUrl, errorCopy, groupByEvent, icsFileName, placeInfo, splitSections, whenLine, GENERIC_ERROR,
+  buildIcs, directionsUrl, errorCopy, groupByEvent, icsFileName, placeInfo, splitSections, whenLine, safeHttpUrl, GENERIC_ERROR,
   type MyTicket,
 } from "./ticketsLogic";
 
@@ -58,6 +58,7 @@ export default function TicketsPage() {
   const setPanel = (id: string, p: Panel | undefined) => setPanels((prev) => ({ ...prev, [id]: p }));
 
   async function openPanel(t: MyTicket) {
+    if (Object.values(panels).some((p) => p?.step === "sending")) return;
     if (panels[t.id]) { setPanel(t.id, undefined); return; }
     setPanel(t.id, { step: "loading" });
     try {
@@ -79,7 +80,11 @@ export default function TicketsPage() {
       const body = await res.json().catch(() => null);
       if (!res.ok || !body?.success) { setPanel(t.id, { step: "error", message: errorCopy(body), orderId, free }); return; }
       setTickets((prev) => (prev ? prev.filter((x) => x.orderId !== orderId) : prev));
-      setPanels({});
+      setPanels((prev) => {
+        const next = { ...prev };
+        for (const x of tickets ?? []) if (x.orderId === orderId) delete next[x.id];
+        return next;
+      });
       setNotice(free ? "Your RSVP is cancelled." : "Your refund is on its way.");
     } catch {
       setPanel(t.id, { step: "error", message: GENERIC_ERROR, orderId, free });
@@ -92,6 +97,7 @@ export default function TicketsPage() {
 
   return (
     <main className="tk-page">
+      <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
       <style>{CSS}</style>
       <div className="tk-wrap">
         <header className="tk-head">
@@ -125,12 +131,15 @@ export default function TicketsPage() {
               g.tickets.map((t, i) => {
                 const place = placeInfo(t.event);
                 const dir = directionsUrl(t.event);
+                const cover = safeHttpUrl(t.event.coverImageUrl);
+                const qr = safeHttpUrl(t.qrUrl);
+                const wallet = safeHttpUrl(t.walletUrl);
                 const panel = panels[t.id];
                 return (
                   <div key={t.id} className="tk-block">
                     <article className="tk-card">
-                      {t.event.coverImageUrl ? (
-                        <img className="tk-cover" src={t.event.coverImageUrl} alt="" />
+                      {cover ? (
+                        <img className="tk-cover" src={cover} alt="" />
                       ) : (
                         <div className="tk-cover tk-cover-plain" aria-hidden="true" />
                       )}
@@ -144,8 +153,8 @@ export default function TicketsPage() {
                         </div>
                       </div>
                       <div className="tk-qrbox">
-                        {t.qrUrl ? (
-                          <img src={t.qrUrl} alt="Ticket QR code" width={200} height={200} className="tk-qr" />
+                        {qr ? (
+                          <img src={qr} alt="Ticket QR code" width={200} height={200} className="tk-qr" />
                         ) : (
                           <div className="tk-qr tk-qr-missing">Your QR code is on its way. Check back soon.</div>
                         )}
@@ -154,7 +163,7 @@ export default function TicketsPage() {
                           {t.ticketTypeName}{g.tickets.length > 1 ? ` · Ticket ${i + 1} of ${g.tickets.length}` : ""}
                         </div>
                         {t.checkedInAt && <span className="tk-badge">Checked in</span>}
-                        {t.walletUrl && <a href={t.walletUrl} className="tk-wallet">Add to Apple Wallet</a>}
+                        {wallet && <a href={wallet} className="tk-wallet">Add to Apple Wallet</a>}
                       </div>
                       <div className="tk-actions" style={{ gridTemplateColumns: dir ? "1fr 1fr" : "1fr" }}>
                         {dir && <a href={dir} target="_blank" rel="noopener noreferrer" className="tk-act tk-act-l">Directions</a>}
@@ -213,7 +222,7 @@ export default function TicketsPage() {
             <div className="tk-col" style={{ marginTop: 10 }}>
               {pastGroups.map((g) => (
                 <div key={g.event.id} className="tk-row">
-                  {g.event.coverImageUrl ? <img className="tk-thumb" src={g.event.coverImageUrl} alt="" /> : <div className="tk-thumb" aria-hidden="true" />}
+                  {safeHttpUrl(g.event.coverImageUrl) ? <img className="tk-thumb" src={safeHttpUrl(g.event.coverImageUrl)!} alt="" /> : <div className="tk-thumb" aria-hidden="true" />}
                   <div style={{ minWidth: 0 }}>
                     <div className="tk-rowdate">{whenLine(g.event).toUpperCase()}</div>
                     <div className="tk-rowtitle"><Link href={`/e/${g.event.slug}`}>{g.event.title}</Link></div>
@@ -230,7 +239,6 @@ export default function TicketsPage() {
 }
 
 const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Hanken+Grotesk:wght@400;500;600;700&display=swap');
 body{background:#0B0B0B;margin:0}
 .tk-page{min-height:100vh;background:#0B0B0B;color:#F5F0E6;font-family:'Hanken Grotesk',system-ui,sans-serif}
 .tk-wrap{max-width:480px;margin:0 auto;padding:16px 20px 60px;box-sizing:border-box}

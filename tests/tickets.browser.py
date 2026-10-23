@@ -37,7 +37,7 @@ def check(cond, name, detail=""):
     if cond: passed += 1; print("  ok  " + name)
     else: failed += 1; print("  FAIL " + name, str(detail)[:400])
 
-def sql(q, *args):
+def sql(q):
     r = subprocess.run(["psql", PG, "-At", "-c", q], capture_output=True, text=True)
     if r.returncode: raise RuntimeError(r.stderr)
     return r.stdout.strip()
@@ -169,13 +169,20 @@ try:
         ctx.close()
         browser.close()
 finally:
-    sql(f"DELETE FROM tickets WHERE event_id IN (SELECT id FROM events WHERE host_user_id='{host}')")
-    sql(f"DELETE FROM ticket_order_items WHERE order_id IN (SELECT id FROM ticket_orders WHERE event_id IN (SELECT id FROM events WHERE host_user_id='{host}'))")
-    sql(f"DELETE FROM ticket_orders WHERE event_id IN (SELECT id FROM events WHERE host_user_id='{host}')")
-    sql(f"DELETE FROM ticket_account_counts WHERE ticket_type_id IN (SELECT id FROM ticket_types WHERE event_id IN (SELECT id FROM events WHERE host_user_id='{host}'))")
-    sql(f"DELETE FROM ticket_types WHERE event_id IN (SELECT id FROM events WHERE host_user_id='{host}')")
-    sql(f"DELETE FROM events WHERE host_user_id='{host}'")
-    sql(f"DELETE FROM users WHERE email LIKE '{P}-%'")
+    ev_ids = f"SELECT id FROM events WHERE host_user_id='{host}'"
+    for stmt in (
+        f"DELETE FROM tickets WHERE event_id IN ({ev_ids})",
+        f"DELETE FROM ticket_order_items WHERE order_id IN (SELECT id FROM ticket_orders WHERE event_id IN ({ev_ids}))",
+        f"DELETE FROM ticket_orders WHERE event_id IN ({ev_ids})",
+        f"DELETE FROM ticket_account_counts WHERE ticket_type_id IN (SELECT id FROM ticket_types WHERE event_id IN ({ev_ids}))",
+        f"DELETE FROM ticket_types WHERE event_id IN ({ev_ids})",
+        f"DELETE FROM events WHERE host_user_id='{host}'",
+        f"DELETE FROM users WHERE email LIKE '{P}-%'",
+    ):
+        try:
+            sql(stmt)
+        except Exception as e:
+            print("  cleanup failed:", str(e)[:200])
 
 print(f"\n{passed} passed, {failed} failed")
 sys.exit(1 if failed else 0)

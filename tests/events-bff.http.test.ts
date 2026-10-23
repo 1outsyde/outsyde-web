@@ -53,6 +53,7 @@ async function call(base: string, method: string, path: string, opts: { token?: 
   const q = async (t: string, p: unknown[] = []) => (await db.query(t, p)).rows as any[];
 
   const P = `eb${Date.now().toString(36)}`;
+  const tkEventIds: string[] = [];
   const mkUser = async (s: string) => (await q(
     `INSERT INTO users (id, email, name, first_name, username) VALUES (gen_random_uuid(), $1, $2, $3, $4) RETURNING id`,
     [`${P}-${s}@test.local`, `Guest ${s} Lastname`, `Guest${s}`, `${P}${s}`.slice(0, 20)],
@@ -315,6 +316,7 @@ async function call(base: string, method: string, path: string, opts: { token?: 
       r = await call(WEB, "GET", `/api/events/me/tickets`);
       assert(r.status === 401, "signed out: me/tickets is 401, which the page turns into /login?return=/tickets", r);
       const tkEv = (await call(BACKEND, "POST", "/api/events", { token: hostTok, body: { title: `${P} Tickets Night`, startsAt: inDays(10), endsAt: inDays(10, 4), timezone: "America/Los_Angeles", city: "Freeport", state: "NY", capacity: 30 } })).body.event;
+      tkEventIds.push(tkEv.id);
       const tkType = (await call(BACKEND, "POST", `/api/events/${tkEv.id}/ticket-types`, { token: hostTok, body: { name: "Free RSVP", priceCents: 0, quantity: 10 } })).body.ticketType;
       await call(BACKEND, "POST", `/api/events/${tkEv.id}/publish`, { token: hostTok });
       const tkRsvp = await call(WEB, "POST", `/api/events/${tkEv.id}/rsvp`, { token: guestTok, body: { ticketTypeId: tkType.id, quantity: 1, idempotencyKey: `${P}-tk1` } });
@@ -359,7 +361,22 @@ async function call(base: string, method: string, path: string, opts: { token?: 
       assert(res.status === 502 && typeof body?.error === "string", `${name}: 502 JSON, no throw`, { status: res.status, body });
     }
   } finally {
+    // Remove the rows this run created, children first: every event hosted by this run's own host user
+    // (the My Tickets section's event included). Nothing outside this run's prefix is touched.
+    for (const row of await q(`SELECT id FROM events WHERE host_user_id = $1`, [host]).catch(() => [] as any[])) if (!tkEventIds.includes(row.id)) tkEventIds.push(row.id);
+    if (tkEventIds.length) {
+      const byEvent = `event_id = ANY($1)`;
+      const orders = `SELECT id FROM ticket_orders WHERE ${byEvent}`;
+      const types = `SELECT id FROM ticket_types WHERE ${byEvent}`;
+      await q(`DELETE FROM ticket_account_counts WHERE ticket_type_id IN (${types})`, [tkEventIds]).catch(() => {});
+      await q(`DELETE FROM tickets WHERE ${byEvent}`, [tkEventIds]).catch(() => {});
+      await q(`DELETE FROM ticket_order_items WHERE order_id IN (${orders})`, [tkEventIds]).catch(() => {});
+      await q(`DELETE FROM ticket_orders WHERE ${byEvent}`, [tkEventIds]).catch(() => {});
+      await q(`DELETE FROM ticket_types WHERE ${byEvent}`, [tkEventIds]).catch(() => {});
+      await q(`DELETE FROM events WHERE id = ANY($1)`, [tkEventIds]).catch(() => {});
+    }
     await q(`DELETE FROM tickets WHERE event_id IN (SELECT id FROM events WHERE host_user_id = ANY($1))`, [[host]]).catch(() => {});
+    await q(`DELETE FROM notifications WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)`, [`${P}-%`]).catch(() => {});
     await q(`DELETE FROM users WHERE email LIKE $1`, [`${P}-%`]).catch(() => {});
     await db.end();
   }

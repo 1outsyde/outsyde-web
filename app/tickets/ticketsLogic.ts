@@ -31,6 +31,17 @@ export interface MyTicket {
   event: TicketEvent;
 }
 
+/** Returns the string only for http: or https: URLs, else null. */
+export function safeHttpUrl(u: unknown): string | null {
+  if (typeof u !== "string" || !u) return null;
+  try {
+    const p = new URL(u);
+    return p.protocol === "http:" || p.protocol === "https:" ? u : null;
+  } catch {
+    return null;
+  }
+}
+
 export const GENERIC_ERROR = "Something went wrong. Try again.";
 
 export function errorCopy(body: unknown): string {
@@ -114,7 +125,7 @@ export function groupByEvent(tickets: MyTicket[]): EventGroup[] {
 /* ---------- calendar file ---------- */
 
 export function escapeIcs(s: string): string {
-  return s.replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r\n|\r|\n/g, "\\n");
+  return s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r\n|\r|\n/g, "\\n");
 }
 
 function icsUtc(d: Date): string {
