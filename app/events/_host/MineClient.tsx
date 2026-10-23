@@ -2,12 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { EDITOR_CSS } from "./editorStyles";
+import { HostShell, useHostApi } from "./hostApi";
 import { MANAGE_CSS } from "./manageStyles";
 import { isHostEvent, type HostEvent } from "./editorLogic";
 import { eventHref, groupMine, statusLabel, takenLine, whenWhere } from "./manageLogic";
-import { errorCopy, GENERIC_ERROR } from "../../e/_shared/format";
+import { errorCopy } from "../../e/_shared/format";
 
 function EventRow({ e }: { e: HostEvent }) {
   const label = statusLabel(e);
@@ -26,22 +25,17 @@ function EventRow({ e }: { e: HostEvent }) {
 }
 
 export default function MineClient() {
-  const router = useRouter();
+  const { call } = useHostApi();
   const [events, setEvents] = useState<HostEvent[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
-    try {
-      const res = await fetch("/api/events/mine", { cache: "no-store" });
-      if (res.status === 401) { router.replace(`/login?return=${encodeURIComponent(window.location.pathname)}`); return; }
-      const body = await res.json().catch(() => null);
-      if (!res.ok || !body?.success || !Array.isArray(body.events)) { setError(errorCopy(res.status, body)); return; }
-      setEvents((body.events as unknown[]).filter(isHostEvent));
-    } catch {
-      setError(GENERIC_ERROR);
-    }
-  }, [router]);
+    const r = await call("GET", "/api/events/mine");
+    if (!r) return;
+    if (r.status !== 200 || !r.body?.success || !Array.isArray(r.body.events)) { setError(errorCopy(r.status, r.body)); return; }
+    setEvents((r.body.events as unknown[]).filter(isHostEvent));
+  }, [call]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -54,10 +48,7 @@ export default function MineClient() {
   ];
 
   return (
-    <main className="ed-page">
-      <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <style>{EDITOR_CSS + MANAGE_CSS}</style>
-      <div className="ed-wrap">
+    <HostShell css={MANAGE_CSS}>
         <header className="mg-head">
           <Link href="/events" className="ed-icon-btn" aria-label="Back to events">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
@@ -86,7 +77,6 @@ export default function MineClient() {
             </section>
           ))}
         </div>
-      </div>
-    </main>
+    </HostShell>
   );
 }

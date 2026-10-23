@@ -1,7 +1,7 @@
 /** Unit tests for the host page helpers. No server needed: npx tsx tests/events-manage-logic.test.ts */
 import {
   groupMine, eventHref, statusLabel, whenWhere, takenLine, typeRows, typeRowText, payoutCard, earningsHint, refundedLine,
-  refundableOrders, orderLine, refundConfirmCopy, canCancel, cancelNotice, backendMessage, guestName, guestLine, checkedInCount,
+  refundableOrders, orderLine, canScan, statusKind, isEnded, DRAFT_DELETE_COPY, refundConfirmCopy, canCancel, cancelNotice, backendMessage, guestName, guestLine, checkedInCount,
   isSummary, type Summary, type HostOrder, type DoorGuest,
 } from "../app/events/_host/manageLogic";
 import type { HostEvent, HostTicketType } from "../app/events/_host/editorLogic";
@@ -99,9 +99,18 @@ eq(guestLine(guest({ username: null })), "Free RSVP", "guest line without userna
 eq(checkedInCount([guest({}), guest({ checkedInAt: "2026-10-25T02:00:00.000Z" })]), 1, "checked in count");
 
 // cancel
-eq(canCancel({ status: "published" }), true, "can cancel live");
-eq(canCancel({ status: "draft" }), true, "can cancel draft");
-eq(canCancel({ status: "cancelled" }), false, "cannot cancel twice");
+const PAST = "2026-10-01T05:00:00.000Z", FUTURE = "2026-10-25T06:00:00.000Z";
+eq(canCancel({ status: "published", endsAt: FUTURE }, NOW), true, "can cancel live");
+eq(canCancel({ status: "published", endsAt: PAST }, NOW), false, "cannot cancel an ended event");
+eq(canScan({ status: "published", endsAt: FUTURE }, NOW), true, "can scan a live event");
+eq(canScan({ status: "published", endsAt: PAST }, NOW), false, "cannot scan an ended event");
+eq(canScan({ status: "cancelled", endsAt: FUTURE }, NOW), false, "cannot scan a cancelled event");
+eq(statusKind({ status: "published", endsAt: PAST }, NOW), "ended", "kind ended");
+eq(isEnded({ endsAt: FUTURE }, NOW), false, "not ended");
+eq(DRAFT_DELETE_COPY.includes("refund") || DRAFT_DELETE_COPY.includes("guest"), false, "draft copy has no guests or refunds");
+eq(guestLine(guest({ firstName: null })), "Free RSVP", "no first name: handle not repeated");
+eq(canCancel({ status: "draft", endsAt: PAST }, NOW), true, "can cancel draft");
+eq(canCancel({ status: "cancelled", endsAt: FUTURE }, NOW), false, "cannot cancel twice");
 eq(cancelNotice({ freeCancelled: 1, refunding: 2 }), "This event is cancelled. 1 RSVP cancelled, 2 refunds started.", "cancel notice");
 eq(cancelNotice(undefined), "This event is cancelled.", "cancel notice with no guests");
 eq(backendMessage({ error: "This event has already started.", code: "EVENT_STARTED" }), "This event has already started.", "backend message shown");

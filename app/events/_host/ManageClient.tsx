@@ -2,12 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { EDITOR_CSS } from "./editorStyles";
+import { HostShell, useHostApi } from "./hostApi";
 import { MANAGE_CSS } from "./manageStyles";
 import { isHostEvent, isHostTicketType, shareUrl, type HostEvent, type HostTicketType } from "./editorLogic";
 import {
-  CANCEL_CONFIRM_COPY, backendMessage, canCancel, cancelNotice, checkedInCount, earningsHint, guestHandle, guestLine, guestName,
+  CANCEL_CONFIRM_COPY, DRAFT_DELETE_COPY, UNAVAILABLE, backendMessage, canCancel, canScan, statusKind, cancelNotice, checkedInCount, earningsHint, guestHandle, guestLine, guestName,
   isDoorGuest, isHostOrder, isSummary, orderLine, payoutCard, refundConfirmCopy, refundableOrders, refundedLine, statusLabel,
   takenLine, typeRowText, typeRows, whenWhere,
   type DoorGuest, type HostOrder, type Summary,
@@ -15,12 +14,10 @@ import {
 import { errorCopy, money, GENERIC_ERROR } from "../../e/_shared/format";
 
 type Screen = "loading" | "ready" | "notfound" | "error";
-type ApiResult = { status: number; body: any } | null;
 
 const GUEST_PREVIEW = 8;
 
 export default function ManageClient({ eventId }: { eventId: string }) {
-  const router = useRouter();
   const [screen, setScreen] = useState<Screen>("loading");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [event, setEvent] = useState<HostEvent | null>(null);
@@ -42,25 +39,7 @@ export default function ManageClient({ eventId }: { eventId: string }) {
 
   const [copied, setCopied] = useState<"yes" | "no" | null>(null);
 
-  const toLogin = useCallback(() => {
-    router.replace(`/login?return=${encodeURIComponent(window.location.pathname)}`);
-  }, [router]);
-
-  /** Fetch a BFF. null when the person is signed out (already sent to login). Never throws. */
-  const call = useCallback(async (method: string, path: string, body?: unknown): Promise<ApiResult> => {
-    try {
-      const res = await fetch(path, {
-        method,
-        cache: "no-store",
-        headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-      });
-      if (res.status === 401) { toLogin(); return null; }
-      return { status: res.status, body: await res.json().catch(() => null) };
-    } catch {
-      return { status: 0, body: null };
-    }
-  }, [toLogin]);
+  const { call } = useHostApi();
 
   /** Sales numbers, orders and guests. A failure here keeps the event on screen with a note. */
   const loadSales = useCallback(async (id: string) => {
@@ -146,13 +125,7 @@ export default function ManageClient({ eventId }: { eventId: string }) {
     await loadSales(event.id);
   }
 
-  const page = (inner: React.ReactNode) => (
-    <main className="ed-page">
-      <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <style>{EDITOR_CSS + MANAGE_CSS}</style>
-      <div className="ed-wrap">{inner}</div>
-    </main>
-  );
+  const page = (inner: React.ReactNode) => <HostShell css={MANAGE_CSS}>{inner}</HostShell>;
 
   if (screen === "loading") return page(<div className="ed-muted" role="status">Loading.</div>);
 
@@ -180,9 +153,14 @@ export default function ManageClient({ eventId }: { eventId: string }) {
   }
 
   const label = statusLabel(event);
-  const chipClass = event.status === "draft" ? "draft" : event.status === "cancelled" ? "cancelled" : label === "ENDED" ? "ended" : "";
+  const kind = statusKind(event);
+  const chipClass = kind === "published" ? "" : kind;
   const isDraft = event.status === "draft";
   const live = event.status === "published";
+  const scannable = canScan(event);
+  const sales = summary !== null;
+  // While the numbers are loading or failed they are not $0.00: say so.
+  const missing = salesError ? UNAVAILABLE : "…";
   const earnings = summary ? summary.totals.hostEarningsCents : 0;
   const payout = summary ? payoutCard(summary.payout, event.timezone, earnings) : null;
   const refunded = summary ? refundedLine(summary.totals) : null;
@@ -208,7 +186,7 @@ export default function ManageClient({ eventId }: { eventId: string }) {
         <div className="mg-toprow">
           {event.status !== "cancelled" && <Link href={`/events/${event.id}/edit`} className="ed-outline">Edit</Link>}
           <Link href={`/e/${event.slug}`} className="ed-outline">View page</Link>
-          {!isDraft && event.status !== "cancelled" && (
+          {!isDraft && scannable && (
             <button type="button" className="ed-outline" style={{ background: "transparent", color: "#F5F0E6", cursor: "pointer", font: "600 14px 'Hanken Grotesk', sans-serif" }} onClick={copyLink}>
               {copied === "yes" ? "Link copied" : "Share link"}
             </button>
@@ -235,17 +213,17 @@ export default function ManageClient({ eventId }: { eventId: string }) {
               </div>
               <div className="mg-stat">
                 <div className="mg-stat-label">Your earnings</div>
-                <div className="mg-stat-big mg-gold" data-testid="earnings">{summary ? money(earnings) : "$0.00"}</div>
+                <div className="mg-stat-big mg-gold" data-testid="earnings">{sales ? money(earnings) : missing}</div>
                 {summary && <div className="mg-stat-hint">{earningsHint(summary.payout)}</div>}
               </div>
               <div className="mg-stat">
                 <div className="mg-stat-label">Paid to your bank</div>
-                <div className="mg-stat-mid">{payout ? payout.value : "Not scheduled"}</div>
+                <div className="mg-stat-mid">{payout ? payout.value : missing}</div>
                 {payout?.hint && <div className="mg-stat-hint">{payout.hint}</div>}
               </div>
               <div className="mg-stat">
                 <div className="mg-stat-label">Refunded</div>
-                <div className="mg-stat-mid">{refunded ? refunded.value : "$0.00"}</div>
+                <div className="mg-stat-mid">{refunded ? refunded.value : missing}</div>
                 {refunded?.hint && <div className="mg-stat-hint">{refunded.hint}</div>}
               </div>
             </div>
@@ -322,19 +300,19 @@ export default function ManageClient({ eventId }: { eventId: string }) {
           {live && (
             <div className="mg-quick">
               <Link href={`/events/${event.id}/team`} className="ed-outline">Door team</Link>
-              <Link href={`/events/${event.id}/scan`} className="ed-primary" style={{ minHeight: 48 }}>Scan tickets</Link>
+              {scannable && <Link href={`/events/${event.id}/scan`} className="ed-primary" style={{ minHeight: 48 }}>Scan tickets</Link>}
             </div>
           )}
           {canCancel(event) && !confirmCancel && (
-            <button type="button" className="mg-cancel-link" onClick={() => { setConfirmCancel(true); setCancelError(null); }}>Cancel event</button>
+            <button type="button" className="mg-cancel-link" onClick={() => { setConfirmCancel(true); setCancelError(null); }}>{isDraft ? "Delete draft" : "Cancel event"}</button>
           )}
           {confirmCancel && (
             <div className="mg-confirm" role="group" aria-label="Confirm cancel event" data-testid="cancel-confirm">
-              <p>{CANCEL_CONFIRM_COPY}</p>
+              <p>{isDraft ? DRAFT_DELETE_COPY : CANCEL_CONFIRM_COPY}</p>
               {cancelError && <p className="ed-err" role="alert">{cancelError}</p>}
               <div className="mg-confirm-actions">
-                <button type="button" className="mg-danger" disabled={cancelling} onClick={doCancel}>{cancelling ? "Cancelling." : "Yes, cancel event"}</button>
-                <button type="button" className="mg-small" disabled={cancelling} onClick={() => { setConfirmCancel(false); setCancelError(null); }}>Keep event</button>
+                <button type="button" className="mg-danger" disabled={cancelling} onClick={doCancel}>{cancelling ? (isDraft ? "Deleting." : "Cancelling.") : isDraft ? "Yes, delete draft" : "Yes, cancel event"}</button>
+                <button type="button" className="mg-small" disabled={cancelling} onClick={() => { setConfirmCancel(false); setCancelError(null); }}>{isDraft ? "Keep draft" : "Keep event"}</button>
               </div>
             </div>
           )}

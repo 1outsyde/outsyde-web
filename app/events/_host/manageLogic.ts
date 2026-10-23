@@ -43,11 +43,22 @@ export function eventHref(e: Pick<HostEvent, "id" | "status">): string {
   return e.status === "draft" ? `/events/${e.id}/edit` : `/events/${e.id}/manage`;
 }
 
+export type StatusKind = "draft" | "published" | "ended" | "cancelled" | "paused";
+
+/** A live event whose end time has passed is "ended". */
+export function isEnded(e: Pick<HostEvent, "endsAt">, now: Date = new Date()): boolean {
+  return new Date(e.endsAt).getTime() < now.getTime();
+}
+
+export function statusKind(e: Pick<HostEvent, "status" | "endsAt">, now: Date = new Date()): StatusKind {
+  if (e.status === "draft") return "draft";
+  if (e.status === "cancelled") return "cancelled";
+  if (e.status === "paused") return "paused";
+  return isEnded(e, now) ? "ended" : "published";
+}
+
 export function statusLabel(e: Pick<HostEvent, "status" | "endsAt">, now: Date = new Date()): string {
-  if (e.status === "draft") return "DRAFT";
-  if (e.status === "cancelled") return "CANCELLED";
-  if (e.status === "paused") return "PAUSED";
-  return new Date(e.endsAt).getTime() < now.getTime() ? "ENDED" : "PUBLISHED";
+  return statusKind(e, now).toUpperCase();
 }
 
 /** "Sat, Oct 25, 9:00 PM to 2:00 AM" plus the city when there is one. Never a street address. */
@@ -118,9 +129,10 @@ export function guestHandle(g: { username: string | null }): string {
   return g.username ? `@${g.username}` : "";
 }
 
-/** "@maya · General admission", without the dot when there is no username. */
+/** "@maya · General admission". A guest without a first name is already shown as "@maya", so the handle is not repeated. */
 export function guestLine(g: DoorGuest): string {
-  return [guestHandle(g), g.ticketTypeName].filter(Boolean).join(" · ");
+  const handle = g.firstName?.trim() ? guestHandle(g) : "";
+  return [handle, g.ticketTypeName].filter(Boolean).join(" · ");
 }
 
 export function checkedInCount(guests: DoorGuest[]): number {
@@ -171,6 +183,8 @@ export function payoutCard(p: Summary["payout"], tz: string, earningsCents: numb
   }
 }
 
+export const UNAVAILABLE = "Unavailable";
+
 /** Earnings stay an estimate until the payout is created. */
 export function earningsHint(p: Summary["payout"]): string {
   return p.status === "paid" ? "Paid out" : "Estimate until your payout is created";
@@ -197,13 +211,21 @@ export function refundConfirmCopy(o: HostOrder): string {
   return `Refund ${guestName(o.guest)}'s order of ${money(o.ticketPriceCents)}? They get their money back and their tickets stop working. You can't undo this.`;
 }
 
-/** Cancel is offered for drafts and live events. The backend decides the rest and its message is shown when it refuses. */
-export function canCancel(e: Pick<HostEvent, "status">): boolean {
-  return e.status === "published" || e.status === "draft";
+/** Cancel is offered for drafts and for live events that have not ended. The backend decides the rest and its message is shown when it refuses. */
+export function canCancel(e: Pick<HostEvent, "status" | "endsAt">, now: Date = new Date()): boolean {
+  if (e.status === "draft") return true;
+  return e.status === "published" && !isEnded(e, now);
+}
+
+/** Scanning and sharing only make sense for a live event that has not ended. */
+export function canScan(e: Pick<HostEvent, "status" | "endsAt">, now: Date = new Date()): boolean {
+  return e.status === "published" && !isEnded(e, now);
 }
 
 export const CANCEL_CONFIRM_COPY =
   "Cancel this event? Every guest who paid is refunded in full, and free RSVPs are cancelled. You can't undo this.";
+
+export const DRAFT_DELETE_COPY = "Delete this draft? It won't be published.";
 
 export function cancelNotice(guests: unknown): string {
   const g = guests as { freeCancelled?: unknown; refunding?: unknown } | null;

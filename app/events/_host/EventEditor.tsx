@@ -16,7 +16,7 @@ import TicketsStep, { type PayoutBanner } from "./TicketsStep";
 import TicketTypeSheet from "./TicketTypeSheet";
 import ReviewStep, { type Agreement } from "./ReviewStep";
 import LiveStep from "./LiveStep";
-import { EDITOR_CSS } from "./editorStyles";
+import { HostShell, useHostApi } from "./hostApi";
 import {
   activeTypes, changedFields, createBody, emptyForm, emptySheet, formFromEvent, hostOptions, isHostEvent, isHostTicketType,
   nextStepLabel, patchBody, profilePayoutNote, publishFailure, sheetFromType, ticketBody, validateForm,
@@ -25,7 +25,6 @@ import {
 
 type Screen = "loading" | "error" | "start" | "details" | "tickets" | "review" | "live";
 type Step = "details" | "tickets" | "review";
-type ApiResult = { status: number; body: any } | null; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 const STEPS: Record<Step, { n: number; title: string }> = {
   details: { n: 1, title: "Event details" },
@@ -84,25 +83,7 @@ export default function EventEditor({ eventId: routeId }: { eventId?: string }) 
   const [accepting, setAccepting] = useState(false);
   const [publishError, setPublishError] = useState<{ message: string; next: PublishNext } | null>(null);
 
-  const toLogin = useCallback(() => {
-    router.replace(`/login?return=${encodeURIComponent(window.location.pathname)}`);
-  }, [router]);
-
-  /** fetch a BFF; null when the person is signed out (already sent to login). Never throws. */
-  const call = useCallback(async (method: string, path: string, body?: unknown): Promise<ApiResult> => {
-    try {
-      const res = await fetch(path, {
-        method,
-        cache: "no-store",
-        headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-      });
-      if (res.status === 401) { toLogin(); return null; }
-      return { status: res.status, body: await res.json().catch(() => null) };
-    } catch {
-      return { status: 0, body: null };
-    }
-  }, [toLogin]);
+  const { call, toLogin } = useHostApi();
 
   const applyServer = useCallback((e: HostEvent, ts?: unknown) => {
     const f = formFromEvent(e);
@@ -394,13 +375,7 @@ export default function EventEditor({ eventId: routeId }: { eventId?: string }) 
 
   /* ---------- render ---------- */
 
-  const page = (children: React.ReactNode) => (
-    <main className="ed-page">
-      <style>{EDITOR_CSS}</style>
-      <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <div className="ed-wrap">{children}</div>
-    </main>
-  );
+  const page = (children: React.ReactNode) => <HostShell>{children}</HostShell>;
 
   const messages = (
     <>
