@@ -3,7 +3,7 @@ import LegalLayout, { LegalSectionBlock as Section } from "@/components/LegalLay
 export const metadata = {
   title: "Refund Policy",
   description: "How refunds work for bookings, product orders and event tickets on Outsyde.",
-  alternates: { canonical: "/refund-policy" },
+  alternates: { canonical: "https://www.goutsyde.com/refund-policy" },
 };
 
 const SECTIONS = [

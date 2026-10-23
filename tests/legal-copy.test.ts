@@ -28,7 +28,7 @@ for (const [name, file] of [["refund", "app/refund-policy/page.tsx"], ["shipping
   assert(!dash, `${name}: no dashes in copy`, dash?.[0]);
   const pct = text.match(/.{0,30}%.{0,30}/);
   assert(!pct, `${name}: no percentage in copy`, pct?.[0]);
-  assert(/canonical: ["']\/(refund|shipping)-policy["']/.test(src), `${name}: own canonical`);
+  assert(new RegExp(`canonical: ["']https://www\\.goutsyde\\.com/${name}-policy["']`).test(src), `${name}: own canonical on www`);
 }
 
 if (existsSync("app/refund-policy/page.tsx")) {
@@ -42,6 +42,11 @@ if (existsSync("app/shipping-policy/page.tsx")) {
   const t = visibleText(readFileSync("app/shipping-policy/page.tsx", "utf8"));
   assert(t.includes("Risk of loss passes to you when the Vendor delivers your order to the carrier"), "shipping: risk of loss clause");
   assert(t.includes("required to provide a tracking number for every shipment"), "shipping: tracking required");
+}
+
+for (const [f, path] of [["app/terms/page.tsx", "/terms"], ["app/privacy/page.tsx", "/privacy"]]) {
+  const src = readFileSync(f, "utf8");
+  assert(src.includes(`canonical: 'https://www.goutsyde.com${path}'`), `${path}: own canonical on www`);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

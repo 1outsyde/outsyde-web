@@ -3,7 +3,7 @@ import LegalLayout from '@/components/LegalLayout'
 export const metadata = {
   title: 'Terms of Service',
   description: 'The Outsyde Terms of Service for customers, businesses, photographers and creators.',
-  alternates: { canonical: '/terms' },
+  alternates: { canonical: 'https://www.goutsyde.com/terms' },
 }
 
 const SECTIONS = [

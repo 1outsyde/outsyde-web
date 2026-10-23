@@ -36,6 +36,16 @@ for (const h of hrefs) assert(urls.includes(`https://www.goutsyde.com${h}`), `si
 assert(urls.includes("https://www.goutsyde.com/coming-soon") && urls.includes("https://www.goutsyde.com/shop"), "sitemap keeps existing routes");
 assert(new Set(urls).size === urls.length, "sitemap has no duplicate URLs");
 
+
+// Homepage footer links every legal page and widens to five columns.
+import { readFileSync } from "node:fs";
+const home = readFileSync("app/page.tsx", "utf8");
+const footer = home.slice(home.indexOf('<div className="footer-grid">'));
+assert(/<h4>Legal<\/h4>/.test(footer), "homepage footer has a Legal column");
+assert(/LEGAL_PAGES\.map/.test(footer), "homepage Legal column renders LEGAL_PAGES");
+assert(/\.footer-grid\{display:grid;grid-template-columns:2\.2fr 1fr 1fr 1fr 1fr;/.test(home), "footer grid has five desktop columns");
+assert(/@media \(max-width:960px\)[\s\S]*\.footer-grid\{grid-template-columns:1fr 1fr;/.test(home), "960px footer rule unchanged");
+
 // next.config redirects: every old URL, permanent (308).
 import nextConfig from "../next.config";
 (async () => {

@@ -3,7 +3,7 @@ import LegalLayout from '@/components/LegalLayout'
 export const metadata = {
   title: 'Privacy Policy',
   description: 'How Outsyde collects, uses and protects your information.',
-  alternates: { canonical: '/privacy' },
+  alternates: { canonical: 'https://www.goutsyde.com/privacy' },
 }
 
 const SECTIONS = [

@@ -3,7 +3,7 @@ import LegalLayout, { LegalSectionBlock as Section } from "@/components/LegalLay
 export const metadata = {
   title: "Shipping Policy",
   description: "How shipping, tracking and delivery work for products bought on Outsyde.",
-  alternates: { canonical: "/shipping-policy" },
+  alternates: { canonical: "https://www.goutsyde.com/shipping-policy" },
 };
 
 const SECTIONS = [
