@@ -24,7 +24,7 @@ export default function RefundPolicyPage() {
   return (
     <LegalLayout title={["Refund", "Policy"]} current="/refund-policy" updated="October 23, 2026" sections={SECTIONS}>
       <p>
-        This Refund Policy explains how refunds work for purchases made through Outsyde LLC (&quot;Outsyde,&quot; &quot;we,&quot; &quot;our,&quot; or &quot;us&quot;), including the Outsyde mobile application, goutsyde.com and every Outsyde powered vendor website (together, the &quot;Platform&quot;). This policy is part of our <a href="/terms">Terms of Service</a>. By booking, buying or purchasing tickets on the Platform, you agree to it.
+        This Refund Policy explains how refunds work for purchases made through Outsyde LLC (&quot;Outsyde,&quot; &quot;we,&quot; &quot;our,&quot; or &quot;us&quot;), including the Outsyde mobile application, goutsyde.com and every Outsyde powered vendor website (together, the &quot;Platform&quot;). This policy is part of our <a href="/terms">Terms of Service</a>. By booking, buying or purchasing tickets on the Platform, you agree to it. Where this Refund Policy and the Terms of Service differ on refunds, this Refund Policy controls.
       </p>
 
       <div className="legal-summary">

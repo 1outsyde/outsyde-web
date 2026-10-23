@@ -37,6 +37,7 @@ if (existsSync("app/refund-policy/page.tsx")) {
   assert(t.includes("less the service fee"), "refund: vendor cancel refund is less the service fee");
   assert(t.includes("non refundable in all cases"), "refund: service fee never refundable");
   assert(t.includes("deposit is non refundable once your booking is confirmed"), "refund: deposits non refundable");
+  assert(t.includes("Where this Refund Policy and the Terms of Service differ on refunds, this Refund Policy controls."), "refund: controls over Terms section 7 on refunds");
 }
 if (existsSync("app/shipping-policy/page.tsx")) {
   const t = visibleText(readFileSync("app/shipping-policy/page.tsx", "utf8"));
