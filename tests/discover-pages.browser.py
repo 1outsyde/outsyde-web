@@ -1,14 +1,16 @@
 """
 Browser checks for the Discover pages (Playwright for Python, Chromium). LOCAL ONLY.
 Run: python3 tests/discover-pages.browser.py
-Env (defaults shown): DP_WEB_URL=http://localhost:3101  DP_BACKEND_URL=http://localhost:5071
+Env (defaults shown): DP_WEB_URL=http://localhost:3101  DP_BACKEND_URL=http://localhost:5071  DP_ONLY= (pro|following|pulse)
   DP_PG_URL=postgresql://outsyde:outsyde@localhost:5432/outsyde_test  DP_BACKEND_DIR=/home/claude/1outsyde/outsyde-backend
 Skips (exit 0) when the web or backend server is not up. Needs psql and node on PATH.
 Seeds users, posts and a story with SQL, and one published free event through the local backend (create,
 free ticket type, accept the host agreement, publish). Removes everything it created.
-Sections: Pro (/discover), Following (/discover/following). Task 8 adds Pulse.
+Sections: Pro (/discover), Following (/discover/following), Pulse (/discover/pulse).
+Pulse makes a tiny H.264 HLS stream with ffmpeg (needs ffmpeg on PATH) and copies it under public/__discover_test/
+for the run only; the folder is removed at the end.
 """
-import re, json, os, subprocess, sys, time, urllib.request
+import re, json, os, shutil, subprocess, sys, tempfile, time, urllib.request
 from urllib.parse import urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -399,6 +401,245 @@ def section_following(browser):
     ctx.close()
 
 
+# ---------------------------------------------------------------------------------------------------------------
+PUBLIC_TEST = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "public", "__discover_test")
+PULSE = "section[aria-label='Pulse videos']"
+PULSE_REQ = re.compile(r"/api/discover/pulse(\?|$)")
+
+def make_hls():
+    """A 3 second 180x320 H.264 HLS stream (1 second segments), served by the web dev server from public/."""
+    tmp = tempfile.mkdtemp(prefix="discover-pulse-")
+    try:
+        r = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=180x320:rate=15",
+                            "-t", "3", "-c:v", "libx264", "-profile:v", "baseline", "-pix_fmt", "yuv420p", "-g", "15",
+                            "-f", "hls", "-hls_time", "1", "-hls_playlist_type", "vod", os.path.join(tmp, "v.m3u8")],
+                           capture_output=True, text=True)
+        if r.returncode: raise RuntimeError("ffmpeg failed: " + r.stderr[:300])
+        dest = os.path.join(PUBLIC_TEST, P)
+        shutil.copytree(tmp, dest)
+        return f"{WEB}/__discover_test/{P}/v.m3u8"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+# Records muted at every play() call, and (when force_hlsjs) hides native HLS so hls.js + MSE is used.
+PLAY_HOOK = """(() => {
+  window.__plays = [];
+  const play = HTMLMediaElement.prototype.play;
+  HTMLMediaElement.prototype.play = function () { window.__plays.push(this.muted); return play.call(this); };
+})();"""
+NO_NATIVE_HLS = """(() => {
+  const can = HTMLMediaElement.prototype.canPlayType;
+  HTMLMediaElement.prototype.canPlayType = function (t) { return /mpegurl/i.test(t) ? "" : can.call(this, t); };
+})();"""
+
+def pulse_items(pg):
+    return pg.locator(f"{PULSE} > article")
+
+def wait_items(pg, n):
+    pg.wait_for_function("([sel, n]) => document.querySelectorAll(sel + ' > article').length >= n", arg=[PULSE, n], timeout=60000)
+
+def playing(pg):
+    """Indexes of the Pulse items whose video is playing (paused === false). With DP_DEBUG, active items are marked a<i>."""
+    return pg.evaluate("""([sel, dbg]) => Array.from(document.querySelectorAll(sel + ' > article')).flatMap((a, i) => {
+        const v = a.querySelector('video'); return [...(v && !v.paused ? [i] : []), ...(dbg && a.dataset.active ? ['a' + i] : [])]; })""",
+        [PULSE, bool(os.environ.get("DP_DEBUG"))])
+
+def scroll_to(pg, i, smooth=False):
+    pg.evaluate("""([sel, i, smooth]) => { const s = document.querySelector(sel);
+        s.scrollTo({ top: i * s.clientHeight, behavior: smooth ? 'smooth' : 'instant' }); }""", [PULSE, i, smooth])
+
+def item_time(pg, i):
+    return pg.evaluate("([sel, i]) => { const a = document.querySelectorAll(sel + ' > article')[i]; const v = a && a.querySelector('video'); return v ? v.currentTime : -1; }", [PULSE, i])
+
+def section_pulse(browser):
+    print("== Pulse (/discover/pulse)")
+    viewer = user("pv", "Pulse Viewer")
+    a1 = user("p1", "Pulse Maker")
+    a2 = user("p2", "Clip Author")
+    src = make_hls()
+    check(urllib.request.urlopen(src, timeout=30).status == 200, "test HLS playlist is served by the web server")
+    # 25 ready videos, newest first (minute 0 newest), plus one still processing (Mux upload id) in the middle.
+    for i in range(25):
+        sql(f"""INSERT INTO feed_posts (author_id, author_type, post_type, content, media_url, media_type, thumbnail_url, feed_surface, display_layout, created_at, updated_at)
+            VALUES ('{a1 if i % 2 == 0 else a2}','consumer','video','{P} pulse {i}','{src}?n={i}','video','{PIXEL}','pulse','pulse', now() - interval '{i} minutes', now())""")
+    sql(f"""INSERT INTO feed_posts (author_id, author_type, post_type, content, media_url, media_type, thumbnail_url, feed_surface, display_layout, created_at, updated_at)
+        VALUES ('{a1}','consumer','video','{P} pulse upl','upl_test','video','{PIXEL}','pulse','pulse', now() - interval '330 seconds', now())""")
+
+    # ---- signed out, 390px, hls.js forced (no native HLS)
+    print("signed out, hls.js path")
+    ctx, pg, errs, reqs = new_ctx(browser, width=390)
+    ctx.add_init_script(PLAY_HOOK)
+    ctx.add_init_script(NO_NATIVE_HLS)
+    kinds = []
+    pg.on("request", lambda r: kinds.append((r.url, r.resource_type)))
+    resp = pg.goto(WEB + "/discover/pulse")
+    check(resp is not None and resp.status == 200, "/discover/pulse returns 200", resp and resp.status)
+    check(pg.title() == "Pulse | Outsyde", "page title", pg.title())
+    cur = pg.get_by_role("navigation", name="Discover").locator("a[aria-current='page']")
+    check(cur.count() == 1 and cur.inner_text().strip() == "Pulse", "tab row: Pulse is current", cur.count())
+    check(pg.locator("link[rel='stylesheet'][href*='fonts.googleapis.com']").count() >= 1, "fonts stylesheet linked")
+    wait_items(pg, 3)
+    pg.wait_for_function("([sel]) => { const v = document.querySelector(sel + ' > article video'); return v && v.currentTime > 0; }", arg=[PULSE], timeout=30000)
+    check(True, "first video plays (currentTime > 0)")
+    check(any(".ts" in u and t in ("xhr", "fetch") for u, t in kinds), "segments load through hls.js (xhr/fetch, not native media)",
+          sorted({t for u, t in kinds if ".ts" in u}))
+    tab_box = pg.get_by_role("navigation", name="Discover").bounding_box()
+    check(tab_box is not None and tab_box["y"] >= 0 and tab_box["y"] + tab_box["height"] <= 200, "tab row stays visible above the feed", tab_box)
+    fills = pg.evaluate("""(sel) => { const s = document.querySelector(sel); const a = s.querySelector('article');
+        return [s.getBoundingClientRect().bottom, window.innerHeight, a.getBoundingClientRect().height, s.clientHeight,
+                document.documentElement.scrollHeight <= window.innerHeight + 1]; }""", PULSE)
+    check(abs(fills[0] - fills[1]) <= 1 and abs(fills[2] - fills[3]) <= 1 and fills[4], "items fill the viewport below the tab row, page does not scroll", fills)
+    check(pg.evaluate("getComputedStyle(document.querySelector('main')).backgroundColor") == "rgb(0, 0, 0)", "page background is #000")
+    # tap: pause after a single tap, resume on the next
+    first = pulse_items(pg).nth(0)
+    first.get_by_role("button", name="Pause video").click()
+    pg.wait_for_timeout(450)
+    check(pg.evaluate("([sel]) => document.querySelector(sel + ' > article video').paused", [PULSE]), "single tap pauses")
+    icon = first.locator("[data-testid='pulse-paused']")
+    check(icon.count() == 1 and abs(icon.bounding_box()["width"] - 72) < 1, "72px pause icon shows while paused", icon.count())
+    first.get_by_role("button", name="Play video").click()
+    pg.wait_for_timeout(450)
+    check(not pg.evaluate("([sel]) => document.querySelector(sel + ' > article video').paused", [PULSE]) and icon.count() == 0, "next tap resumes")
+    # sign-in prompts
+    first.get_by_role("button", name="Like").click()
+    d = pg.get_by_role("dialog", name="Sign in")
+    d.wait_for(timeout=5000)
+    check("Please sign in to like posts." in d.inner_text(), "signed out: like opens the sign-in prompt", d.inner_text())
+    pg.get_by_role("button", name="Close", exact=True).click()
+    first.get_by_role("button", name=re.compile("^(Pause|Play) video$")).dblclick()
+    d.wait_for(timeout=5000)
+    check("Please sign in to like posts." in d.inner_text(), "signed out: double tap opens the sign-in prompt")
+    pg.get_by_role("button", name="Close", exact=True).click()
+    pg.wait_for_timeout(400)
+    check(not pg.evaluate("([sel]) => document.querySelector(sel + ' > article video').paused", [PULSE]), "double tap does not pause")
+    check(pulse_items(pg).nth(0).get_by_role("button", name="Turn sound on").count() == 1, "sound toggle says Turn sound on")
+    # scroll through everything; never more than one video playing
+    samples, late_ok = [], False
+    i = 1
+    while True:
+        n = pulse_items(pg).count()
+        if i >= n:
+            if pg.get_by_text("You're all caught up").count():
+                break
+            scroll_to(pg, n)  # the loading item at the end
+            pg.wait_for_timeout(800)
+            if pulse_items(pg).count() == n and pg.get_by_text("You're all caught up").count() == 0:
+                check(False, "feed grows or ends", n); break
+            continue
+        scroll_to(pg, i, smooth=True)
+        for _ in range(4):
+            samples.append(playing(pg)); pg.wait_for_timeout(120)
+        if i == 1:
+            try:
+                pg.wait_for_function("([sel]) => { const a = document.querySelectorAll(sel + ' > article')[1]; const v = a && a.querySelector('video'); return v && v.currentTime > 0; }", arg=[PULSE], timeout=15000)
+                late_ok = True
+            except Exception:
+                late_ok = False
+        i += 1
+        if i > 40: break
+    check(late_ok, "second video plays after it becomes active (late startLoad on the hls.js path)", item_time(pg, 1))
+    nplay = [len([y for y in x if isinstance(y, int)]) for x in samples]
+    check(max(nplay) <= 1, "at most 1 video playing at any sample", [x for x, n in zip(samples, nplay) if n > 1] or len(samples))
+    if os.environ.get("DP_DEBUG"): print("  samples:", samples)
+    check(nplay.count(1) >= len(samples) // 2, "a video is playing most of the time", samples)
+    check(pg.evaluate("() => window.__plays.length > 0 && window.__plays.every((m) => m === true)"), "every play() runs with muted === true",
+          pg.evaluate("() => window.__plays"))
+    check(pg.evaluate("() => Array.from(document.querySelectorAll('video')).every((v) => v.muted)"), "every video is muted")
+    caps = pg.evaluate("([sel, p]) => Array.from(document.querySelectorAll(sel + ' > article')).map((a) => { const m = a.innerText.match(new RegExp(p + ' pulse [0-9a-z]+')); return m ? m[0] : null; })", [PULSE, P])
+    check(len(caps) == 25 and None not in caps and len(set(caps)) == 25, "25 unique videos render", (len(caps), len(set(caps))))
+    check(f"{P} pulse upl" not in pg.inner_text("body") and not any("upl_test" in r for r in reqs), "the processing (upl_test) video never renders or loads")
+    pg.get_by_text("You're all caught up").wait_for(timeout=10000)
+    check(True, "end card: You're all caught up")
+    n_pulse = len([r for r in reqs if PULSE_REQ.search(r)])
+    check(n_pulse == 2 and all("limit=20" in r for r in reqs if PULSE_REQ.search(r)), "2 Pulse page requests, limit=20", [r for r in reqs if PULSE_REQ.search(r)])
+    scroll_to(pg, 0); pg.wait_for_timeout(500); scroll_to(pg, 30); pg.wait_for_timeout(1500)
+    check(len([r for r in reqs if PULSE_REQ.search(r)]) == n_pulse, "no Pulse requests after the end card")
+    check(not any("/api/discover/pulse/engagement" in r for r in reqs), "signed out: no engagement request")
+    check(not any("/api/discover/follow/" in r for r in reqs), "signed out: no follow checks")
+    check(pg.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth"), "390px: no horizontal scroll")
+    check(real(errs) == [], "no console or page errors", errs)
+    ctx.close()
+
+    # ---- signed in, native media path
+    print("signed in")
+    cookies, sid = auth_cookies(sql, BDIR, viewer, WEB)
+    sids.append(sid)
+    ctx, pg, errs, reqs = new_ctx(browser, cookies, width=390)
+    ctx.add_init_script(PLAY_HOOK)
+    posts = []
+    pg.on("request", lambda r: posts.append(r.post_data or "") if "/api/discover/pulse/engagement" in r.url and r.method == "POST" else None)
+    statuses = []
+    pg.on("response", lambda r: statuses.append(r.status) if "/api/discover/pulse/engagement" in r.url else None)
+    pg.goto(WEB + "/discover/pulse")
+    wait_items(pg, 3)
+    first_id = pulse_items(pg).nth(0).get_attribute("data-post-id")
+    pg.wait_for_function("([sel]) => { const v = document.querySelector(sel + ' > article video'); return v && v.currentTime > 0 && !v.paused; }", arg=[PULSE], timeout=30000)
+    pg.wait_for_timeout(1600)
+    check(not posts, "no engagement while the video is still active", posts)
+    scroll_to(pg, 1)
+    pg.wait_for_timeout(1500)
+    mine = [json.loads(b) for b in posts if b and json.loads(b).get("postId") == first_id]
+    check(len(mine) == 1, "one engagement POST for the first video after scrolling on", posts)
+    if mine:
+        b = mine[0]
+        check(b["watchTimeMs"] >= 1000 and b["videoDurationMs"] > 0 and isinstance(b["isRewatch"], bool), "engagement body: watchTimeMs >= 1000, duration, isRewatch", b)
+    check(statuses and all(s == 200 for s in statuses), "engagement accepted by the backend", statuses)
+    check(sql(f"SELECT count(*) FROM pulse_engagements WHERE post_id='{first_id}' AND user_id='{viewer}'") == "1", "engagement row saved")
+    checks = [r for r in reqs if "/api/discover/follow/" in r]
+    check(sorted(checks) == sorted({f"{WEB}/api/discover/follow/{a1}", f"{WEB}/api/discover/follow/{a2}"}), "one follow check per author", checks)
+    sound = pulse_items(pg).nth(1).get_by_role("button", name="Turn sound on")
+    sound.click()
+    pg.wait_for_timeout(300)
+    check(pulse_items(pg).nth(1).get_by_role("button", name="Turn sound off").count() == 1 and
+          pg.evaluate("([sel]) => document.querySelectorAll(sel + ' > article')[1].querySelector('video').muted === false", [PULSE]), "sound toggle unmutes the active video")
+    # double tap likes (never unlikes)
+    second = pulse_items(pg).nth(1)
+    second.get_by_role("button", name=re.compile("^(Pause|Play) video$")).dblclick()
+    second.locator("[data-testid='pulse-like-count']").filter(has_text="1").wait_for(timeout=10000)
+    check(second.get_by_role("button", name="Like").get_attribute("aria-pressed") == "true", "double tap likes")
+    second.get_by_role("button", name=re.compile("^(Pause|Play) video$")).dblclick()
+    pg.wait_for_timeout(800)
+    check(second.get_by_role("button", name="Like").get_attribute("aria-pressed") == "true", "second double tap keeps the like")
+    second.get_by_role("button", name="Comment").click()
+    pg.get_by_role("dialog", name="Comments").wait_for(timeout=10000)
+    check(True, "comment opens the comments panel")
+    pg.keyboard.press("Escape")
+    check(real(errs) == [], "signed in: no console or page errors", errs)
+    ctx.close()
+
+    # ---- a stream that cannot load (fatal hls.js error): poster plus "Video unavailable", the item stays
+    print("fatal stream error")
+    ctx, pg, errs, reqs = new_ctx(browser, width=390)
+    ctx.add_init_script(NO_NATIVE_HLS)
+    def card(i, url):
+        return {"id": f"00000000-0000-4000-8000-00000000000{i}", "videoUrl": url, "thumbnailUrl": PIXEL, "caption": f"{P} fatal {i}",
+                "likeCount": 0, "commentCount": 0, "isLiked": False, "isSaved": False,
+                "author": {"userId": a1, "username": f"{P}p1", "displayName": "Pulse Maker", "profilePhotoUrl": "", "role": "consumer"}}
+    feed = {"success": True, "data": {"videos": [card(1, f"{WEB}/__discover_test/{P}/missing.m3u8"), card(2, src)],
+                                      "nextCursor": None, "hasMore": False, "nextOffset": 2, "pageSize": 20}}
+    ctx.route(PULSE_REQ, lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(feed)))
+    pg.goto(WEB + "/discover/pulse")
+    wait_items(pg, 2)
+    bad = pulse_items(pg).nth(0)
+    bad.get_by_text("Video unavailable").wait_for(timeout=30000)
+    check(bad.locator("video").count() == 0 and bad.locator(f"img[src='{PIXEL}']").count() == 1, "fatal error: the poster shows instead of the player")
+    check(pulse_items(pg).count() == 2 and f"{P} fatal 1" in bad.inner_text(), "fatal error: the item stays in the list")
+    scroll_to(pg, 1)
+    pg.wait_for_function("([sel]) => { const v = document.querySelectorAll(sel + ' > article')[1].querySelector('video'); return v && v.currentTime > 0; }", arg=[PULSE], timeout=30000)
+    check(True, "fatal error: the next video still plays")
+    ctx.close()
+
+    # ---- empty feed
+    print("empty")
+    ctx, pg, errs, reqs = new_ctx(browser, width=390)
+    ctx.route(PULSE_REQ, lambda r: r.fulfill(status=200, content_type="application/json",
+              body='{"success":true,"data":{"videos":[],"nextCursor":null,"hasMore":false,"nextOffset":0,"pageSize":20}}'))
+    pg.goto(WEB + "/discover/pulse")
+    pg.get_by_text("No videos yet").wait_for(timeout=60000)
+    check(True, "empty feed shows No videos yet")
+    ctx.close()
+
+
 def cleanup():
     ids = ",".join(f"'{u}'" for u in created_users)
     if not ids:
@@ -411,6 +652,8 @@ def cleanup():
         f"DELETE FROM user_saved_posts WHERE post_id IN ({posts})",
         f"DELETE FROM feed_engagement_events WHERE post_id IN ({posts})",
         f"DELETE FROM pulse_engagements WHERE post_id IN ({posts})",
+        f"DELETE FROM post_distribution WHERE post_id IN ({posts})",
+        f"DELETE FROM user_interests WHERE user_id IN ({ids})",
         f"DELETE FROM feed_posts WHERE author_id IN ({ids})",
         f"DELETE FROM story_views WHERE viewer_id IN ({ids}) OR story_id IN (SELECT id FROM stories WHERE author_id IN ({ids}))",
         f"DELETE FROM stories WHERE author_id IN ({ids})",
@@ -432,14 +675,17 @@ def cleanup():
 try:
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
-        section_pro(browser)
-        section_following(browser)
+        only = os.environ.get("DP_ONLY", "")  # e.g. DP_ONLY=pulse runs one section
+        for name, fn in (("pro", section_pro), ("following", section_following), ("pulse", section_pulse)):
+            if not only or only == name:
+                fn(browser)
         browser.close()
 except Exception as e:
     failed += 1
     print("  FAIL unexpected error:", str(e)[:600])
 finally:
     cleanup()
+    shutil.rmtree(PUBLIC_TEST, ignore_errors=True)
 
 print(f"\n{passed} passed, {failed} failed")
 sys.exit(1 if failed else 0)

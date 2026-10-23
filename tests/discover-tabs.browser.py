@@ -4,7 +4,7 @@ Run: python3 tests/discover-tabs.browser.py
 Env (defaults shown): DT_WEB_URL=http://localhost:3101
   DT_PG_URL=postgresql://outsyde:outsyde@localhost:5432/outsyde_test  DT_BACKEND_DIR=/home/claude/1outsyde/outsyde-backend
 Skips (exit 0) when the web server is not up. Needs psql and node on PATH.
-Only /discover/pulse may still be skipped (not built yet); /events, /discover/following and /discover must exist.
+All four tab pages must exist: /events, /discover/following, /discover and /discover/pulse.
 """
 import re, os, subprocess, sys, time, urllib.request
 from urllib.parse import urlparse
@@ -44,7 +44,6 @@ def tok(uid):
     code = f'console.log(require("jsonwebtoken").sign({{userId:"{uid}",isVendor:false}},"test",{{expiresIn:"1h"}}))'
     return subprocess.run(["node", "-e", code], capture_output=True, text=True, cwd=BDIR, check=True).stdout.strip()
 
-BUILT = {"/events", "/discover/following", "/discover"}
 TABS = [("Events", "/events", "events"), ("Following", "/discover/following", "following"),
         ("Pro", "/discover", "pro"), ("Pulse", "/discover/pulse", "pulse")]
 P = "dt" + format(int(time.time()), "x")
@@ -64,8 +63,6 @@ try:
         for label, path, key in TABS:
             print(f"tab row on {path}")
             resp = pg.goto(WEB + path)
-            if path not in BUILT and (resp is None or resp.status == 404):
-                print(f"skip {path}: not built yet"); continue
             check(resp is not None and resp.status == 200, f"{path}: returns 200", resp and resp.status)
             nav = pg.get_by_role("navigation", name="Discover")
             nav.wait_for(timeout=60000)
@@ -84,8 +81,7 @@ try:
         ctx, pg = new_ctx(browser, None, 390)
         for label, path, key in TABS:
             resp = pg.goto(WEB + path)
-            if path not in BUILT and (resp is None or resp.status == 404):
-                print(f"skip {path}: not built yet"); continue
+            check(resp is not None and resp.status == 200, f"{path}: returns 200 (390px)", resp and resp.status)
             pg.get_by_role("navigation", name="Discover").wait_for(timeout=60000)
             check(pg.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth"), f"{path}: no horizontal scroll at 390px")
         ctx.close()
