@@ -86,7 +86,7 @@ export function businessReferralLine(r: BusinessReferral, now: Date = new Date()
     case "paid":
       return `$25 sent${p.paidAt ? ` on ${shortDate(p.paidAt)}` : ""}.`;
     case "cancelled":
-      return "Their plan payment was refunded, so the $25 was cancelled.";
+      return "This $25 payout was cancelled.";
     case "review":
       return "We're checking this payout. No action needed.";
     case "held":
