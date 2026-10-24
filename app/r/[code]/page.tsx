@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/app-stores";
-import { normalizeReferralCode, signupHrefForCode, REFERRAL_COPY } from "@/lib/referral";
+import { normalizeReferralCode, signupHrefForCode, businessSignupHrefForCode, REFERRAL_COPY, BUSINESS_REFERRAL_COPY } from "@/lib/referral";
 
 // Friend invite landing (2026-10-23). The share link from the backend is FRONTEND_URL/r/<CODE>.
 // No backend call (there is no public code lookup) and no cookie: the code travels in the Join link.
@@ -27,6 +27,9 @@ const css = `
   .ri-apps { display: flex; gap: 10px; flex-wrap: wrap; }
   .ri-ghost { flex: 1 1 180px; text-align: center; font-size: 13px; color: rgba(245,240,230,0.75); border: 1px solid rgba(245,240,230,0.15); border-radius: 10px; padding: 12px 14px; text-decoration: none; }
   .ri-ghost:hover { border-color: rgba(245,240,230,0.35); color: #F5F0E6; }
+  .ri-biz { display: flex; flex-direction: column; gap: 10px; padding-top: 18px; border-top: 1px solid rgba(245,240,230,0.1); }
+  .ri-biz-line { font-size: 14px; font-weight: 600; color: #F5F0E6; }
+  .ri-biz .ri-ghost { flex: none; }
   .ri-fine { font-size: 12px; color: rgba(245,240,230,0.4); line-height: 1.5; }
   @media (max-width: 480px) { .ri-card { padding: 28px 22px; } .ri-title { font-size: 36px; } }
 `;
@@ -55,6 +58,11 @@ export default async function InvitePage({ params }: { params: Promise<{ code: s
                 <a className="ri-ghost" href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer">Get the app on Android</a>
               </div>
               <p className="ri-fine">{REFERRAL_COPY.fineprint}</p>
+              <div className="ri-biz">
+                <span className="ri-biz-line">{BUSINESS_REFERRAL_COPY.invitedLine}</span>
+                <Link className="ri-ghost" href={businessSignupHrefForCode(code)}>{BUSINESS_REFERRAL_COPY.invitedButton}</Link>
+                <p className="ri-fine">{BUSINESS_REFERRAL_COPY.invitedFineprint}</p>
+              </div>
             </>
           ) : (
             <>

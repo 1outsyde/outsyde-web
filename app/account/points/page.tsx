@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { REFERRAL_COPY } from "@/lib/referral";
+import BusinessReferralCard from "@/components/referral/BusinessReferralCard";
 
 interface PointsBalance { balance: number; dollarValue?: number; }
 interface ReferralInfo {
@@ -249,6 +250,8 @@ export default function PointsPage() {
                 </div>
               </div>
             )}
+
+            {referral && <BusinessReferralCard code={referral.referralCode} />}
 
             <div className="info-row">
               <div className="info-pill"><span>★</span> Points are added automatically with every purchase. The more you shop, the more you save.</div>

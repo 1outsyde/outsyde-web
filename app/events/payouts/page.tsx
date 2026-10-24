@@ -88,9 +88,10 @@ export default function EventPayoutsPage() {
         {view.step === "ready" && (
           <div className="po-card">
             <h1 className="po-h1">Payouts are set up</h1>
-            <p className="po-text">Ticket money is paid to your bank 3 days after your event ends.</p>
+            <p className="po-text">Ticket money is paid to your bank 3 days after your event ends. Referral rewards are paid here too.</p>
             <div className="po-row">
               <Link href="/events/mine" className="po-btn">Your events</Link>
+              <Link href="/account/points" className="po-link">Your rewards</Link>
               <Link href="/tickets" className="po-link">My tickets</Link>
               <Link href="/" className="po-link">Back to home</Link>
             </div>
@@ -103,7 +104,7 @@ export default function EventPayoutsPage() {
             <p className="po-text">
               {needs.mode === "almost"
                 ? "Stripe still needs a few details before you can get paid."
-                : "Connect a bank account through Stripe to get paid for ticket sales."}
+                : "Connect a bank account through Stripe to get paid on Outsyde, for ticket sales and referral rewards."}
             </p>
             {actionError && <p className="po-err" role="alert">{actionError}</p>}
             <div className="po-row">
@@ -111,6 +112,7 @@ export default function EventPayoutsPage() {
                 {sending ? "Opening Stripe…" : needs.mode === "almost" ? "Finish payout setup" : "Set up payouts"}
               </button>
               <Link href="/events/mine" className="po-link">Your events</Link>
+              <Link href="/account/points" className="po-link">Your rewards</Link>
               <Link href="/" className="po-link">Back to home</Link>
             </div>
           </div>

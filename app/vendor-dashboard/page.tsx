@@ -7,6 +7,7 @@ import CoverVideo from "@/components/CoverVideo";
 import { COVER_VIDEO_MAX_SECONDS, uploadCoverVideo } from "@/lib/coverMedia";
 import { isTaxonomy, type BusinessTaxonomy } from "@/lib/business-taxonomy";
 import IndustrySection, { industryProblem, offerTypeOf, type IndustryValue } from "./IndustrySection";
+import BusinessReferralCard from "@/components/referral/BusinessReferralCard";
 import {
   BOOKING_FILTERS,
   bookingStatusColor,
@@ -821,6 +822,8 @@ export default function VendorDashboardPage() {
                   <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, color: "#c9a84c" }}>{business.followingCount ?? 0}</div>
                 </div>
               </div>
+              {/* Business referral cash goes to this business's Stripe account, so setup uses the dashboard's own Stripe flow. */}
+              <BusinessReferralCard onSetupPayouts={handleConnectStripe} />
               {!loadingOrders && orders.length > 0 && (
                 <div style={{ marginTop: 20 }}>
                   <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "#555", marginBottom: 12 }}>Recent orders</div>
