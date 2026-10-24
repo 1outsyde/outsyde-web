@@ -3,8 +3,14 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { REFERRAL_COPY } from "@/lib/referral";
 
 interface PointsBalance { balance: number; dollarValue?: number; }
+interface ReferralInfo {
+  referralCode: string;
+  referralLink: string;
+  stats?: { totalReferrals?: number; pendingReferrals?: number; qualifyingReferrals?: number; completedReferrals?: number; totalPointsEarned?: number };
+}
 interface PointTransaction {
   id: string | number;
   type: string;
@@ -18,6 +24,8 @@ export default function PointsPage() {
   const [balance, setBalance] = useState<PointsBalance | null>(null);
   const [transactions, setTransactions] = useState<PointTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [referral, setReferral] = useState<ReferralInfo | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -36,6 +44,14 @@ export default function PointsPage() {
         setTransactions(h.transactions || h || []);
       }
       setLoading(false);
+      // Invite card: optional, never blocks the page.
+      try {
+        const refRes = await fetch("/api/account/referral");
+        if (refRes.ok) {
+          const r = await refRes.json();
+          if (typeof r?.referralCode === "string" && typeof r?.referralLink === "string") setReferral(r);
+        }
+      } catch { /* card stays hidden */ }
     }
     load();
   }, [router]);
@@ -96,6 +112,16 @@ export default function PointsPage() {
     }
     .info-pill span:first-child { color: #E8B930; }
 
+    .invite-card { border: 1px solid rgba(245,240,230,0.1); border-radius: 14px; padding: 24px 28px; margin-bottom: 36px; display: flex; flex-direction: column; gap: 14px; }
+    .invite-title { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 0.08em; color: #F5F0E6; }
+    .invite-body { font-size: 13.5px; line-height: 1.6; color: rgba(245,240,230,0.6); }
+    .invite-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .invite-code { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 0.14em; color: #E8B930; padding: 8px 14px; border: 1px dashed rgba(232,185,48,0.4); border-radius: 8px; }
+    .invite-btn { font: 600 13px 'Hanken Grotesk', sans-serif; padding: 10px 16px; border-radius: 8px; cursor: pointer; border: 1px solid rgba(245,240,230,0.15); background: transparent; color: #F5F0E6; }
+    .invite-btn.primary { background: #E8B930; color: #000; border-color: #E8B930; }
+    .invite-btn:focus-visible { outline: 2px solid #F5F0E6; outline-offset: 2px; }
+    .invite-stats { display: flex; gap: 24px; flex-wrap: wrap; font-size: 12.5px; color: rgba(245,240,230,0.45); }
+    .invite-stats b { color: #F5F0E6; font-weight: 600; margin-right: 4px; }
     .section-title { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 0.08em; margin-bottom: 16px; color: rgba(245,240,230,0.7); }
 
     .tiers-grid { display: flex; flex-direction: column; gap: 6px; margin-bottom: 36px; }
@@ -186,6 +212,43 @@ export default function PointsPage() {
                 <div className="dollar-sub">Points are added automatically with every purchase.</div>
               </div>
             </div>
+
+            {referral && (
+              <div className="invite-card">
+                <div className="invite-title">{REFERRAL_COPY.cardTitle}</div>
+                <div className="invite-body">{REFERRAL_COPY.cardBody}</div>
+                <div className="invite-row">
+                  <span className="invite-code">{referral.referralCode}</span>
+                  <button
+                    type="button"
+                    className="invite-btn primary"
+                    onClick={async () => {
+                      const shareData = { title: "Join me on Outsyde", text: REFERRAL_COPY.offer, url: referral.referralLink };
+                      try {
+                        if (typeof navigator !== "undefined" && navigator.share) { await navigator.share(shareData); return; }
+                      } catch { /* closed the share sheet or not allowed: fall back to copy */ }
+                      try { await navigator.clipboard.writeText(referral.referralLink); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* ignore */ }
+                    }}
+                  >
+                    Share invite
+                  </button>
+                  <button
+                    type="button"
+                    className="invite-btn"
+                    onClick={async () => {
+                      try { await navigator.clipboard.writeText(referral.referralLink); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* ignore */ }
+                    }}
+                  >
+                    {copied ? "Link copied" : "Copy link"}
+                  </button>
+                </div>
+                <div className="invite-stats">
+                  <span><b>{referral.stats?.totalReferrals ?? 0}</b>invited</span>
+                  <span><b>{(referral.stats?.pendingReferrals ?? 0) + (referral.stats?.qualifyingReferrals ?? 0)}</b>waiting on a first purchase</span>
+                  <span><b>{(referral.stats?.totalPointsEarned ?? 0).toLocaleString()}</b>points earned</span>
+                </div>
+              </div>
+            )}
 
             <div className="info-row">
               <div className="info-pill"><span>★</span> Points are added automatically with every purchase. The more you shop, the more you save.</div>
