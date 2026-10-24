@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useSyncExternalStore } from "react";
+import { normalizeReferralCode, REFERRAL_COPY } from "@/lib/referral";
+
+const noopSubscribe = () => () => {};
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
@@ -128,6 +131,10 @@ export default function ConsumerSignupPage() {
   const [usernameChecking, setUsernameChecking] = useState(false);
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [usernameTimer, setUsernameTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  // Friend invite code from /r/<CODE> (?ref=). Read from the URL on the client (empty on the server),
+  // so the page needs no Suspense boundary and nothing changes for signups without a code.
+  const search = useSyncExternalStore(noopSubscribe, () => window.location.search, () => "");
+  const referralCode = normalizeReferralCode(new URLSearchParams(search).get("ref"));
 
   const [form, setForm] = useState<FormData>({
     email: "", password: "", confirmPassword: "",
@@ -312,6 +319,7 @@ export default function ConsumerSignupPage() {
       // Shared list codes (2026-10-18): industries, what they're into, what matters, Other text.
       ...interestsPayload(form.interests),
       source: 'outsyde-web',
+      ...(referralCode ? { referralCode } : {}),
     };
 
     try {
@@ -389,6 +397,7 @@ export default function ConsumerSignupPage() {
           margin-bottom: 4px;
         }
         .step-sub { font-size: 13px; color: #666; margin-bottom: 28px; line-height: 1.5; }
+        .invite-note { max-width: 560px; margin: 0 auto 16px; padding: 10px 14px; border-radius: 8px; font-size: 13px; line-height: 1.5; text-align: center; color: #E8B930; background: rgba(232,185,48,0.08); border: 1px solid rgba(232,185,48,0.3); }
         .field-group { margin-bottom: 18px; }
         label {
           display: block;
@@ -544,6 +553,7 @@ export default function ConsumerSignupPage() {
       <div className="page" ref={formRef}>
         <Link href="/" className="logo-link">OUTSYDE</Link>
         <p className="tagline">Create your account</p>
+        {referralCode && <p className="invite-note" role="status">{REFERRAL_COPY.codeApplied}</p>}
 
         <div className="card">
           <div className="steps">

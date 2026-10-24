@@ -66,6 +66,7 @@ const SKIP_PREFIXES = [
   "/signup",
   "/claim",
   "/finish",
+  "/r",
   "/forgot-password",
   "/reset-password",
   "/plan-offer",
