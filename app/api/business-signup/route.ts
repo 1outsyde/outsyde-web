@@ -26,6 +26,7 @@
 
 import { NextResponse } from "next/server";
 import { sendBusinessSignupConfirmation } from "@/lib/emails";
+import { normalizeReferralCode } from "@/lib/referral";
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 const OFFER_TYPES = new Set(["products", "services", "both"]);
@@ -72,6 +73,7 @@ interface BusinessSignupBody {
   billingState?: unknown;
   billingZipCode?: unknown;
   logoDataUrl?: unknown;
+  referralCode?: unknown;
 }
 
 export async function POST(req: Request) {
@@ -114,7 +116,11 @@ export async function POST(req: Request) {
     billingState,
     billingZipCode,
     logoDataUrl,
+    referralCode: rawReferralCode,
   } = body;
+  // Optional referral code (2026-10-24): forwarded only when it's a valid code. A bad one never
+  // fails the signup; the backend decides whether it counts.
+  const referralCode = normalizeReferralCode(rawReferralCode);
 
   // --- input validation ---
   if (typeof firstName !== "string" || !firstName.trim()) {
@@ -219,6 +225,7 @@ export async function POST(req: Request) {
     vendorAgreementAcceptedAt: new Date().toISOString(),
     // With a logo, this route sends the admin alert itself once the logo is saved.
     deferAdminNotification: logo ? true : undefined,
+    ...(referralCode ? { referralCode } : {}),
   };
 
   let signupRes: Response;
@@ -294,6 +301,7 @@ export async function POST(req: Request) {
   const response = NextResponse.json({
     ok: true,
     business: signupData.business ?? null,
+    referralApplied: signupData.referralApplied === true,
     message:
       typeof signupData.message === "string"
         ? signupData.message

@@ -15,10 +15,13 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { normalizeReferralCode, BUSINESS_REFERRAL_COPY } from "@/lib/referral";
 import { Eye, EyeOff } from "lucide-react";
 import ExistingAccountHint, { isAlreadyRegistered } from "@/components/ExistingAccountHint";
 import { isOtherCode, isTaxonomy, specialtiesFor, type BusinessTaxonomy, type TaxonomySpecialty } from "@/lib/business-taxonomy";
+
+const noopSubscribe = () => () => {};
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -137,11 +140,19 @@ export default function BusinessSignupPage() {
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [socialMedia, setSocialMedia] = useState("");
 
+  // Referral code (2026-10-24): prefilled from ?ref= (the /r/<CODE> invite page), editable, optional.
+  // Read from the URL on the client so nothing changes for signups without a code.
+  const search = useSyncExternalStore(noopSubscribe, () => window.location.search, () => "");
+  const [typedReferral, setTypedReferral] = useState<string | null>(null);
+  const referralInput = typedReferral ?? normalizeReferralCode(new URLSearchParams(search).get("ref")) ?? "";
+  const referralCode = normalizeReferralCode(referralInput);
+  const referralInvalid = referralInput.trim() !== "" && !referralCode;
+
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [submitError, setSubmitError] = useState("");
-  const [success, setSuccess] = useState<{ message: string; businessName: string } | null>(null);
+  const [success, setSuccess] = useState<{ message: string; businessName: string; referralApplied: boolean } | null>(null);
 
   const [currentStep, setCurrentStep] = useState<0 | 1>(0);
   const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
@@ -377,6 +388,7 @@ export default function BusinessSignupPage() {
           websiteUrl: websiteUrl.trim() || undefined,
           socialMedia: socialMedia.trim() || undefined,
           logoDataUrl: logoDataUrl || undefined,
+          ...(referralCode ? { referralCode } : {}),
         }),
       });
       const data = await res.json();
@@ -402,6 +414,7 @@ export default function BusinessSignupPage() {
       setSuccess({
         message: data.message || "Your application has been submitted and is pending approval.",
         businessName: businessName.trim(),
+        referralApplied: data.referralApplied === true,
       });
     } catch {
       setSubmitState("error");
@@ -541,6 +554,7 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
                 <strong>{email}</strong> once <strong>{success.businessName}</strong> has been
                 reviewed.
               </p>
+              {success.referralApplied && <p>{BUSINESS_REFERRAL_COPY.codeApplied}</p>}
             </div>
           ) : currentStep === 1 ? (
             <div className="bs-card bs-agreement-card">
@@ -1195,6 +1209,24 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
                       onChange={(e) => setSocialMedia(e.target.value)}
                       placeholder="@yourbusiness"
                     />
+                  </div>
+                  <div className="bs-field">
+                    <label htmlFor="bs-referral">{BUSINESS_REFERRAL_COPY.fieldLabel}</label>
+                    <input
+                      id="bs-referral"
+                      type="text"
+                      value={referralInput}
+                      onChange={(e) => setTypedReferral(e.target.value)}
+                      placeholder="ABC12345"
+                      autoCapitalize="characters"
+                      autoComplete="off"
+                      maxLength={20}
+                      aria-invalid={referralInvalid || undefined}
+                      aria-describedby={referralInvalid ? "bs-referral-hint" : undefined}
+                    />
+                    {referralInvalid && (
+                      <p id="bs-referral-hint" className="bs-hint">Codes use letters and numbers only.</p>
+                    )}
                   </div>
 
                   <label className="bs-terms">

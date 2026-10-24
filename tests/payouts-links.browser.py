@@ -78,7 +78,8 @@ try:
         ctx, pg, errs = new_ctx(browser, token, 1280)
         pg.goto(WEB + "/events/payouts")
         pg.get_by_role("heading", name="Set up payouts").wait_for(timeout=15000)
-        check(pg.get_by_text("Connect a bank account through Stripe to get paid for ticket sales.").count() == 1, "no account: setup copy shows")
+        check(pg.get_by_text("Connect a bank account through Stripe to get paid on Outsyde, for ticket sales and referral rewards.").count() == 1, "no account: setup copy shows")
+        check(pg.locator(".po-card").get_by_role("link", name="Your rewards").get_attribute("href") == "/account/points", "needs setup: Your rewards link to /account/points")
         btn = pg.get_by_role("button", name="Set up payouts")
         check(btn.count() == 1, "button reads Set up payouts")
         before = pg.url
@@ -125,7 +126,8 @@ try:
         pg.route("**/api/events/payouts/status*", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps({"success": True, "hostType": "user", "hasAccount": True, "ready": True, "needsSetup": False})))
         pg.goto(WEB + "/events/payouts?stripe=done")
         pg.get_by_role("heading", name="Payouts are set up").wait_for(timeout=15000)
-        check(pg.get_by_text("Ticket money is paid to your bank 3 days after your event ends.").count() == 1
+        check(pg.get_by_text("Ticket money is paid to your bank 3 days after your event ends. Referral rewards are paid here too.").count() == 1
+              and pg.get_by_role("link", name="Your rewards").get_attribute("href") == "/account/points"
               and pg.get_by_role("link", name="My tickets").get_attribute("href") == "/tickets"
               and pg.get_by_role("link", name="Back to home").get_attribute("href") == "/", "ready: heading, line, My tickets and home links")
         check(pg.locator(".po-card").get_by_role("link", name="Your events").get_attribute("href") == "/events/mine", "ready: Your events link to /events/mine")
