@@ -108,7 +108,7 @@ export const ACTION_LABEL: Record<ActionKind, string> = {
 };
 
 export const ACTION_DONE: Record<ActionKind, string> = {
-  retry: "Payout set to try again. It goes out within a few minutes.",
+  retry: "Payout set to try again. The payout job tries it again within a few minutes.",
   email: "Email sent to the host.",
   collected: "Marked collected.",
   written_off: "Written off.",
@@ -434,6 +434,7 @@ export const AEM_CSS = `
 .aem-payout-bad { border-color: rgba(255,107,107,0.3); background: rgba(255,107,107,0.04); }
 .aem-payout-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .aem-payout-amt { font-family: 'Bebas Neue', sans-serif; font-size: 40px; color: #E8B930; line-height: 1; }
+.aem-payout-amt-muted { color: rgba(245,240,230,0.45); text-decoration: line-through; }
 .aem-kv { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
 .aem-kv > div { display: flex; justify-content: space-between; gap: 10px; }
 .aem-kv > div > span:first-child { color: rgba(245,240,230,0.55); }

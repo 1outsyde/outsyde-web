@@ -352,9 +352,9 @@ export default function EventMoneyClient({ id }: { id: string }) {
             </div>
             {payout ? (
               <>
-                <div className="aem-payout-amt">{usd(payout.amountCents)}</div>
+                <div className={e.status === "cancelled" ? "aem-payout-amt aem-payout-amt-muted" : "aem-payout-amt"}>{usd(payout.amountCents)}</div>
                 <div className="aem-kv">
-                  <div><span>Host earns</span><span>{usd(payout.grossCents)}</span></div>
+                  <div><span>Earned when the payout was made</span><span>{usd(payout.grossCents)}</span></div>
                   <div><span>Taken back for an earlier refund</span><span>{usd(payout.deductedCents)}</span></div>
                   <div><span>Due</span><span>{dayLong(payout.dueAt) || "Not set"}</span></div>
                   {payout.paidAt ? <div><span>Paid</span><span>{dayLong(payout.paidAt)}</span></div> : null}
@@ -362,7 +362,7 @@ export default function EventMoneyClient({ id }: { id: string }) {
                   <div><span>Sent to</span><span>{payout.connectedAccount ?? "No account yet"}</span></div>
                   {payout.status === "held" ? <div><span>Why it waits</span><span>{holdText(payout.holdReason)}</span></div> : null}
                 </div>
-                {payout.lastError ? <div className="aem-err">Last error from Stripe: {payout.lastError}</div> : null}
+                {payout.lastError ? <div className="aem-err">Last error: {payout.lastError}</div> : null}
                 {payout.status === "review" || payout.status === "held" ? (
                   <ActionGroup
                     id={payout.id}

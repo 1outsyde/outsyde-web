@@ -172,7 +172,7 @@ console.log("filters");
     ev({ title: "cx", status: "cancelled", payout: { status: "review" } }),
     ev({ title: "nothing sold done", payout: null, salesCents: 0, hostEarnsCents: 0, owedToHostCents: 0 }),
   ];
-  eq(FILTERS.map((f) => f.label), ["All", "Upcoming", "Ended, not paid yet", "Paid", "Needs attention"], "filter labels in order");
+  eq(FILTERS.map((f) => f.label), ["All", "Upcoming", "Ended, not paid yet", "Paid", "Needs you now"], "filter labels in order");
   eq(filterCounts(rows, NOW), { all: 7, upcoming: 1, awaiting: 1, paid: 1, attention: 2 }, "counts");
   eq(filterEvents(rows, "attention", NOW).map((e) => e.title), ["stuck", "held"], "needs attention");
   eq(filterEvents(rows, "upcoming", NOW).map((e) => e.title), ["up"], "upcoming");

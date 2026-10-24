@@ -313,7 +313,7 @@ try:
         check(f"{P} Lounge" in hnames and "Individual hosts" in hnames and hnames.index(f"{P} Lounge") < hnames.index("Individual hosts"), "host groups: business before individual hosts", hnames)
         biz_group = pg.locator(f"[data-group='host']:has(.aem-group-name:text-is('{P} Lounge'))")
         check(biz_group.locator("a.aem-row").count() == 4 and "Business" in biz_group.locator(".aem-kind").inner_text(), "business group holds its four events")
-        check("needs payout setup" in pg.locator("[data-group='host']:has(.aem-group-name:text-is('Individual hosts')) .aem-bad-text").inner_text(), "individual hosts flag the host without payout setup")
+        check(re.search(r"needs? payout setup", pg.locator("[data-group='host']:has(.aem-group-name:text-is('Individual hosts')) .aem-bad-text").inner_text()) is not None, "individual hosts flag the host without payout setup")
         pg.get_by_role("button", name="By date").click()
 
         # Range change refetches with a new from.
@@ -359,7 +359,7 @@ try:
         c.get_by_role("button", name="Try again").click()
         c.get_by_role("button", name="Confirm: Try again?").click()
         pg.locator(".aem-banner-ok").wait_for(timeout=20000)
-        check(pg.locator(".aem-banner-ok").inner_text().startswith("Payout set to try again. It goes out within a few minutes."), "green banner after Try again")
+        check(pg.locator(".aem-banner-ok").inner_text().startswith("Payout set to try again. The payout job tries it again within a few minutes."), "green banner after Try again")
         st = sql(f"SELECT status || ':' || attempts FROM event_payouts WHERE id='{pay_biz}'")
         aud = sql(f"SELECT count(*) FROM audit_logs WHERE target_id='{pay_biz}' AND action='event_payout.retry' AND after_state->>'status'='pending'")
         if st.startswith("pending"):

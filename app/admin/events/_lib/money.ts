@@ -84,7 +84,7 @@ export const FILTERS: { id: FilterId; label: string }[] = [
   { id: "upcoming", label: "Upcoming" },
   { id: "awaiting", label: "Ended, not paid yet" },
   { id: "paid", label: "Paid" },
-  { id: "attention", label: "Needs attention" },
+  { id: "attention", label: "Needs you now" },
 ];
 
 export type RangePreset = "last30" | "last90" | "year" | "all";

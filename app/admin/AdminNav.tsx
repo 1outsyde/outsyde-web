@@ -30,6 +30,7 @@ function isActive(pathname: string, href: string): boolean {
 // app/admin/layout.tsx and use the same width.
 const PHONE_CSS = `
   .admin-nav-phone { display: none; }
+  .admin-nav-desktop { min-width: 0; overflow-x: auto; scrollbar-width: none; }
   @media (max-width: 1023px) {
     .admin-nav-desktop { display: none !important; }
     .admin-nav-phone { display: flex; align-items: center; gap: 10px; margin-left: auto; min-width: 0; }
