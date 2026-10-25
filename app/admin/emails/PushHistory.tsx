@@ -44,6 +44,7 @@ const REASON: Record<string, string> = {
   InvalidCredentials: "Expo credentials problem",
   send_error: "Expo couldn't be reached",
   server_restarted: "Server restarted while sending",
+  stopped_mid_send: "Sending stopped partway, it may have arrived",
   not_sent: "Not sent",
 };
 

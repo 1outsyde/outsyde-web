@@ -530,6 +530,7 @@ export default function PushTab({ onOpenSend }: { onOpenSend: (sendId: string) =
             <span className="em-confirm">
               Push to {plural(recipients, "person", "people")} ({AUDIENCE_LABEL[audience ?? "all"]}), opening {screen === "link" ? "your link" : screenLabel}? This can&apos;t be undone.
               {limits?.quietHours && <span className="pu-warn">{quietLine(limits.nowNewYork)}</span>}
+              {sendBlocker && <span className="pu-warn" style={{ color: "#ff6b6b" }}>{sendBlocker}</span>}
             </span>
           ) : (
             <>
@@ -545,7 +546,7 @@ export default function PushTab({ onOpenSend }: { onOpenSend: (sendId: string) =
           {confirming ? (
             <>
               <button className="em-btn em-btn-ghost" onClick={() => setConfirming(false)} disabled={busy !== null}>Cancel</button>
-              <button className="em-btn em-btn-gold" onClick={sendAll} disabled={busy !== null}>
+              <button className="em-btn em-btn-gold" onClick={sendAll} disabled={busy !== null || !!sendBlocker}>
                 {busy === "send" ? "Starting" : limits?.quietHours ? "Send anyway" : `Yes, send ${recipients}`}
               </button>
             </>
