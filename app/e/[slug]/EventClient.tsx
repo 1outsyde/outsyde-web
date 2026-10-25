@@ -7,6 +7,7 @@ import { CheckoutHost } from "./Checkout";
 import type { EventPayload, TicketType } from "./types";
 import { GENERIC_ERROR, errorCopy, fmt, maxQty, minQty, clampQty, money, newKey, rangeLine, revealLine } from "../_shared/format";
 import { hasStarted } from "./checkoutLogic";
+import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/app-stores";
 
 const whenLine = rangeLine;
 
@@ -273,6 +274,10 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
     .ev-btn-outline { height: 36px; padding: 0 16px; border-radius: 18px; border: 1px solid #F5F0E6; background: transparent; color: #F5F0E6; font: 600 13px 'Hanken Grotesk', sans-serif; cursor: pointer; flex-shrink: 0; }
     .ev-btn-outline:disabled { opacity: 0.6; cursor: default; }
     .ev-card { background: #141414; border: 1px solid #2A2A2A; border-radius: 14px; padding: 12px 14px; display: flex; gap: 12px; align-items: flex-start; }
+    .ev-app { border-color: #1A3C34; background: #10241F; }
+    .ev-app-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+    .ev-app-link { min-height: 44px; padding: 0 16px; border-radius: 22px; background: #1A3C34; color: #F5F0E6; display: inline-flex; align-items: center; font-size: 14px; font-weight: 600; }
+    .ev-app-link:hover { background: #224d43; color: #F5F0E6; }
     .ev-label { font-size: 12px; font-weight: 700; color: #B8B0A0; letter-spacing: 1px; }
     .ev-trow { width: 100%; text-align: left; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border: 0; border-bottom: 1px solid #1F1F1F; background: transparent; color: #F5F0E6; font-family: inherit; cursor: pointer; min-height: 44px; }
     .ev-trow[disabled] { cursor: default; }
@@ -452,6 +457,17 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
           {ended && !cancelled && <div className="ev-muted">This event has ended.</div>}
           {started && !ended && !cancelled && !draft && <div className="ev-muted">This event has started.</div>}
           <div className="ev-muted">{refundLine}</div>
+
+          <div className="ev-card ev-app" data-testid="get-the-app">
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>Get the Outsyde app</div>
+              <div className="ev-muted">Faster checkout and all your tickets in one place.</div>
+              <div className="ev-app-links">
+                <a className="ev-app-link" href={APP_STORE_URL} target="_blank" rel="noopener noreferrer">Download on the App Store</a>
+                <a className="ev-app-link" href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer">Get it on Google Play</a>
+              </div>
+            </div>
+          </div>
         </div>
 
         {showBar && (
