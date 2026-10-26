@@ -65,6 +65,8 @@ async function call(base: string, method: string, path: string, opts: { token?: 
   const hostTok = tok(host);
   const guestTok = tok(guest);
   const host2 = await mkUser("host2");
+  // Every host needs payouts set up to publish, free events too (backend 2026-10-26).
+  for (const u of [host, host2]) await q(`INSERT INTO user_payout_accounts (user_id, stripe_account_id, onboarding_complete) VALUES ($1, $2, true)`, [u, `acct_${P}_${u.slice(0, 8)}`]);
   const host2Tok = tok(host2);
   const ZERO = "00000000-0000-0000-0000-000000000000";
   // Publishing needs the Event Host Agreement: read it, then accept the current version (as the host pages do).
@@ -677,6 +679,7 @@ async function call(base: string, method: string, path: string, opts: { token?: 
     for (const row of await q(`SELECT id FROM events WHERE host_user_id = ANY($1)`, [[host, host2]]).catch(() => [] as any[])) if (!tkEventIds.includes(row.id)) tkEventIds.push(row.id);
     await q(`DELETE FROM event_door_team WHERE host_user_id = ANY($1)`, [[host, host2]]).catch(() => {});
     await q(`DELETE FROM host_agreement_acceptances WHERE user_id = ANY($1)`, [[host, host2]]).catch(() => {});
+    await q(`DELETE FROM user_payout_accounts WHERE user_id = ANY($1)`, [[host, host2]]).catch(() => {});
     if (tkEventIds.length) {
       await q(`DELETE FROM event_door_members WHERE event_id = ANY($1)`, [tkEventIds]).catch(() => {});
       const byEvent = `event_id = ANY($1)`;

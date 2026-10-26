@@ -69,6 +69,8 @@ def accept_agreement(token):
     return api("POST", "/api/events/host-agreement/accept", token, {"version": ag["version"]})
 
 host, g1, g2 = mkuser("host"), mkuser("g1"), mkuser("g2")
+# Every host needs payouts set up to publish, free events too (backend 2026-10-26).
+sql(f"INSERT INTO user_payout_accounts (user_id, stripe_account_id, onboarding_complete) VALUES ('{host}', 'acct_{P}_host', true)")
 ht, t1, t2 = tok(host), tok(g1), tok(g2)
 accept_agreement(ht)
 
@@ -185,6 +187,7 @@ finally:
         f"DELETE FROM ticket_types WHERE event_id IN ({ev_ids})",
         f"DELETE FROM events WHERE host_user_id='{host}'",
         f"DELETE FROM host_agreement_acceptances WHERE user_id='{host}'",
+        f"DELETE FROM user_payout_accounts WHERE user_id='{host}'",
         f"DELETE FROM users WHERE email LIKE '{P}-%'",
     ):
         try:
