@@ -77,6 +77,8 @@ def new_ctx(browser, token, width):
     return ctx, pg, errs
 
 host = sql(f"INSERT INTO users (id,email,name,first_name,username) VALUES (gen_random_uuid(),'{P}-host@test.local','Host Lastname','Host','{P}host') RETURNING id").splitlines()[0]
+# Every host needs payouts set up to publish, free events too (backend 2026-10-26).
+sql(f"INSERT INTO user_payout_accounts (user_id, stripe_account_id, onboarding_complete) VALUES ('{host}', 'acct_{P}_host', true)")
 guest = sql(f"INSERT INTO users (id,email,name,first_name,username) VALUES (gen_random_uuid(),'{P}-guest@test.local','Gwen Surname','Gwen','{P}gwen') RETURNING id").splitlines()[0]
 stranger = sql(f"INSERT INTO users (id,email,name,first_name,username) VALUES (gen_random_uuid(),'{P}-stranger@test.local','Stan Stranger','Stan','{P}stan') RETURNING id").splitlines()[0]
 
@@ -230,6 +232,7 @@ finally:
         f"DELETE FROM ticket_types WHERE event_id IN ({ev_ids})",
         f"DELETE FROM events WHERE host_user_id='{host}'",
         f"DELETE FROM host_agreement_acceptances WHERE user_id='{host}'",
+        f"DELETE FROM user_payout_accounts WHERE user_id='{host}'",
         f"DELETE FROM users WHERE email LIKE '{P}-%'",
     ):
         try:

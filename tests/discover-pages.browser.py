@@ -107,6 +107,8 @@ def section_pro(browser):
     alice = user("a", "Alice Poster")
     bob = user("b", "Bob Poster")
     host = user("h", "Event Host")
+    # Every host needs payouts set up to publish, free events too (backend 2026-10-26).
+    sql(f"INSERT INTO user_payout_accounts (user_id, stripe_account_id, onboarding_complete) VALUES ('{host}', 'acct_{P}_host', true)")
     # 10 posts by others (Alice 0-4, Bob 5-9), 2 by the viewer, oldest for the viewer so the backend would not put them first.
     for i in range(10):
         seed_post(alice if i < 5 else bob, f"{P} other {i}", 10 + i)
@@ -748,6 +750,7 @@ def cleanup():
         f"DELETE FROM ticket_types WHERE event_id IN ({evs})",
         f"DELETE FROM events WHERE host_user_id IN ({ids})",
         f"DELETE FROM host_agreement_acceptances WHERE user_id IN ({ids})",
+        f"DELETE FROM user_payout_accounts WHERE user_id IN ({ids})",
     ]
     stmts += [f"DELETE FROM sessions WHERE sid='{s}'" for s in sids]
     stmts.append(f"DELETE FROM users WHERE id IN ({ids})")

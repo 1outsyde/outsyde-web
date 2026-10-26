@@ -99,6 +99,8 @@ def mkuser(slug, first):
 
 FAKE = ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"]
 host = mkuser("host", "Hana"); member = mkuser("mem", "Marcus"); member2 = mkuser("mem2", "Nia")
+# Every host needs payouts set up to publish, free events too (backend 2026-10-26).
+sql(f"INSERT INTO user_payout_accounts (user_id, stripe_account_id, onboarding_complete) VALUES ('{host}', 'acct_{P}_host', true)")
 guest = mkuser("gwen", "Gwen"); guest2 = mkuser("kai", "Kai"); stranger = mkuser("stan", "Stan")
 users = [host, member, member2, guest, guest2, stranger]
 tmp = tempfile.mkdtemp(prefix="door-qr-")
@@ -430,6 +432,7 @@ finally:
         f"DELETE FROM ticket_types WHERE event_id IN ({ev_ids})",
         f"DELETE FROM events WHERE host_user_id='{host}'",
         f"DELETE FROM host_agreement_acceptances WHERE user_id='{host}'",
+        f"DELETE FROM user_payout_accounts WHERE user_id='{host}'",
         f"DELETE FROM notifications WHERE user_id IN ({ulist})",
         f"DELETE FROM users WHERE email LIKE '{P}-%'",
     ):
