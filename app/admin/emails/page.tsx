@@ -1,9 +1,10 @@
 "use client";
 
-// Admin → Emails. Tab shell: ?tab=setup (default) | broadcast | history.
+// Admin → Emails. Tab shell: ?tab=setup (default) | broadcast | push | history.
 //   Account setup: ./AccountSetupTab.tsx (unchanged from #64)
 //   Broadcast:     ./BroadcastTab.tsx (Legend's own HTML announcements, backend #292)
-//   History:       ./HistoryTab.tsx (every logged email, by send and by person, backend #292)
+//   Push:          ./PushTab.tsx (app push notifications, backend #368)
+//   History:       ./HistoryTab.tsx (every logged email, by send and by person, backend #292; push sends with &view=push)
 // Design: the Admin Email Pages Design note in the vault. Copy: plain punctuation, no dashes.
 
 import { Suspense, useCallback } from "react";
@@ -11,13 +12,15 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import AccountSetupTab from "./AccountSetupTab";
 import BroadcastTab from "./BroadcastTab";
 import HistoryTab from "./HistoryTab";
+import PushTab from "./PushTab";
 import { EM_CSS } from "./shared";
 
-type Tab = "setup" | "broadcast" | "history";
+type Tab = "setup" | "broadcast" | "push" | "history";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "setup", label: "Account setup" },
   { key: "broadcast", label: "Broadcast" },
+  { key: "push", label: "Push" },
   { key: "history", label: "History" },
 ];
 
@@ -32,7 +35,7 @@ const SHELL_CSS = `
 `;
 
 function parseTab(value: string | null): Tab {
-  return value === "broadcast" || value === "history" ? value : "setup";
+  return value === "broadcast" || value === "push" || value === "history" ? value : "setup";
 }
 
 function EmailsShell() {
@@ -41,6 +44,8 @@ function EmailsShell() {
   const pathname = usePathname();
   const tab = parseTab(params.get("tab"));
   const openSend = params.get("send");
+  const openPush = params.get("push");
+  const pushView = params.get("view") === "push";
 
   const go = useCallback(
     (next: Tab, extra?: Record<string, string>) => {
@@ -78,10 +83,15 @@ function EmailsShell() {
       </div>
       {tab === "setup" && <AccountSetupTab />}
       {tab === "broadcast" && <BroadcastTab onOpenSend={(id) => go("history", { send: id })} />}
+      {tab === "push" && <PushTab onOpenSend={(id) => go("history", { view: "push", push: id })} />}
       {tab === "history" && (
         <HistoryTab
           openSendId={openSend}
           onOpenSend={(id) => go("history", id ? { send: id } : undefined)}
+          pushView={pushView}
+          openPushId={openPush}
+          onOpenPush={(id) => go("history", id ? { view: "push", push: id } : { view: "push" })}
+          onLeavePush={() => go("history")}
         />
       )}
     </>

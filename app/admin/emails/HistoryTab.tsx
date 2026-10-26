@@ -8,6 +8,8 @@
 // Booking, shoot, order, staff and account emails are logged by backend PR C2 (no send id, so they
 // show under By person only). Internal alerts and password or claim code emails are never logged.
 //
+//   Push:      every push sent from the Push tab (./PushHistory.tsx, backend #368), &view=push, &push=<id>
+//
 // BFFs: GET /api/admin/emails/sends?limit&before, GET /api/admin/emails/sends/:id,
 // GET /api/admin/emails/people?q=, GET /api/admin/emails/people/:userId/emails.
 // Copy follows the house style: plain punctuation, no dashes.
@@ -17,6 +19,7 @@ import {
   AUDIENCE_LABEL, OFFLINE, ROLE_LABEL, StateMsg, api, errorText, personName, when,
   type AuthState, type Person,
 } from "./shared";
+import PushHistory from "./PushHistory";
 
 interface SendRow {
   id: string;
@@ -107,9 +110,18 @@ function counts(s: SendRow): string {
 export default function HistoryTab({
   openSendId,
   onOpenSend,
+  pushView = false,
+  openPushId = null,
+  onOpenPush,
+  onLeavePush,
 }: {
   openSendId: string | null;
   onOpenSend: (sendId: string | null) => void;
+  /** Push view (?view=push). Optional, so the email views behave exactly as before without it. */
+  pushView?: boolean;
+  openPushId?: string | null;
+  onOpenPush?: (id: string | null) => void;
+  onLeavePush?: () => void;
 }) {
   const [authState, setAuthState] = useState<AuthState>("loading");
   const [view, setView] = useState<"sends" | "people">("sends");
@@ -252,6 +264,23 @@ export default function HistoryTab({
     return <div className="em-wrap"><StateMsg state={authState} /></div>;
   }
 
+  // ── push sends (separate from the email views above and below) ────────────
+  if ((pushView || openPushId) && onOpenPush) {
+    return (
+      <div className="em-wrap">
+        <div className="em-sub">Every push sent from the Push tab, who it went to and what happened to each one.</div>
+        {!openPushId && (
+          <div className="em-seg" role="tablist" aria-label="History view">
+            <button role="tab" aria-selected={false} onClick={() => { setView("sends"); onLeavePush?.(); }}>By send</button>
+            <button role="tab" aria-selected={false} onClick={() => { setView("people"); onLeavePush?.(); }}>By person</button>
+            <button role="tab" aria-selected={true} className="on">Push</button>
+          </div>
+        )}
+        <PushHistory openId={openPushId} onOpen={onOpenPush} onAuth={handleAuth} />
+      </div>
+    );
+  }
+
   // ── one send ──────────────────────────────────────────────────────────────
   if (openSendId) {
     const s = detail?.send.id === openSendId ? detail.send : null;
@@ -344,6 +373,7 @@ export default function HistoryTab({
       <div className="em-seg" role="tablist" aria-label="History view">
         <button role="tab" aria-selected={view === "sends"} className={view === "sends" ? "on" : ""} onClick={() => setView("sends")}>By send</button>
         <button role="tab" aria-selected={view === "people"} className={view === "people" ? "on" : ""} onClick={() => setView("people")}>By person</button>
+        {onOpenPush && <button role="tab" aria-selected={false} onClick={() => onOpenPush(null)}>Push</button>}
       </div>
 
       {view === "sends" ? (
