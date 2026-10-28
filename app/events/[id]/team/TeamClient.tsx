@@ -6,7 +6,7 @@
  * accept). Rows: on the team (Remove), invited (Cancel invite), said no (Invite again). Remove and cancel confirm first.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { HostShell, useHostApi } from "../../_host/hostApi";
 import { MANAGE_CSS } from "../../_host/manageStyles";
@@ -32,6 +32,8 @@ export default function TeamClient({ eventId }: { eventId: string }) {
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Set before any await, so a double tap sends one invite (state alone updates a render too late).
+  const sendingRef = useRef(false);
 
   const [confirm, setConfirm] = useState<{ userId: string; scope: Scope } | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -74,22 +76,26 @@ export default function TeamClient({ eventId }: { eventId: string }) {
   async function add(e: React.FormEvent) {
     e.preventDefault();
     const name = cleanUsername(username);
-    if (!name || adding) return;
+    if (!name || sendingRef.current) return;
+    sendingRef.current = true;
     setAdding(true);
     setAddError(null);
     setNotice(null);
     const err = await sendInvite(name, scope);
+    sendingRef.current = false;
     setAdding(false);
     if (err) { setAddError(err); return; }
     setUsername("");
   }
 
   async function inviteAgain(m: TeamMember, s: Scope) {
-    if (adding || !m.username) return;
+    if (sendingRef.current || !m.username) return;
+    sendingRef.current = true;
     setAdding(true);
     setRemoveError(null);
     setNotice(null);
     const err = await sendInvite(m.username, s);
+    sendingRef.current = false;
     setAdding(false);
     if (err) setRemoveError(err);
   }

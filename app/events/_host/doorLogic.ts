@@ -38,12 +38,24 @@ export function scanWindowNote(e: { startsAt: string; endsAt: string; timezone: 
 
 export type DoorRole = "host" | "standing" | "event";
 
-export interface DoorEvent { id: string; slug: string; title: string; startsAt: string; endsAt: string; timezone: string; role: DoorRole }
+/** inviteId (backend p4-scanner, additive): the accepted invite behind a member's row, null for the host's own events. */
+export interface DoorEvent { id: string; slug: string; title: string; startsAt: string; endsAt: string; timezone: string; role: DoorRole; inviteId?: string | null }
 
 export function isDoorEvent(x: unknown): x is DoorEvent {
   const e = x as DoorEvent | null;
   return !!e && typeof e.id === "string" && typeof e.title === "string" && typeof e.startsAt === "string"
     && typeof e.endsAt === "string" && typeof e.timezone === "string" && ["host", "standing", "event"].includes(e.role);
+}
+
+/** A member (not the host) can leave the team from /events/door when the row carries its invite id. */
+export function canLeave(e: DoorEvent): boolean {
+  return e.role !== "host" && typeof e.inviteId === "string" && e.inviteId.length > 0;
+}
+
+export function leaveConfirmCopy(e: DoorEvent): string {
+  return e.role === "standing"
+    ? "Leave this host's door team? You won't be able to scan any of their events."
+    : `Leave the door team for ${e.title}? You won't be able to scan it anymore.`;
 }
 
 export function roleLabel(role: DoorRole): string {

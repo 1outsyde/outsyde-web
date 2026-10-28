@@ -308,6 +308,26 @@ try:
         check(pg.locator("[data-testid=team-event]").get_by_role("button", name="Remove").count() == 1, "an accepted row offers Remove")
         check(real(errs) == [], "no console or page errors (host again)", errs)
         ctx.close()
+
+        # ----- review #2: a member can leave from /events/door -----
+        print("leave (second member)")
+        nia_inv = sql(f"SELECT id FROM event_door_team WHERE member_user_id='{member2}' AND removed_at IS NULL")
+        check(api("POST", f"/api/events/door/invites/{nia_inv}/accept", m2t).get("success") is True, "Nia accepts the new invite")
+        ctx, pg, errs, _ = new_ctx(browser, m2t)
+        pg.goto(WEB + "/events/door")
+        pg.locator("[data-testid=door-row]").first.wait_for(timeout=20000)
+        leave = pg.get_by_role("button", name="Leave team")
+        check(leave.count() == 1, "a member row offers Leave team", leave.count())
+        leave.click()
+        conf = pg.get_by_role("group", name="Confirm leave")
+        check("Leave this host's door team? You won't be able to scan any of their events." in conf.inner_text(), "leave asks to confirm", conf.inner_text())
+        check(sql(f"SELECT count(*) FROM event_door_team WHERE member_user_id='{member2}' AND removed_at IS NULL") == "1", "not left before confirming")
+        conf.get_by_role("button", name="Yes, leave").click()
+        pg.wait_for_function("!document.querySelector('[data-testid=door-row]')", timeout=10000)
+        check(sql(f"SELECT removed_by_user_id FROM event_door_team WHERE id='{nia_inv}'") == member2, "DB: left, removed by the member")
+        check("You left the door team." in pg.content(), "left notice")
+        check(real(errs) == [], "no console or page errors (leave)", errs)
+        ctx.close()
         browser.close()
 
         # ----- real QR decode through the fake camera -----

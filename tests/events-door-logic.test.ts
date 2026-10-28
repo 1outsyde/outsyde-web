@@ -2,7 +2,7 @@
 import {
   scanWindowNote, isDoorEvent, roleLabel, cleanUsername, removeConfirmCopy, usernameMax, USERNAME_MAX, timeOnly,
   memberStatus, memberStatusLine, memberAction, cancelInviteCopy, inviteSentCopy, isDoorInvite, inviteHeadline, inviteScopeLine,
-  inviteAnsweredCopy, type DoorInvite, type TeamMember,
+  inviteAnsweredCopy, leaveConfirmCopy, canLeave, type DoorInvite, type TeamMember,
 } from "../app/events/_host/doorLogic";
 
 let passed = 0, failed = 0;
@@ -71,6 +71,14 @@ eq(inviteAnsweredCopy("declined", inv({})), "Invite declined. Club Nine can see 
 for (const s of [inviteScopeLine(inv({})), inviteAnsweredCopy("declined", inv({})), memberStatusLine(mem({ status: "declined" }), "event")]) {
   eq(/[–—]| - /.test(s), false, `no dashes: ${s.slice(0, 30)}`);
 }
+
+// Leave (review #2): members can leave from /events/door
+const dev = (o: object) => ({ id: "e", slug: "s", title: "Late Night", startsAt: "a", endsAt: "b", timezone: tz, role: "event", inviteId: "i9", ...o }) as any;
+eq([canLeave(dev({})), canLeave(dev({ role: "standing" })), canLeave(dev({ role: "host", inviteId: null })), canLeave(dev({ inviteId: null })), canLeave(dev({ inviteId: undefined }))],
+  [true, true, false, false, false], "Leave only for a member row that has its invite id");
+eq(leaveConfirmCopy(dev({})), "Leave the door team for Late Night? You won't be able to scan it anymore.", "leave copy, one event");
+eq(leaveConfirmCopy(dev({ role: "standing" })), "Leave this host's door team? You won't be able to scan any of their events.", "leave copy, all events");
+eq(isDoorEvent(dev({})), true, "door event guard accepts inviteId");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
