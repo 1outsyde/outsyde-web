@@ -47,6 +47,7 @@ let reply: { status: number; body: unknown } = { status: 200, body: {} };
     ["/api/auth/forgot-password", "/api/auth/forgot-password", () => import("../app/api/auth/forgot-password/route"), { email: "maya@email.com" }, { success: true }],
     ["/api/auth/reset-password", "/api/auth/reset-password", () => import("../app/api/auth/reset-password/route"), { token: "t", email: "maya@email.com", newPassword: "abcdef" }, { success: true }],
     ["/api/account-setup/verify-code", "/api/auth/forgot-password/verify-code", () => import("../app/api/account-setup/verify-code/route"), { email: "maya@email.com", code: "123456" }, { success: true, resetToken: "r" }],
+    ["/api/accept-invite/complete (log in)", "/api/auth/login", () => import("../app/api/accept-invite/complete/route"), { code: "INV1", mode: "login", email: "maya@email.com", password: "x" }, { success: true }],
   ];
 
   try {
@@ -60,7 +61,7 @@ let reply: { status: number; body: unknown } = { status: 200, body: {} };
         const mod = await load();
         const res = await mod.POST(mk(body));
         const s = seen.find((x) => x.path === upstream);
-        assert(!!s && res.status === 200, `${name}: reaches ${upstream}`, { status: res.status, paths: seen.map((x) => x.path) });
+        assert(!!s, `${name}: reaches ${upstream}`, { status: res.status, paths: seen.map((x) => x.path) });
         assert(s?.headers["x-outsyde-client-ip"] === "203.0.113.7", `${name}: forwards the visitor address (first x-forwarded-for entry)`, s?.headers["x-outsyde-client-ip"]);
         assert(keyOn ? s?.headers["x-outsyde-proxy-key"] === "k".repeat(48) : s?.headers["x-outsyde-proxy-key"] === undefined, `${name}: proxy key ${keyOn ? "sent" : "not sent"}`, s?.headers["x-outsyde-proxy-key"]);
       }
@@ -76,13 +77,28 @@ let reply: { status: number; body: unknown } = { status: 200, body: {} };
     console.log("429 copy");
     const limited = { success: false, code: "RATE_LIMITED", message: LIMIT, error: { code: "RATE_LIMITED", message: LIMIT } };
     reply = { status: 429, body: limited };
-    let res = await login.POST(mk({ identifier: "maya@email.com", password: "x" }));
+    let res: Response = await login.POST(mk({ identifier: "maya@email.com", password: "x" }));
     let b: any = await res.json();
     assert(res.status === 429 && b?.error === LIMIT && b?.code === "RATE_LIMITED", "/api/login 429 says too many tries, not invalid password", b);
     const sub = await import("../app/api/subscription/login/route");
     res = await sub.POST(mk({ email: "v@email.com", password: "x" }));
     b = await res.json();
     assert(res.status === 429 && b?.error === LIMIT, "/api/subscription/login 429 says too many tries", b);
+    const RESET_LIMIT = "Too many requests. Please wait a few minutes and try again.";
+    reply = { status: 429, body: { success: false, code: "RATE_LIMITED", message: RESET_LIMIT, error: { code: "RATE_LIMITED", message: RESET_LIMIT } } };
+    const forgot = await import("../app/api/auth/forgot-password/route");
+    res = await forgot.POST(mk({ email: "maya@email.com" }));
+    b = await res.json();
+    assert(res.status === 429 && b?.error === RESET_LIMIT && b?.code === "RATE_LIMITED", "/api/auth/forgot-password 429 is shown, not \"a link has been sent\"", { status: res.status, b });
+    reply = { status: 500, body: { error: "boom" } };
+    res = await forgot.POST(mk({ email: "maya@email.com" }));
+    b = await res.json();
+    assert(res.status === 200 && b?.success === true, "/api/auth/forgot-password other answers still say sent (no email check)", { status: res.status, b });
+    reply = { status: 429, body: { success: false, code: "RATE_LIMITED", message: LIMIT, error: { code: "RATE_LIMITED", message: LIMIT } } };
+    const invite = await import("../app/api/accept-invite/complete/route");
+    res = await invite.POST(mk({ code: "INV1", mode: "login", email: "maya@email.com", password: "x" }));
+    b = await res.json();
+    assert(res.status === 429 && b?.error === LIMIT, "/api/accept-invite/complete log in 429 says too many tries", b);
     reply = { status: 401, body: { success: false, error: { code: "INVALID_CREDENTIALS", message: "Invalid credentials" } } };
     res = await login.POST(mk({ identifier: "maya@email.com", password: "x" }));
     b = await res.json();

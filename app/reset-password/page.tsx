@@ -51,6 +51,12 @@ function ResetPasswordForm() {
         return;
       }
 
+      if (res.status === 429) {
+        setState("error");
+        setErrorMsg("Too many requests. Please wait a few minutes and try again.");
+        return;
+      }
+
       setState("error");
       setErrorMsg("Something went wrong. Please try again.");
     } catch {
