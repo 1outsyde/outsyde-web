@@ -9,14 +9,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { GENERIC_ERROR } from "../_shared/format";
-import { QUICK_COPY, quickErrorCopy, validateQuickLogin, validateQuickSignup, type QuickMode } from "./quickAuthLogic";
+import { QUICK_COPY, existsCopy, loginOutcome, quickErrorCopy, validateQuickLogin, validateQuickSignup, type QuickMode, type QuickPurpose } from "./quickAuthLogic";
 
-export type QuickPurpose = "checkout" | "rsvp" | "follow";
+export type { QuickPurpose };
 
 type Props = {
   open: boolean;
   initialMode: QuickMode;
   purpose?: QuickPurpose;
+  /** Same-origin path to come back to if the person has to leave the page (finish setup, Apple or Google log in). */
+  returnPath: string;
   onClose: () => void;
   onDone: (r: { email: string; created: boolean }) => void;
 };
@@ -80,7 +82,7 @@ const COPY: Record<QuickPurpose, { title: string; sub: string; loginTitle: strin
   follow: { title: "Join Outsyde", sub: "Create your free Outsyde account to follow this host. It takes a few seconds.", loginTitle: "Log in to follow", cta: "Create account and follow", loginCta: "Log in and follow" },
 };
 
-export default function QuickAuthSheet({ open, initialMode, purpose = "checkout", onClose, onDone }: Props) {
+export default function QuickAuthSheet({ open, initialMode, purpose = "checkout", returnPath, onClose, onDone }: Props) {
   const [mode, setMode] = useState<QuickMode>(initialMode);
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
@@ -93,6 +95,8 @@ export default function QuickAuthSheet({ open, initialMode, purpose = "checkout"
   const [existsNote, setExistsNote] = useState(false);
   const [wrongPassword, setWrongPassword] = useState(false);
   const [photoNote, setPhotoNote] = useState("");
+  const [oauthMsg, setOauthMsg] = useState("");
+  const sheetRef = useRef<HTMLDivElement | null>(null);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const firstRef = useRef<HTMLInputElement | null>(null);
@@ -117,6 +121,35 @@ export default function QuickAuthSheet({ open, initialMode, purpose = "checkout"
     if (photoUrlRef.current) URL.revokeObjectURL(photoUrlRef.current);
   }, []);
 
+  // Modal: the page behind doesn't scroll, and focus goes back to what opened the sheet on close.
+  useEffect(() => {
+    if (!open) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      if (opener && opener.isConnected) opener.focus();
+    };
+  }, [open]);
+
+  function trapTab(ev: React.KeyboardEvent) {
+    if (ev.key !== "Tab" || !sheetRef.current) return;
+    const items = Array.from(sheetRef.current.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), input:not([disabled])"))
+      .filter((el) => el.offsetParent !== null || el.getClientRects().length > 0 || el.id === "qa-photo");
+    if (!items.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement;
+    if (ev.shiftKey && (active === first || !sheetRef.current.contains(active))) {
+      ev.preventDefault();
+      last.focus();
+    } else if (!ev.shiftKey && (active === last || !sheetRef.current.contains(active))) {
+      ev.preventDefault();
+      first.focus();
+    }
+  }
+
   function pickPhoto(f: File | null) {
     if (photoUrlRef.current) URL.revokeObjectURL(photoUrlRef.current);
     photoUrlRef.current = f ? URL.createObjectURL(f) : null;
@@ -139,6 +172,7 @@ export default function QuickAuthSheet({ open, initialMode, purpose = "checkout"
     setFormError("");
     setExistsNote(false);
     setWrongPassword(false);
+    setOauthMsg("");
   }
 
   async function submitSignup() {
@@ -196,6 +230,7 @@ export default function QuickAuthSheet({ open, initialMode, purpose = "checkout"
     setErrors(v);
     setFormError("");
     setWrongPassword(false);
+    setOauthMsg("");
     if (Object.keys(v).length) return;
     busyRef.current = true;
     setBusy(true);
@@ -208,9 +243,18 @@ export default function QuickAuthSheet({ open, initialMode, purpose = "checkout"
       });
       const body = await res.json().catch(() => null);
       if (!res.ok) {
-        const copy = quickErrorCopy(res.status, body, "login");
-        if (res.status === 401 && copy.message === QUICK_COPY.mismatch) setWrongPassword(true);
-        else setFormError(copy.message);
+        const out = loginOutcome(res.status, body);
+        if (out.kind === "claim") {
+          // Imported account with no password yet: the backend just emailed a code. Finish on /claim
+          // (same hand off as /login), then come back to this event with the pending action.
+          const q = new URLSearchParams({ sent: "1", email: email.trim().toLowerCase(), return: returnPath });
+          finished = true;
+          window.location.href = `/claim?${q.toString()}`;
+          return;
+        }
+        if (out.kind === "oauth") setOauthMsg(out.message);
+        else if (out.wrongPassword) setWrongPassword(true);
+        else setFormError(out.message);
         return;
       }
       finished = true;
@@ -241,7 +285,7 @@ export default function QuickAuthSheet({ open, initialMode, purpose = "checkout"
   const fieldErr = (k: keyof Errors, id: string) => errors[k] ? <div id={id} className="qa-err" role="alert">{errors[k]}</div> : null;
 
   return (
-    <div className="qa-root" onKeyDown={(ev) => { if (ev.key === "Escape") { ev.stopPropagation(); close(); } }}>
+    <div className="qa-root" onKeyDown={(ev) => { if (ev.key === "Escape") { ev.stopPropagation(); close(); } else trapTab(ev); }}>
       <style dangerouslySetInnerHTML={{ __html: `
         .qa-root { position: fixed; inset: 0; z-index: 350; }
         .qa-scrim { position: absolute; inset: 0; background: rgba(0,0,0,0.55); border: 0; padding: 0; width: 100%; cursor: default; }
@@ -262,7 +306,7 @@ export default function QuickAuthSheet({ open, initialMode, purpose = "checkout"
         .qa-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
       ` }} />
       <button type="button" className="qa-scrim" aria-label="Close" tabIndex={-1} onClick={close} />
-      <div className="qa-sheet" role="dialog" aria-modal="true" aria-labelledby="qa-title" data-testid="quick-auth-sheet">
+      <div className="qa-sheet" ref={sheetRef} role="dialog" aria-modal="true" aria-labelledby="qa-title" data-testid="quick-auth-sheet">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2 id="qa-title" style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>{title}</h2>
           <button type="button" className="qa-close" aria-label="Close" onClick={close} disabled={busy}>
@@ -270,7 +314,7 @@ export default function QuickAuthSheet({ open, initialMode, purpose = "checkout"
           </button>
         </div>
         {existsNote && !signup ? (
-          <div role="status" style={{ fontSize: 13, lineHeight: 1.45, color: "#F5D26B", background: "#2E2510", borderRadius: 12, padding: "10px 12px" }}>{QUICK_COPY.exists}</div>
+          <div role="status" style={{ fontSize: 13, lineHeight: 1.45, color: "#F5D26B", background: "#2E2510", borderRadius: 12, padding: "10px 12px" }}>{existsCopy(purpose)}</div>
         ) : (
           <div style={{ fontSize: 13, color: "#B8B0A0", lineHeight: 1.45, marginTop: -6 }}>
             {signup ? c.sub : "Use your Outsyde email and password."}
@@ -323,6 +367,11 @@ export default function QuickAuthSheet({ open, initialMode, purpose = "checkout"
           {!errors.password && signup && <div id="qa-pass-hint" className="qa-hint">At least 6 characters.</div>}
           {wrongPassword && <div id="qa-pass-wrong" className="qa-err" role="alert">{QUICK_COPY.mismatch}</div>}
           {formError && <div className="qa-err" role="alert" style={{ marginTop: 0 }}>{formError}</div>}
+          {oauthMsg && (
+            <div role="alert" style={{ fontSize: 13, lineHeight: 1.45, color: "#F5D26B" }}>
+              {oauthMsg} <a href={`/login?return=${encodeURIComponent(returnPath)}`}>Go to log in</a>
+            </div>
+          )}
           {photoNote && <div role="status" style={{ fontSize: 13, color: "#F5D26B" }}>{photoNote}</div>}
 
           <button type="submit" className="qa-cta" disabled={busy} aria-busy={busy}>

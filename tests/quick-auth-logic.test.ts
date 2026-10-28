@@ -1,6 +1,6 @@
 /** Unit tests for the quick sign up sheet rules. No server needed: npx tsx tests/quick-auth-logic.test.ts */
 import { GENERIC_ERROR } from "../app/e/_shared/format";
-import { validateQuickSignup, validateQuickLogin, quickErrorCopy, phoneDigits, QUICK_COPY } from "../app/e/[slug]/quickAuthLogic";
+import { validateQuickSignup, validateQuickLogin, quickErrorCopy, phoneDigits, QUICK_COPY, existsCopy, loginOutcome, pendingReturnPath } from "../app/e/[slug]/quickAuthLogic";
 
 let passed = 0, failed = 0;
 function eq(actual: unknown, expected: unknown, name: string) {
@@ -53,6 +53,24 @@ eq(quickErrorCopy(400, { error: "Invalid data", details: [{ path: ["name"] }] })
 eq(quickErrorCopy(400, { error: "Email already registered" }), { message: GENERIC_ERROR, switchToLogin: false }, "unknown 400 → generic, never raw backend text");
 eq(quickErrorCopy(500, { error: "boom" }), { message: GENERIC_ERROR, switchToLogin: false }, "500 → GENERIC_ERROR");
 eq(quickErrorCopy(502, { error: "Couldn’t reach the server. Please try again." }), { message: GENERIC_ERROR, switchToLogin: false }, "502 → GENERIC_ERROR");
+
+console.log("existsCopy (per purpose)");
+eq(existsCopy("checkout"), QUICK_COPY.exists, "checkout keeps the mockup 43 line");
+eq(existsCopy("rsvp"), QUICK_COPY.exists, "rsvp keeps the mockup 43 line");
+eq(existsCopy("follow"), "That email already has an Outsyde account. Log in to follow.", "follow says follow");
+
+console.log("loginOutcome (special accounts)");
+eq(loginOutcome(401, { code: "ACCOUNT_NEEDS_SETUP", error: "We emailed you a 6-digit code." }), { kind: "claim" }, "passwordless account → finish setup on /claim");
+eq(loginOutcome(401, { code: "OAUTH_ONLY", error: "This account uses Apple sign-in. Please continue with Apple." }), { kind: "oauth", message: "This account uses Apple sign-in. Please continue with Apple." }, "Apple or Google only → their own line");
+eq(loginOutcome(401, { code: "OAUTH_ONLY" }), { kind: "oauth", message: QUICK_COPY.oauth }, "OAUTH_ONLY with no text → our line");
+eq(loginOutcome(401, { error: "Invalid email/username or password." }), { kind: "error", message: QUICK_COPY.mismatch, wrongPassword: true }, "plain 401 → mismatch");
+eq(loginOutcome(429, {}), { kind: "error", message: QUICK_COPY.loginLimit, wrongPassword: false }, "429 → tries line");
+eq(/[\u2013\u2014]| - /.test(QUICK_COPY.oauth), false, "no dashes in oauth copy");
+
+console.log("pendingReturnPath");
+eq(pendingReturnPath("late-night", { kind: "checkout", typeId: "t1", qty: 2 }), "/e/late-night?checkout=t1&qty=2", "checkout path");
+eq(pendingReturnPath("late-night", { kind: "rsvp", typeId: "t2", qty: 1 }), "/e/late-night?rsvp=t2&qty=1", "rsvp path (preselect on return)");
+eq(pendingReturnPath("late-night", { kind: "follow" }), "/e/late-night", "follow path");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

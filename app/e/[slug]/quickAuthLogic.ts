@@ -2,6 +2,7 @@
 import { GENERIC_ERROR } from "../_shared/format";
 
 export type QuickMode = "signup" | "login";
+export type QuickPurpose = "checkout" | "rsvp" | "follow";
 
 /** What to do once the person is signed in. */
 export type Pending =
@@ -16,6 +17,8 @@ export const QUICK_COPY = {
   password: "Use at least 6 characters.",
   passwordRequired: "Enter your password.",
   exists: "That email already has an Outsyde account. Log in to get your tickets.",
+  existsFollow: "That email already has an Outsyde account. Log in to follow.",
+  oauth: "This account uses Apple or Google sign in. Continue on the log in page.",
   limit: "Too many sign ups from this network. Please try again in a few minutes.",
   loginLimit: "Too many tries. Please wait a few minutes and try again.",
   mismatch: "That password doesn't match. Try again or reset it.",
@@ -72,4 +75,36 @@ export function quickErrorCopy(status: number, body: unknown, mode: QuickMode = 
     }
   }
   return { message: GENERIC_ERROR, switchToLogin: false };
+}
+
+/** The mockup 43 note, worded for what the sheet was opened for. */
+export function existsCopy(purpose: QuickPurpose): string {
+  return purpose === "follow" ? QUICK_COPY.existsFollow : QUICK_COPY.exists;
+}
+
+export type LoginOutcome =
+  | { kind: "claim" }
+  | { kind: "oauth"; message: string }
+  | { kind: "error"; message: string; wrongPassword: boolean };
+
+/**
+ * A failed log in from the sheet. A passwordless (imported) account finishes setup on /claim, where
+ * the backend's emailed code is entered (same as /login). An Apple or Google only account gets its
+ * own line and a link to the log in page, never "wrong password".
+ */
+export function loginOutcome(status: number, body: unknown): LoginOutcome {
+  const b = (body && typeof body === "object" ? body : {}) as { code?: unknown; error?: unknown };
+  const code = typeof b.code === "string" ? b.code : "";
+  if (code === "ACCOUNT_NEEDS_SETUP") return { kind: "claim" };
+  if (code === "OAUTH_ONLY") return { kind: "oauth", message: typeof b.error === "string" && b.error.trim() ? b.error : QUICK_COPY.oauth };
+  const copy = quickErrorCopy(status, body, "login");
+  return { kind: "error", message: copy.message, wrongPassword: status === 401 && copy.message === QUICK_COPY.mismatch };
+}
+
+/** Where to come back to on this event page if the person has to leave it to sign in. */
+export function pendingReturnPath(slug: string, pending: Pending): string {
+  const base = `/e/${slug}`;
+  if (pending.kind === "checkout") return `${base}?checkout=${encodeURIComponent(pending.typeId)}&qty=${pending.qty}`;
+  if (pending.kind === "rsvp") return `${base}?rsvp=${encodeURIComponent(pending.typeId)}&qty=${pending.qty}`;
+  return base;
 }

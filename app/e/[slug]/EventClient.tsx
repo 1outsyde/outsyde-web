@@ -10,7 +10,7 @@ import { hasStarted } from "./checkoutLogic";
 import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/app-stores";
 import QuickAuthSheet, { type QuickPurpose } from "./QuickAuthSheet";
 import AppGetBlock from "./AppGetBlock";
-import type { Pending, QuickMode } from "./quickAuthLogic";
+import { pendingReturnPath, type Pending, type QuickMode } from "./quickAuthLogic";
 
 const whenLine = rangeLine;
 
@@ -70,26 +70,31 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
   // Quick sign up / log in sheet (p4-quicksignup): what to do once the person is signed in.
   const [authSheet, setAuthSheet] = useState<{ pending: Pending; mode: QuickMode } | null>(null);
   const [sheetKey, setSheetKey] = useState(0);
+  // Bumped after the sheet signs someone in, so the follow check runs again with the new cookie.
+  const [authVersion, setAuthVersion] = useState(0);
+  const probingRef = useRef(false);
   const [newAccountEmail, setNewAccountEmail] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<EventPayload | null> => {
     try {
       const res = await fetch(`/api/events/slug/${encodeURIComponent(slug)}`, { cache: "no-store" });
       if (res.status === 404) {
         setData(null);
         setPhase("notfound");
-        return;
+        return null;
       }
       const body = await res.json().catch(() => null);
       if (res.ok && body?.event) {
-        setData({ event: body.event, ticketTypes: body.ticketTypes ?? [] });
+        const next = { event: body.event, ticketTypes: body.ticketTypes ?? [] };
+        setData(next);
         setPhase("ready");
-        return;
+        return next;
       }
     } catch {
       /* fall through */
     }
     setPhase((p) => (p === "ready" ? p : "error"));
+    return null;
   }, [slug]);
 
   useEffect(() => {
@@ -127,7 +132,7 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
     return () => {
       cancelled = true;
     };
-  }, [followTarget]);
+  }, [followTarget, authVersion]);
 
   // No follow target (host has no follow id, or the viewer is the host): the light /api/auth/me probe decides.
   const eventLoaded = !!e;
@@ -271,7 +276,14 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
       return;
     }
     // Signed in state not known yet (probe still running): ask once, so a signed out tap opens the sheet.
-    const known = signedIn ?? (await probeSignedIn());
+    if (signedIn === null && probingRef.current) return;
+    probingRef.current = signedIn === null;
+    let known: boolean | null;
+    try {
+      known = signedIn ?? (await probeSignedIn());
+    } finally {
+      probingRef.current = false;
+    }
     if (known !== null && known !== signedIn) setSignedIn(known);
     if (known === false) {
       openAuth({ kind: "checkout", typeId: selected.id, qty });
@@ -284,18 +296,35 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
     return `/e/${slug}?checkout=${encodeURIComponent(typeId)}&qty=${count}`;
   }
 
-  function onAuthDone(r: { email: string; created: boolean }) {
+  async function onAuthDone(r: { email: string; created: boolean }) {
     const pending = authSheet?.pending ?? null;
     setAuthSheet(null);
     setSignedIn(true);
     if (r.created) setNewAccountEmail(r.email);
+    // Refresh what depends on who is signed in (holder, host, follow state), like the old /login round trip did.
+    setAuthVersion((v) => v + 1);
+    const refreshed = pending?.kind === "checkout" ? (void load(), null) : await load();
     if (!pending) return;
     if (pending.kind === "checkout") {
       router.push(checkoutPathFor(pending.typeId, pending.qty));
     } else if (pending.kind === "rsvp") {
-      const t = types.find((x) => x.id === pending.typeId);
+      const t = (refreshed?.ticketTypes ?? types).find((x) => x.id === pending.typeId);
       if (t) void rsvp(t, pending.qty, true);
     } else {
+      // Skip the follow for the host themselves or someone who already follows.
+      if (refreshed?.event.viewerIsHost) return;
+      const id = refreshed?.event.host.followId ?? e?.host.followId;
+      if (!id) return;
+      try {
+        const res = await fetch(`/api/account/follow/${encodeURIComponent(id)}`, { cache: "no-store" });
+        const body = res.ok ? await res.json().catch(() => null) : null;
+        if (body?.isFollowing === true) {
+          setFollowing(true);
+          return;
+        }
+      } catch {
+        /* fall through to the follow */
+      }
       void toggleFollow(true);
     }
   }
@@ -575,6 +604,7 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
             open
             initialMode={authSheet.mode}
             purpose={sheetPurpose}
+            returnPath={pendingReturnPath(slug, authSheet.pending)}
             onClose={() => setAuthSheet(null)}
             onDone={onAuthDone}
           />

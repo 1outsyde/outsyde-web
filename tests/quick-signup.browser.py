@@ -10,6 +10,8 @@ from datetime import datetime, timedelta, timezone
 PAID = "qs-paid"      # paid ticket type, host has a follow id
 FREE = "qs-free"      # free RSVP, host has NO follow id (signed in state comes from /api/auth/me)
 TAKEN = "taken@email.com"
+SETUP = "setup@email.com"     # imported account with no password: login answers ACCOUNT_NEEDS_SETUP
+APPLE = "apple@email.com"     # Apple only account: login answers OAUTH_ONLY
 HOST_ID = "11111111-2222-4333-8444-555555555555"
 TT_PAID = "22222222-3333-4444-8555-666666666666"
 TT_FREE = "33333333-4444-4555-8666-777777777777"
@@ -92,7 +94,8 @@ def run_stub(port):
             if self._authed():
                 if self.path.startswith("/api/auth/me"):
                     return self._send(200, {"user": {"id": "u-new", "email": "x@y.z"}})
-                return self._send(200, {"isFollowing": False, "following": False})
+                already = (self.headers.get("Authorization") or "") == "Bearer tok-login"
+                return self._send(200, {"isFollowing": already, "following": already})
             return self._send(401, {"success": False, "error": "Unauthorized"})
 
         def do_POST(self):
@@ -106,11 +109,16 @@ def run_stub(port):
             self._record(body)
             p = self.path
             if p == "/api/auth/customer/quick-signup":
-                if (body or {}).get("email", "").lower() == TAKEN:
+                if (body or {}).get("email", "").lower() in (TAKEN, SETUP, APPLE):
                     return self._send(409, {"success": False, "code": "EMAIL_EXISTS", "message": "That email already has an Outsyde account."})
                 return self._send(200, {"success": True, "user": {"id": "u-new", "email": (body or {}).get("email", "").lower()},
                                         "accessToken": "tok-new", "refreshToken": "r", "expiresIn": 604800, "referralApplied": False})
             if p == "/api/auth/mobile/login":
+                ident = (body or {}).get("identifier", "").lower()
+                if ident == SETUP:
+                    return self._send(401, {"success": False, "error": {"code": "ACCOUNT_NEEDS_SETUP", "message": "We emailed you a 6-digit code to finish setting up your account.", "email": SETUP}})
+                if ident == APPLE:
+                    return self._send(401, {"success": False, "error": {"code": "OAUTH_ONLY", "message": "This account uses Apple sign-in. Please continue with Apple."}})
                 if (body or {}).get("password") == GOOD_PASS:
                     return self._send(200, {"user": {"isVendor": False}, "accessToken": "tok-login"})
                 return self._send(401, {"success": False, "error": {"message": "Invalid email/username or password.", "code": "INVALID_CREDENTIALS"}})
@@ -409,6 +417,107 @@ with sync_playwright() as pw:
     pg.click(".ev-cta")
     pg.wait_for_selector("[data-testid=quick-auth-sheet]", timeout=15000)
     check(not any("/login" in u for u in navs), "early tap: sheet, not /login", navs)
+    c.close()
+
+    print("passwordless account goes to finish setup with the return path")
+    reset()
+    c, pg, navs = open_page(b, PAID)
+    pg.click(".ev-cta")
+    pg.wait_for_selector("[data-testid=quick-auth-sheet]", timeout=15000)
+    fill_signup(pg, email=SETUP)
+    pg.click(".qa-cta")
+    pg.wait_for_selector("text=Welcome back", timeout=10000)
+    pg.fill("#qa-pass", "anything")
+    pg.click(".qa-cta")
+    pg.wait_for_url("**/claim**", timeout=15000)
+    from urllib.parse import urlparse, parse_qs
+    q = parse_qs(urlparse(pg.url).query)
+    check(q.get("sent") == ["1"] and q.get("email") == [SETUP], "claim with sent=1 and the email", pg.url)
+    check(q.get("return") == [f"/e/{PAID}?checkout={TT_PAID}&qty=1"], "claim keeps the checkout as the return path", q.get("return"))
+    c.close()
+
+    print("Apple only account shows its own line and a log in link")
+    reset()
+    c, pg, navs = open_page(b, PAID)
+    pg.click(".ev-cta")
+    pg.wait_for_selector("[data-testid=quick-auth-sheet]", timeout=15000)
+    pg.click("text=Already have an account? Log in")
+    pg.fill("#qa-email", APPLE)
+    pg.fill("#qa-pass", "anything")
+    pg.click(".qa-cta")
+    pg.wait_for_selector("text=This account uses Apple sign-in. Please continue with Apple.", timeout=10000)
+    txt = sheet(pg).inner_text()
+    check("That password doesn't match" not in txt, "not the wrong password line", txt)
+    lk = sheet(pg).locator("a", has_text="Go to log in")
+    check(lk.count() == 1 and (lk.get_attribute("href") or "").startswith("/login?return="), "log in page link with return", lk.get_attribute("href") if lk.count() else None)
+    c.close()
+
+    print("after log in, the page refreshes the signed in details")
+    reset()
+    c, pg, navs = open_page(b, PAID)
+    check(pg.locator("button.ev-btn-outline:has-text('Follow')").count() == 1, "signed out shows Follow")
+    pg.click(".ev-cta")
+    pg.wait_for_selector("[data-testid=quick-auth-sheet]", timeout=15000)
+    pg.click("text=Already have an account? Log in")
+    pg.fill("#qa-email", "maya@email.com")
+    pg.fill("#qa-pass", GOOD_PASS)
+    pg.click(".qa-cta")
+    pg.wait_for_selector("[aria-label='Ticket checkout']", timeout=15000)
+    pg.wait_for_selector("button.ev-btn-outline:has-text('Following')", state="attached", timeout=15000)
+    check(True, "an account that already follows now shows Following")
+    slugs = [x for x in stub_log() if x["p"].startswith("/api/follows/check/") and x["auth"] == "Bearer tok-login"]
+    check(len(slugs) >= 1, "follow state checked again with the new token", len(slugs))
+    c.close()
+
+    print("follow when already following does not send a second follow")
+    reset()
+    c, pg, navs = open_page(b, PAID)
+    pg.click("button.ev-btn-outline:has-text('Follow')")
+    pg.wait_for_selector("[data-testid=quick-auth-sheet]", timeout=15000)
+    pg.click("text=Already have an account? Log in")
+    pg.fill("#qa-email", "maya@email.com")
+    pg.fill("#qa-pass", GOOD_PASS)
+    pg.click(".qa-cta")
+    pg.wait_for_selector("button.ev-btn-outline:has-text('Following')", timeout=15000)
+    pg.wait_for_timeout(500)
+    check(len(calls(lambda p: p == "/api/follows", "POST")) == 0, "no follow POST for someone already following", len(calls(lambda p: p == "/api/follows", "POST")))
+    c.close()
+
+    print("keyboard: focus stays in the sheet, Escape returns focus, page does not scroll")
+    reset()
+    c, pg, navs = open_page(b, PAID)
+    pg.focus(".ev-cta")
+    pg.keyboard.press("Enter")
+    pg.wait_for_selector("[data-testid=quick-auth-sheet]", timeout=15000)
+    check(pg.evaluate("getComputedStyle(document.body).overflow") == "hidden", "page behind does not scroll")
+    inside = True
+    for _ in range(14):
+        pg.keyboard.press("Tab")
+        if not pg.evaluate("!!document.activeElement.closest('[data-testid=quick-auth-sheet]')"):
+            inside = False
+    check(inside, "Tab never leaves the sheet")
+    inside = True
+    for _ in range(14):
+        pg.keyboard.press("Shift+Tab")
+        if not pg.evaluate("!!document.activeElement.closest('[data-testid=quick-auth-sheet]')"):
+            inside = False
+    check(inside, "Shift+Tab never leaves the sheet")
+    pg.keyboard.press("Escape")
+    pg.wait_for_timeout(300)
+    check(sheet(pg).count() == 0, "Escape closes")
+    check(pg.evaluate("document.activeElement && document.activeElement.classList.contains('ev-cta')"), "focus back on Get tickets")
+    check(pg.evaluate("getComputedStyle(document.body).overflow") != "hidden", "page scroll restored")
+    c.close()
+
+    print("follow purpose: existing email note says follow")
+    reset()
+    c, pg, navs = open_page(b, PAID)
+    pg.click("button.ev-btn-outline:has-text('Follow')")
+    pg.wait_for_selector("[data-testid=quick-auth-sheet]", timeout=15000)
+    fill_signup(pg, email=TAKEN)
+    pg.click(".qa-cta")
+    pg.wait_for_selector("text=That email already has an Outsyde account. Log in to follow.", timeout=10000)
+    check(True, "follow note")
     c.close()
 
     print("desktop width")
