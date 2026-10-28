@@ -106,7 +106,7 @@ interface Order {
   totalAmount: number;
   createdAt: string;
   customerName?: string;
-  items?: { name: string; quantity: number; priceCents?: number; variantLabel?: string | null }[];
+  items?: { name: string; quantity: number; priceCents?: number; variantLabel?: string | null; addonsLabel?: string | null }[];
   shippingAddress?: string | null;
   // Outsyde loyalty rewards the customer used, in cents (backend #314). Paid by Outsyde.
   discountAmountCents?: number | null;
@@ -896,6 +896,7 @@ export default function VendorDashboardPage() {
                               <li key={idx}>
                                 {item.quantity}× {item.name}
                                 {item.variantLabel ? ` (${item.variantLabel})` : ""}
+                                {item.addonsLabel ? ` · ${item.addonsLabel}` : ""}
                                 {item.priceCents != null ? ` — ${formatCents(item.priceCents)}` : ""}
                               </li>
                             ))}
