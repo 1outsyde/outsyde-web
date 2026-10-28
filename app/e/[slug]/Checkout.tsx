@@ -17,6 +17,7 @@ import Link from "next/link";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import type { EventInfo, TicketType } from "./types";
+import AppGetBlock from "./AppGetBlock";
 import { GENERIC_ERROR, failureCopy, money, newKey, startLine } from "../_shared/format";
 import {
   afterRetrieve, confirmOutcome, entryDecision, holdPhase, lateCopy, paramsKey, parseSaved, phaseForOrder, shouldQuietRestart, unavailableFrom, storageAfterPhase, storageKey,
@@ -83,7 +84,7 @@ interface OrderInfo {
 
 /* ---------- entry: reads the URL ---------- */
 
-export function CheckoutHost({ slug, event, ticketTypes, onPaid }: { slug: string; event: EventInfo; ticketTypes: TicketType[]; onPaid?: () => void }) {
+export function CheckoutHost({ slug, event, ticketTypes, onPaid, newAccountEmail }: { slug: string; event: EventInfo; ticketTypes: TicketType[]; onPaid?: () => void; newAccountEmail?: string | null }) {
   const router = useRouter();
   const params = useSearchParams();
   const p = { checkout: params.get("checkout"), qty: params.get("qty") };
@@ -120,6 +121,7 @@ export function CheckoutHost({ slug, event, ticketTypes, onPaid }: { slug: strin
       type={active.entry.type}
       qty={active.entry.qty}
       onPaid={onPaid}
+      newAccountEmail={newAccountEmail}
       onFinished={() => {
         finished.current = true;
         router.replace(`/e/${slug}`, { scroll: false });
@@ -136,7 +138,7 @@ export function CheckoutHost({ slug, event, ticketTypes, onPaid }: { slug: strin
 
 /* ---------- checkout ---------- */
 
-export default function Checkout({ slug, event, type, qty, onPaid, onFinished, onClose }: { slug: string; event: EventInfo; type: TicketType; qty: number; onPaid?: () => void; onFinished?: () => void; onClose: () => void }) {
+export default function Checkout({ slug, event, type, qty, onPaid, onFinished, onClose, newAccountEmail }: { slug: string; event: EventInfo; type: TicketType; qty: number; onPaid?: () => void; onFinished?: () => void; onClose: () => void; newAccountEmail?: string | null }) {
   const sKey = storageKey(event.id, type.id, qty);
   const saveRef = useRef<Saved | null>(null);
   const resumeRef = useRef<Saved | null>(null);
@@ -513,6 +515,7 @@ export default function Checkout({ slug, event, type, qty, onPaid, onFinished, o
                 })()}
               </p>
               <Link href="/tickets" className="co-gold">View my tickets</Link>
+              <AppGetBlock newAccountEmail={newAccountEmail} testId="checkout-app" />
               <button type="button" className="co-ghost" onClick={close}>Back to event</button>
             </div>
           </div>
