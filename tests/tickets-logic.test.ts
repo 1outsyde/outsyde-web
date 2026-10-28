@@ -1,5 +1,5 @@
 /** Unit tests for the My Tickets helpers. No server needed: npx tsx tests/tickets-logic.test.ts */
-import { safeHttpUrl, escapeIcs, buildIcs, icsFileName, splitSections, groupByEvent, placeInfo, whenLine, directionsUrl, errorCopy } from "../app/tickets/ticketsLogic";
+import { safeHttpUrl, escapeIcs, buildIcs, icsFileName, splitSections, groupByEvent, placeInfo, whenLine, directionsUrl, errorCopy, canAddToAppleWallet } from "../app/tickets/ticketsLogic";
 
 let passed = 0, failed = 0;
 function eq(actual: unknown, expected: unknown, name: string) {
@@ -83,6 +83,29 @@ eq(errorCopy(500, { error: "Server configuration error." }), "Something went wro
 eq(errorCopy(400, { error: "Unexpected response from server" }), "Something went wrong. Try again.", "no code: generic");
 eq(errorCopy(409, { code: "LIMIT_REACHED", error: "x" }), "You already have the most tickets allowed for this event. If you just started a checkout, try again in a few minutes.", "known code: shared copy");
 eq(errorCopy(409, { code: "SOLD_OUT" }), "These tickets are sold out.", "sold out copy");
+
+console.log("canAddToAppleWallet");
+const UA = {
+  iphoneSafari: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1",
+  iphoneChrome: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0.6723.90 Mobile/15E148 Safari/604.1",
+  ipadOld: "Mozilla/5.0 (iPad; CPU OS 16_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+  macSafari: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
+  macChrome: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+  macFirefox: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:132.0) Gecko/20100101 Firefox/132.0",
+  android: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
+  windows: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0",
+};
+eq(canAddToAppleWallet(UA.iphoneSafari, 5), true, "iPhone Safari");
+eq(canAddToAppleWallet(UA.iphoneChrome, 5), true, "iPhone Chrome");
+eq(canAddToAppleWallet(UA.macSafari, 0), true, "Mac Safari");
+eq(canAddToAppleWallet(UA.macSafari, 5), false, "iPad (iPadOS says Macintosh, but has touch)");
+eq(canAddToAppleWallet(UA.ipadOld, 5), false, "older iPad");
+eq(canAddToAppleWallet(UA.macChrome, 0), false, "Mac Chrome");
+eq(canAddToAppleWallet(UA.macFirefox, 0), false, "Mac Firefox");
+eq(canAddToAppleWallet(UA.android, 5), false, "Android");
+eq(canAddToAppleWallet(UA.windows, 0), false, "Windows");
+eq(canAddToAppleWallet("", 0), false, "empty");
+eq(canAddToAppleWallet(undefined), false, "unknown");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
