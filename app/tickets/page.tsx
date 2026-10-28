@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  buildIcs, directionsUrl, errorCopy, groupByEvent, icsFileName, placeInfo, splitSections, whenLine, safeHttpUrl, GENERIC_ERROR,
+  buildIcs, directionsUrl, errorCopy, groupByEvent, icsFileName, placeInfo, splitSections, whenLine, safeHttpUrl, canAddToAppleWallet, GENERIC_ERROR,
   type MyTicket,
 } from "./ticketsLogic";
 
@@ -39,6 +39,9 @@ export default function TicketsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [panels, setPanels] = useState<Record<string, Panel | undefined>>({});
+  // Apple Wallet badge only where the pass can open (decided in the browser, after load, so the server render never guesses).
+  const [walletOk, setWalletOk] = useState(false);
+  useEffect(() => { setWalletOk(canAddToAppleWallet(navigator.userAgent, navigator.maxTouchPoints ?? 0)); }, []);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -133,7 +136,7 @@ export default function TicketsPage() {
                 const dir = directionsUrl(t.event);
                 const cover = safeHttpUrl(t.event.coverImageUrl);
                 const qr = safeHttpUrl(t.qrUrl);
-                const wallet = safeHttpUrl(t.walletUrl);
+                const wallet = walletOk ? safeHttpUrl(t.walletUrl) : null;
                 const panel = panels[t.id];
                 return (
                   <div key={t.id} className="tk-block">

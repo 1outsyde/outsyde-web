@@ -151,3 +151,19 @@ export function buildIcs(t: MyTicket, now: Date = new Date()): string {
   ];
   return lines.map(fold).join("\r\n") + "\r\n";
 }
+
+/**
+ * Whether this browser can add an Apple Wallet pass (p3-wallet): any browser on iPhone, Safari on a Mac. Not iPad
+ * (no Wallet app for passes; iPadOS Safari says "Macintosh", so a touch screen Mac is treated as an iPad), not
+ * Android or Windows (they would just download a file they can't open).
+ */
+export function canAddToAppleWallet(userAgent: string | null | undefined, maxTouchPoints = 0): boolean {
+  const ua = userAgent ?? "";
+  if (/iPhone|iPod/.test(ua)) return true;
+  if (/iPad|Android/.test(ua)) return false;
+  if (/Macintosh/.test(ua)) {
+    if (maxTouchPoints > 1) return false;
+    return /Safari\//.test(ua) && !/Chrome\/|Chromium\/|CriOS|Edg\/|Firefox\/|FxiOS|OPR\//.test(ua);
+  }
+  return false;
+}
