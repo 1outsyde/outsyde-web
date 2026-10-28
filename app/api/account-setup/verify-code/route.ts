@@ -6,6 +6,7 @@
 // The resetToken (15-minute, one use) is what /api/account-setup/claim consumes.
 
 import { NextResponse } from "next/server";
+import { visitorHeaders } from "@/lib/auth-cookie";
 
 export async function POST(req: Request) {
   const backendUrl = process.env.OUTSYDE_BACKEND_URL;
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
   try {
     upstream = await fetch(`${backendUrl}/api/auth/forgot-password/verify-code`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...visitorHeaders(req.headers) },
       body: JSON.stringify({ email, code }),
     });
   } catch (err) {

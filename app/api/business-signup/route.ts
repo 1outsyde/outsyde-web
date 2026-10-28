@@ -27,6 +27,7 @@
 import { NextResponse } from "next/server";
 import { sendBusinessSignupConfirmation } from "@/lib/emails";
 import { normalizeReferralCode } from "@/lib/referral";
+import { visitorHeaders } from "@/lib/auth-cookie";
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 const OFFER_TYPES = new Set(["products", "services", "both"]);
@@ -278,7 +279,7 @@ export async function POST(req: Request) {
 
   const business = (signupData.business ?? null) as { id?: string } | null;
   if (logo && business?.id) {
-    await finishLogoAndNotify(backendUrl, business.id, logo, setCookies, payload.email, password);
+    await finishLogoAndNotify(backendUrl, business.id, logo, setCookies, payload.email, password, visitorHeaders(req.headers));
   }
 
   // MUST be awaited — on Vercel, a serverless function can be frozen/killed
@@ -327,6 +328,7 @@ async function finishLogoAndNotify(
   setCookies: string[],
   email: string,
   password: string,
+  visitor: Record<string, string>,
 ): Promise<void> {
   // The signup response logs the owner in with a session cookie; use it server side.
   let auth: Record<string, string> | null = null;
@@ -338,7 +340,7 @@ async function finishLogoAndNotify(
     try {
       const loginRes = await fetch(`${backendUrl}/api/auth/mobile/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...visitor },
         body: JSON.stringify({ email, password }),
       });
       const loginData = (await loginRes.json().catch(() => ({}))) as { accessToken?: unknown };

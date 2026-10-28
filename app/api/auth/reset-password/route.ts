@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { visitorHeaders } from "@/lib/auth-cookie";
 
 export async function POST(req: NextRequest) {
   let token: string, email: string, newPassword: string;
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
   try {
     backendRes = await fetch(`${process.env.OUTSYDE_BACKEND_URL}/api/auth/reset-password`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...visitorHeaders(req.headers) },
       body: JSON.stringify({ token, email, newPassword }),
     });
   } catch {

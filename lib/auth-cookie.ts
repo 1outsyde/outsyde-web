@@ -22,3 +22,17 @@ export function clientIpFrom(headers: Headers): string | null {
   if (real && isIP(real) !== 0) return real;
   return null;
 }
+
+/**
+ * Headers that let the backend count this visitor on their own (quick sign up, log in, password
+ * reset): the visitor's address and, when OUTSYDE_PROXY_KEY is set, the shared key that proves the
+ * address came from goutsyde.com. Empty when neither is known.
+ */
+export function visitorHeaders(headers: Headers): Record<string, string> {
+  const out: Record<string, string> = {};
+  const ip = clientIpFrom(headers);
+  if (ip) out["x-outsyde-client-ip"] = ip;
+  const key = process.env.OUTSYDE_PROXY_KEY;
+  if (key) out["x-outsyde-proxy-key"] = key;
+  return out;
+}

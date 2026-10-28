@@ -20,6 +20,7 @@
 //   → forward result
 
 import { NextResponse } from "next/server";
+import { visitorHeaders } from "@/lib/auth-cookie";
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 
@@ -87,6 +88,7 @@ export async function POST(req: Request) {
     } else {
       return await handleLogin({
         backendUrl,
+        visitor: visitorHeaders(req.headers),
         code: code.trim(),
         email: email.trim().toLowerCase(),
         password,
@@ -160,11 +162,14 @@ async function handleSignup({
 // ---------------------------------------------------------------------------
 async function handleLogin({
   backendUrl,
+  visitor,
   code,
   email,
   password,
 }: {
   backendUrl: string;
+  /** Visitor address + proxy key, so the backend's login limits count this person on their own. */
+  visitor: Record<string, string>;
   code: string;
   email: string;
   password: string;
@@ -172,7 +177,7 @@ async function handleLogin({
   // Leg 1: authenticate
   const loginRes = await fetch(`${backendUrl}/api/auth/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...visitor },
     body: JSON.stringify({ email, password }),
   });
 

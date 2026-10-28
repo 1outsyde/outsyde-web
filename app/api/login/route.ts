@@ -8,7 +8,7 @@
 // (stats, bookings, products, services) can be called from the web.
 
 import { NextResponse } from "next/server";
-import { accessTokenCookie } from "@/lib/auth-cookie";
+import { accessTokenCookie, visitorHeaders } from "@/lib/auth-cookie";
 
 export async function POST(req: Request) {
   const backendUrl = process.env.OUTSYDE_BACKEND_URL;
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   try {
     loginRes = await fetch(`${backendUrl}/api/auth/mobile/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...visitorHeaders(req.headers) },
       body: JSON.stringify({ identifier: identifier.trim(), password }),
     });
   } catch (err) {

@@ -19,6 +19,7 @@
 // → store returned accessToken in httpOnly cookie "outsyde_access_token"
 
 import { NextResponse } from "next/server";
+import { visitorHeaders } from "@/lib/auth-cookie";
 
 const TOKEN_COOKIE = "outsyde_access_token";
 
@@ -46,7 +47,7 @@ export async function POST(req: Request) {
 
   const loginRes = await fetch(`${backendUrl}/api/auth/mobile/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...visitorHeaders(req.headers) },
     body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
   });
 
