@@ -1,17 +1,21 @@
 "use client";
 
 /**
- * Door team (mockup 17). Host only: GET /door/team answers 404 for anyone else. Two lists: the standing team
- * (all the host's events) and this event only. Add by username with a scope; remove with a confirm.
+ * Door team (mockups 17 and 38). Host only: GET /door/team answers 404 for anyone else. Two lists: the standing team
+ * (all the host's events) and this event only. Invite by username with a scope (backend 075: they scan once they
+ * accept). Rows: on the team (Remove), invited (Cancel invite), said no (Invite again). Remove and cancel confirm first.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { HostShell, useHostApi } from "../../_host/hostApi";
 import { MANAGE_CSS } from "../../_host/manageStyles";
-import { backendMessage, guestHandle, guestName } from "../../_host/manageLogic";
+import { backendMessage, guestName } from "../../_host/manageLogic";
 import { errorCopy, GENERIC_ERROR } from "../../../e/_shared/format";
-import { cleanUsername, isTeamMember, removeConfirmCopy, usernameMax, type Scope, type TeamMember } from "../../_host/doorLogic";
+import {
+  cancelInviteCopy, cleanUsername, inviteSentCopy, isTeamMember, memberAction, memberStatus, memberStatusLine, removeConfirmCopy,
+  usernameMax, type Scope, type TeamMember,
+} from "../../_host/doorLogic";
 
 type Screen = "loading" | "ready" | "notfound" | "error";
 
@@ -28,6 +32,8 @@ export default function TeamClient({ eventId }: { eventId: string }) {
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Set before any await, so a double tap sends one invite (state alone updates a render too late).
+  const sendingRef = useRef(false);
 
   const [confirm, setConfirm] = useState<{ userId: string; scope: Scope } | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -54,27 +60,44 @@ export default function TeamClient({ eventId }: { eventId: string }) {
 
   useEffect(() => { load(); }, [load]);
 
+  /** POST an invite; an "invite again" replaces the declined row (same person) instead of adding one. */
+  async function sendInvite(name: string, s: Scope): Promise<string | null> {
+    const r = await call("POST", `/api/events/${eventId}/door/team`, { username: name, scope: s });
+    if (!r) return null;
+    if (r.status !== 201 || !r.body?.success || !isTeamMember(r.body.member)) return backendMessage(r.status, r.body);
+    const m = r.body.member as TeamMember;
+    const upsert = (l: TeamMember[]) => (l.some((x) => x.userId === m.userId) ? l.map((x) => (x.userId === m.userId ? m : x)) : [...l, m]);
+    if (s === "standing") setStanding(upsert);
+    else setEventOnly(upsert);
+    setNotice(inviteSentCopy(m));
+    return null;
+  }
+
   async function add(e: React.FormEvent) {
     e.preventDefault();
     const name = cleanUsername(username);
-    if (!name || adding) return;
+    if (!name || sendingRef.current) return;
+    sendingRef.current = true;
     setAdding(true);
     setAddError(null);
     setNotice(null);
-    const r = await call("POST", `/api/events/${eventId}/door/team`, { username: name, scope });
+    const err = await sendInvite(name, scope);
+    sendingRef.current = false;
     setAdding(false);
-    if (!r) return;
-    if (r.status !== 201 || !r.body?.success || !isTeamMember(r.body.member)) {
-      setAddError(backendMessage(r.status, r.body));
-      return;
-    }
-    const m = r.body.member as TeamMember;
-    if (scope === "standing") setStanding((l) => [...l, m]);
-    else setEventOnly((l) => [...l, m]);
+    if (err) { setAddError(err); return; }
     setUsername("");
-    setNotice(scope === "standing"
-      ? `${guestName(m)} is on your door team for all your events.`
-      : `${guestName(m)} is on the door team for this event.`);
+  }
+
+  async function inviteAgain(m: TeamMember, s: Scope) {
+    if (sendingRef.current || !m.username) return;
+    sendingRef.current = true;
+    setAdding(true);
+    setRemoveError(null);
+    setNotice(null);
+    const err = await sendInvite(m.username, s);
+    sendingRef.current = false;
+    setAdding(false);
+    if (err) setRemoveError(err);
   }
 
   async function remove(m: TeamMember, s: Scope) {
@@ -89,7 +112,7 @@ export default function TeamClient({ eventId }: { eventId: string }) {
       if (s === "standing") setStanding((l) => l.filter((x) => x.userId !== m.userId));
       else setEventOnly((l) => l.filter((x) => x.userId !== m.userId));
       setConfirm(null);
-      setNotice(`${guestName(m)} was removed from the door team.`);
+      setNotice(memberStatus(m) === "invited" ? `${guestName(m)}'s invite was cancelled.` : `${guestName(m)} was removed from the door team.`);
       return;
     }
     setRemoveError(backendMessage(r.status, r.body));
@@ -129,24 +152,29 @@ export default function TeamClient({ eventId }: { eventId: string }) {
       <ul className="mg-list">
         {members.map((m) => {
           const open = confirm?.userId === m.userId && confirm.scope === s;
+          const action = memberAction(m);
+          const cancelling = action === "Cancel invite";
           return (
-            <li key={m.userId} className="mg-li" style={open ? { flexWrap: "wrap" } : undefined} data-testid="team-row">
+            <li key={m.userId} className="mg-li" style={open ? { flexWrap: "wrap" } : undefined} data-testid="team-row" data-status={memberStatus(m)}>
               <div className="mg-li-main">
                 <div className="mg-li-name">{guestName(m)}</div>
-                <div className="mg-li-sub">
-                  {[m.firstName?.trim() ? guestHandle(m) : "", s === "event" ? "access ends when the event ends" : ""].filter(Boolean).join(" · ")}
-                </div>
+                <div className="mg-li-sub" style={memberStatus(m) === "invited" ? { color: "#E8B930" } : undefined}>{memberStatusLine(m, s)}</div>
               </div>
-              {!open && (
-                <button type="button" className="mg-small" disabled={removing} onClick={() => { setConfirm({ userId: m.userId, scope: s }); setRemoveError(null); }}>Remove</button>
+              {!open && action === "Invite again" && (
+                <button type="button" className="mg-small" disabled={adding || !m.username} onClick={() => inviteAgain(m, s)}>Invite again</button>
+              )}
+              {!open && action !== "Invite again" && (
+                <button type="button" className="mg-small" disabled={removing} onClick={() => { setConfirm({ userId: m.userId, scope: s }); setRemoveError(null); }}>{action}</button>
               )}
               {open && (
-                <div className="mg-confirm" style={{ flexBasis: "100%" }} role="group" aria-label="Confirm remove">
-                  <p>{removeConfirmCopy(m, s)}</p>
+                <div className="mg-confirm" style={{ flexBasis: "100%" }} role="group" aria-label={cancelling ? "Confirm cancel invite" : "Confirm remove"}>
+                  <p>{cancelling ? cancelInviteCopy(m) : removeConfirmCopy(m, s)}</p>
                   {removeError && <p className="ed-err" role="alert">{removeError}</p>}
                   <div className="mg-confirm-actions">
-                    <button type="button" className="mg-danger" disabled={removing} onClick={() => remove(m, s)}>{removing ? "Removing…" : "Yes, remove"}</button>
-                    <button type="button" className="mg-small" disabled={removing} onClick={() => { setConfirm(null); setRemoveError(null); }}>Keep</button>
+                    <button type="button" className="mg-danger" disabled={removing} onClick={() => remove(m, s)}>
+                      {removing ? (cancelling ? "Cancelling…" : "Removing…") : (cancelling ? "Yes, cancel invite" : "Yes, remove")}
+                    </button>
+                    <button type="button" className="mg-small" disabled={removing} onClick={() => { setConfirm(null); setRemoveError(null); }}>{cancelling ? "Keep invite" : "Keep"}</button>
                   </div>
                 </div>
               )}
@@ -172,11 +200,11 @@ export default function TeamClient({ eventId }: { eventId: string }) {
 
       <div className="mg-body">
         <p className="ed-sublabel" style={{ margin: 0, color: "#CFC7B8", lineHeight: 1.45 }}>
-          Your team can scan tickets and see the guest list. They can&apos;t see sales, earnings or edit the event.
+          People you invite can scan tickets and see the guest list once they accept. They can&apos;t see sales, earnings or edit the event.
         </p>
 
         <form className="ed-stack-sm" onSubmit={add} data-testid="team-add">
-          <label htmlFor="team-user" className="ed-label">ADD SOMEONE</label>
+          <label htmlFor="team-user" className="ed-label">INVITE SOMEONE</label>
           <input id="team-user" className="ed-in" value={username} placeholder="@username" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false}
             maxLength={usernameMax(username)} onChange={(e) => { setUsername(e.target.value.slice(0, usernameMax(e.target.value))); setAddError(null); }} />
           <div className="ed-box" style={{ padding: 12, gap: 10 }}>
@@ -185,18 +213,19 @@ export default function TeamClient({ eventId }: { eventId: string }) {
               <button type="button" role="radio" aria-checked={scope === "event"} className={scope === "event" ? "on" : ""} onClick={() => setScope("event")}>Only this event</button>
             </div>
             <div className="ed-hint">
-              {scope === "standing" ? "They can scan every event you host until you remove them." : "They can scan this event until it ends."}
+              {scope === "standing" ? "Once they accept, they can scan every event you host until you remove them." : "Once they accept, they can scan this event until it ends."}
             </div>
             <button type="submit" className="ed-primary" style={{ minHeight: 44, fontSize: 14 }} disabled={adding || !cleanUsername(username)}>
-              {adding ? "Adding…" : "Add to door team"}
+              {adding ? "Sending…" : "Send invite"}
             </button>
           </div>
           {addError && <p className="ed-err" role="alert" data-testid="add-error">{addError}</p>}
         </form>
         {notice && <p className="ed-ok" role="status">{notice}</p>}
 
-        {list(standing, "standing", "No one yet. Add someone with All my events to have them at every event.", "YOUR TEAM, ALL EVENTS")}
-        {list(eventOnly, "event", "No one added just for this event.", "ONLY THIS EVENT")}
+        {removeError && !confirm && <p className="ed-err" role="alert">{removeError}</p>}
+        {list(standing, "standing", "No one yet. Invite someone with All my events to have them at every event.", "YOUR TEAM, ALL EVENTS")}
+        {list(eventOnly, "event", "No one invited just for this event.", "ONLY THIS EVENT")}
       </div>
     </>,
   );

@@ -568,6 +568,33 @@ async function call(base: string, method: string, path: string, opts: { token?: 
     const member = teamAfterAdd.body.event.find((m: any) => m.username === guestUsername);
     assert(!!member && member.userId === guest && typeof member.firstName === "string", "team list shows the added member with userId, first name and username", teamAfterAdd.body);
     const memberId: string = member?.userId;
+    assert(member?.status === "invited" && typeof member.inviteId === "string", "the add is an invite (backend 075)", member);
+    r = await call(WEB, "GET", `/api/events/door/mine`, { token: guestTok });
+    assert(r.status === 200 && !JSON.stringify(r.body).includes(draft.id), "door/mine leaves the event out until the invite is accepted", r);
+
+    console.log("Door team invites (the invitee's side)");
+    const inviteId: string = member?.inviteId;
+    r = await call(WEB, "GET", `/api/events/door/invites`);
+    assert(r.status === 401, "invites signed out: 401", r);
+    r = await call(WEB, "GET", `/api/events/door/invites`, { token: guestTok });
+    const dInv = await call(BACKEND, "GET", `/api/events/door/invites`, { token: guestTok });
+    assert(r.status === 200 && JSON.stringify(r.body) === JSON.stringify(dInv.body) && r.body.invites.some((i: any) => i.id === inviteId), "invites: same body as the backend, lists the invite", r);
+    r = await call(WEB, "GET", `/api/events/door/invites/${inviteId}`, { token: guestTok });
+    assert(r.status === 200 && r.body?.invite?.status === "invited", "one invite through the BFF", r);
+    r = await call(WEB, "GET", `/api/events/door/invites/${inviteId}`, { token: hostTok });
+    assert(r.status === 404 && r.body?.code === "INVITE_NOT_FOUND", "someone else's invite: backend 404 relayed", r);
+    for (const a of ["accept", "decline", "leave"]) {
+      r = await call(WEB, "POST", `/api/events/door/invites/not-a-uuid/${a}`, { token: guestTok });
+      assert(expect404(r), `${a}: bad invite id is 404 without the backend`, r);
+      r = await call(WEB, "POST", `/api/events/door/invites/${inviteId}/${a}`);
+      assert(r.status === 401, `${a} signed out: 401`, r);
+    }
+    r = await call(WEB, "GET", `/api/events/door/invites/not-a-uuid`, { token: guestTok });
+    assert(expect404(r), "get: bad invite id is 404 without the backend", r);
+    r = await call(WEB, "POST", `/api/events/door/invites/${inviteId}/accept`, { token: guestTok });
+    assert(r.status === 200 && r.body?.invite?.status === "accepted", "accept through the BFF", r);
+    r = await call(WEB, "POST", `/api/events/door/invites/${inviteId}/accept`, { token: guestTok });
+    assert(r.status === 409 && r.body?.code === "INVITE_CLOSED", "accept twice: backend 409 relayed", r);
     r = await call(WEB, "GET", `/api/events/door/mine`, { token: guestTok });
     assert(r.status === 200 && JSON.stringify(r.body).includes(draft.id), "door/mine now lists the event for the team member", r);
 
@@ -664,6 +691,10 @@ async function call(base: string, method: string, path: string, opts: { token?: 
     cases.push(["step4 host-agreement", async () => (await route("../app/api/events/host-agreement/route")).GET(mk("/x"))]);
     cases.push(["step4 host-agreement/accept", async () => (await route("../app/api/events/host-agreement/accept/route")).POST(mk("/x", "POST", { version: "v" }))]);
     cases.push(["step4 door/mine", async () => (await route("../app/api/events/door/mine/route")).GET(mk("/x"))]);
+    cases.push(["p4 door/invites", async () => (await route("../app/api/events/door/invites/route")).GET(mk("/x"))]);
+    const inv1 = { params: Promise.resolve({ inviteId: U }) };
+    cases.push(["p4 door/invites/:id", async () => (await route("../app/api/events/door/invites/[inviteId]/route")).GET(mk("/x"), inv1)]);
+    for (const a of ["accept", "decline", "leave"]) cases.push([`p4 door/invites/:id/${a}`, async () => (await route(`../app/api/events/door/invites/[inviteId]/${a}/route`)).POST(mk("/x", "POST"), inv1)]);
     cases.push(["step4 orders/:orderId/refund", async () => (await route("../app/api/events/[id]/orders/[orderId]/refund/route")).POST(mk("/x", "POST"), { params: Promise.resolve({ id: U, orderId: U }) })]);
     cases.push(["step4 ticket-types/:typeId PATCH", async () => (await route("../app/api/events/[id]/ticket-types/[typeId]/route")).PATCH(mk("/x", "PATCH", {}), { params: Promise.resolve({ id: U, typeId: U }) })]);
     cases.push(["step4 ticket-types/:typeId DELETE", async () => (await route("../app/api/events/[id]/ticket-types/[typeId]/route")).DELETE(mk("/x", "DELETE"), { params: Promise.resolve({ id: U, typeId: U }) })]);
@@ -678,6 +709,7 @@ async function call(base: string, method: string, path: string, opts: { token?: 
     // (the My Tickets section's event included). Nothing outside this run's prefix is touched.
     for (const row of await q(`SELECT id FROM events WHERE host_user_id = ANY($1)`, [[host, host2]]).catch(() => [] as any[])) if (!tkEventIds.includes(row.id)) tkEventIds.push(row.id);
     await q(`DELETE FROM event_door_team WHERE host_user_id = ANY($1)`, [[host, host2]]).catch(() => {});
+    await q(`DELETE FROM notifications WHERE triggered_by_user_id = ANY($1) OR user_id = ANY($1)`, [[host, host2]]).catch(() => {});
     await q(`DELETE FROM host_agreement_acceptances WHERE user_id = ANY($1)`, [[host, host2]]).catch(() => {});
     await q(`DELETE FROM user_payout_accounts WHERE user_id = ANY($1)`, [[host, host2]]).catch(() => {});
     if (tkEventIds.length) {
