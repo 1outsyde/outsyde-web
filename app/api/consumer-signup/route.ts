@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { accessTokenCookie } from "@/lib/auth-cookie";
 
 const BACKEND = process.env.OUTSYDE_BACKEND_URL!;
 
@@ -23,6 +24,11 @@ export async function POST(req: NextRequest) {
     const setCookie = backendRes.headers.get("set-cookie");
     if (setCookie) {
       res.headers.set("set-cookie", setCookie);
+    }
+
+    // Sign the new account in on goutsyde.com too (p4-quicksignup): same cookie as /api/login.
+    if (backendRes.ok && typeof data?.accessToken === "string" && data.accessToken) {
+      res.headers.append("set-cookie", accessTokenCookie(data.accessToken));
     }
 
     return res;
