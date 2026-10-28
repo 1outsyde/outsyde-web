@@ -5,7 +5,7 @@
  */
 
 import { fmt } from "../../e/_shared/format";
-import { guestName } from "./manageLogic";
+import { guestHandle, guestName } from "./manageLogic";
 
 /** "9:42 PM" in the event's own time zone. */
 export function timeOnly(iso: string, tz: string): string {
@@ -56,7 +56,13 @@ export function roleLabel(role: DoorRole): string {
 
 export type Scope = "standing" | "event";
 
-export interface TeamMember { userId: string; firstName: string | null; username: string | null; addedAt: string | null }
+export type MemberStatus = "invited" | "accepted" | "declined";
+
+/** status, inviteId, invitedAt come with door team invites (backend migration 075); older responses lack them. */
+export interface TeamMember {
+  userId: string; firstName: string | null; username: string | null; addedAt: string | null;
+  status?: MemberStatus; inviteId?: string; invitedAt?: string | null;
+}
 
 export function isTeamMember(x: unknown): x is TeamMember {
   const m = x as TeamMember | null;
@@ -72,6 +78,71 @@ export function cleanUsername(input: string): string {
 export const USERNAME_MAX = 40;
 export function usernameMax(input: string): number {
   return input.startsWith("@") ? USERNAME_MAX + 1 : USERNAME_MAX;
+}
+
+/** Missing or unknown status = on the team (a response from before invites). */
+export function memberStatus(m: TeamMember): MemberStatus {
+  return m.status === "invited" || m.status === "declined" ? m.status : "accepted";
+}
+
+/** Second line of a team row (canvas 38). The @handle is left out when the name already is the handle. */
+export function memberStatusLine(m: TeamMember, scope: Scope): string {
+  const st = memberStatus(m);
+  const text = st === "invited" ? "Invited, waiting for them to accept"
+    : st === "declined" ? "Said no. You can invite them again."
+    : scope === "event" ? "On the team until the event ends" : "On the team";
+  return [m.firstName?.trim() ? guestHandle(m) : "", text].filter(Boolean).join(" · ");
+}
+
+export function memberAction(m: TeamMember): "Remove" | "Cancel invite" | "Invite again" {
+  const st = memberStatus(m);
+  return st === "invited" ? "Cancel invite" : st === "declined" ? "Invite again" : "Remove";
+}
+
+export function cancelInviteCopy(m: TeamMember): string {
+  return `Cancel ${guestName(m)}'s invite? They won't be able to accept it.`;
+}
+
+export function inviteSentCopy(m: TeamMember): string {
+  return `Invite sent. ${guestName(m)} can scan once they accept.`;
+}
+
+/* ---------- invites for me (GET /door/invites) ---------- */
+
+export type InviteStatus = "invited" | "accepted" | "declined" | "gone";
+
+export interface DoorInvite {
+  id: string; scope: Scope; role: string; status: InviteStatus; invitedAt: string | null;
+  host: { name: string };
+  event: { id: string; title: string; startsAt: string; endsAt: string; timezone: string } | null;
+  upcoming: { id: string; title: string; startsAt: string; timezone: string }[];
+}
+
+export function isDoorInvite(x: unknown): x is DoorInvite {
+  const i = x as DoorInvite | null;
+  return !!i && typeof i.id === "string" && (i.scope === "standing" || i.scope === "event")
+    && ["invited", "accepted", "declined", "gone"].includes(i.status)
+    && !!i.host && typeof i.host.name === "string" && Array.isArray(i.upcoming)
+    && (i.event === null || (typeof i.event?.title === "string" && typeof i.event.startsAt === "string" && typeof i.event.timezone === "string"));
+}
+
+export function inviteHeadline(i: DoorInvite): string {
+  return `${i.host.name} invited you to their door team`;
+}
+
+/** Canvas 40: what the invite covers, the event day in the event's own zone. */
+export function inviteScopeLine(i: DoorInvite): string {
+  const what = i.scope === "event" && i.event
+    ? `Only this event: ${i.event.title}, ${fmt(i.event.startsAt, i.event.timezone, { weekday: "short", month: "short", day: "numeric" })}.`
+    : `All of ${i.host.name}'s events.`;
+  return `${what} You can scan tickets and see the guest list.`;
+}
+
+export function inviteAnsweredCopy(answer: "accepted" | "declined", i: DoorInvite): string {
+  if (answer === "declined") return `Invite declined. ${i.host.name} can see you said no.`;
+  return i.scope === "event"
+    ? "You're on the door team. The event is in your list below."
+    : "You're on the door team. Their events are in your list below.";
 }
 
 export function removeConfirmCopy(m: TeamMember, scope: Scope): string {

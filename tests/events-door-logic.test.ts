@@ -1,6 +1,8 @@
 /** Unit tests for the shared door helpers (roles, scan window, door team). No server: npx tsx tests/events-door-logic.test.ts */
 import {
   scanWindowNote, isDoorEvent, roleLabel, cleanUsername, removeConfirmCopy, usernameMax, USERNAME_MAX, timeOnly,
+  memberStatus, memberStatusLine, memberAction, cancelInviteCopy, inviteSentCopy, isDoorInvite, inviteHeadline, inviteScopeLine,
+  inviteAnsweredCopy, type DoorInvite, type TeamMember,
 } from "../app/events/_host/doorLogic";
 
 let passed = 0, failed = 0;
@@ -37,6 +39,38 @@ eq(scanWindowNote({ ...ev, status: "published" }, new Date("2026-10-24T20:00:00.
 eq(scanWindowNote({ ...ev, status: "cancelled" }, new Date("2026-10-24T20:00:00.000Z")), "Check in is closed for this event.", "cancelled is closed");
 eq(scanWindowNote({ ...ev, status: "draft" }, new Date("2026-10-24T20:00:00.000Z")), "Check in is closed for this event.", "draft is closed");
 eq([USERNAME_MAX, usernameMax("marcus"), usernameMax("@marcus"), usernameMax("")], [40, 40, 41, 40], "username max: 40, 41 only with a leading @");
+
+
+// p4-scanner: invites (backend 075). Old responses without status count as on the team.
+const mem = (o: Partial<TeamMember>): TeamMember => ({ userId: "u", firstName: "Marcus", username: "marcus", addedAt: null, ...o });
+eq([memberStatus(mem({})), memberStatus(mem({ status: "invited" })), memberStatus(mem({ status: "declined" })), memberStatus(mem({ status: "accepted" })), memberStatus(mem({ status: "weird" as any }))],
+  ["accepted", "invited", "declined", "accepted", "accepted"], "member status, missing or unknown = on the team");
+eq(memberStatusLine(mem({ status: "accepted" }), "standing"), "@marcus · On the team", "standing on the team line");
+eq(memberStatusLine(mem({ status: "accepted" }), "event"), "@marcus · On the team until the event ends", "event on the team line");
+eq(memberStatusLine(mem({ status: "invited" }), "event"), "@marcus · Invited, waiting for them to accept", "invited line");
+eq(memberStatusLine(mem({ status: "declined" }), "standing"), "@marcus · Said no. You can invite them again.", "declined line");
+eq(memberStatusLine(mem({ status: "invited", firstName: null }), "event"), "Invited, waiting for them to accept", "no handle twice when the name is the handle");
+eq([memberAction(mem({ status: "accepted" })), memberAction(mem({ status: "invited" })), memberAction(mem({ status: "declined" }))], ["Remove", "Cancel invite", "Invite again"], "row actions");
+eq(cancelInviteCopy(mem({})), "Cancel Marcus's invite? They won't be able to accept it.", "cancel invite copy");
+eq(inviteSentCopy(mem({ firstName: null })), "Invite sent. @marcus can scan once they accept.", "invite sent copy");
+
+const inv = (o: Partial<DoorInvite>): DoorInvite => ({
+  id: "i1", scope: "event", role: "door", status: "invited", invitedAt: "2026-10-28T12:00:00.000Z", host: { name: "Club Nine" },
+  event: { id: "e1", title: "Late Night", startsAt: "2026-11-01T01:00:00.000Z", endsAt: "2026-11-01T06:00:00.000Z", timezone: tz }, upcoming: [], ...o,
+});
+eq(isDoorInvite(inv({})), true, "invite guard");
+eq(isDoorInvite({ ...inv({}), status: "maybe" }), false, "unknown status rejected");
+eq(isDoorInvite({ ...inv({}), host: null }), false, "invite needs a host");
+eq(isDoorInvite(inv({ scope: "standing", event: null, upcoming: [{ id: "e2", title: "T", startsAt: "2026-11-01T01:00:00.000Z", timezone: tz }] })), true, "standing invite guard");
+eq(inviteHeadline(inv({})), "Club Nine invited you to their door team", "headline");
+eq(inviteScopeLine(inv({})), "Only this event: Late Night, Sat, Oct 31. You can scan tickets and see the guest list.", "event scope line in the event's zone");
+eq(inviteScopeLine(inv({ scope: "standing", event: null })), "All of Club Nine's events. You can scan tickets and see the guest list.", "standing scope line");
+eq(inviteAnsweredCopy("accepted", inv({})), "You're on the door team. The event is in your list below.", "accepted copy, event");
+eq(inviteAnsweredCopy("accepted", inv({ scope: "standing", event: null })), "You're on the door team. Their events are in your list below.", "accepted copy, standing");
+eq(inviteAnsweredCopy("declined", inv({})), "Invite declined. Club Nine can see you said no.", "declined copy");
+for (const s of [inviteScopeLine(inv({})), inviteAnsweredCopy("declined", inv({})), memberStatusLine(mem({ status: "declined" }), "event")]) {
+  eq(/[–—]| - /.test(s), false, `no dashes: ${s.slice(0, 30)}`);
+}
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
