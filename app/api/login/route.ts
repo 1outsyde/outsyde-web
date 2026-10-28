@@ -8,6 +8,7 @@
 // (stats, bookings, products, services) can be called from the web.
 
 import { NextResponse } from "next/server";
+import { accessTokenCookie } from "@/lib/auth-cookie";
 
 export async function POST(req: Request) {
   const backendUrl = process.env.OUTSYDE_BACKEND_URL;
@@ -90,11 +91,7 @@ export async function POST(req: Request) {
   // Max-Age matches the backend's ACCESS_TOKEN_EXPIRY_SECONDS (7 days) so the cookie
   // doesn't expire while the token it holds is still valid.
   if (accessToken) {
-    const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
-    response.headers.append(
-      "Set-Cookie",
-      `outsyde_access_token=${accessToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800${secure}`
-    );
+    response.headers.append("Set-Cookie", accessTokenCookie(accessToken));
   }
 
   return response;

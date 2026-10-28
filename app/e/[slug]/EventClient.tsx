@@ -8,6 +8,9 @@ import type { EventPayload, TicketType } from "./types";
 import { GENERIC_ERROR, errorCopy, fmt, maxQty, minQty, clampQty, money, newKey, rangeLine, revealLine } from "../_shared/format";
 import { hasStarted } from "./checkoutLogic";
 import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/app-stores";
+import QuickAuthSheet, { type QuickPurpose } from "./QuickAuthSheet";
+import AppGetBlock from "./AppGetBlock";
+import { pendingReturnPath, type Pending, type QuickMode } from "./quickAuthLogic";
 
 const whenLine = rangeLine;
 
@@ -31,6 +34,18 @@ function statusText(t: TicketType, tz: string): string {
   }
 }
 
+/** Light signed in probe: true, false (401), or null when it can't tell. */
+async function probeSignedIn(): Promise<boolean | null> {
+  try {
+    const res = await fetch("/api/auth/me", { cache: "no-store" });
+    if (res.status === 401) return false;
+    if (res.ok) return true;
+  } catch {
+    /* unknown */
+  }
+  return null;
+}
+
 /* ---------- component ---------- */
 
 type Phase = "ready" | "loading" | "notfound" | "error";
@@ -51,27 +66,35 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const keyRef = useRef<string | null>(null);
   const ticketsRef = useRef<HTMLDivElement | null>(null);
-  const loginHref = `/login?return=${encodeURIComponent(`/e/${slug}`)}`;
   const preselected = useRef(false);
+  // Quick sign up / log in sheet (p4-quicksignup): what to do once the person is signed in.
+  const [authSheet, setAuthSheet] = useState<{ pending: Pending; mode: QuickMode } | null>(null);
+  const [sheetKey, setSheetKey] = useState(0);
+  // Bumped after the sheet signs someone in, so the follow check runs again with the new cookie.
+  const [authVersion, setAuthVersion] = useState(0);
+  const probingRef = useRef(false);
+  const [newAccountEmail, setNewAccountEmail] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<EventPayload | null> => {
     try {
       const res = await fetch(`/api/events/slug/${encodeURIComponent(slug)}`, { cache: "no-store" });
       if (res.status === 404) {
         setData(null);
         setPhase("notfound");
-        return;
+        return null;
       }
       const body = await res.json().catch(() => null);
       if (res.ok && body?.event) {
-        setData({ event: body.event, ticketTypes: body.ticketTypes ?? [] });
+        const next = { event: body.event, ticketTypes: body.ticketTypes ?? [] };
+        setData(next);
         setPhase("ready");
-        return;
+        return next;
       }
     } catch {
       /* fall through */
     }
     setPhase((p) => (p === "ready" ? p : "error"));
+    return null;
   }, [slug]);
 
   useEffect(() => {
@@ -97,15 +120,33 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
           const body = await res.json().catch(() => null);
           setSignedIn(true);
           setFollowing(body?.isFollowing === true);
+          return;
         }
       } catch {
-        /* leave unknown */
+        /* fall back below */
       }
+      // The follow check didn't settle it (backend error, odd id): ask /api/auth/me instead.
+      const me = await probeSignedIn();
+      if (!cancelled && me !== null) setSignedIn(me);
     })();
     return () => {
       cancelled = true;
     };
-  }, [followTarget]);
+  }, [followTarget, authVersion]);
+
+  // No follow target (host has no follow id, or the viewer is the host): the light /api/auth/me probe decides.
+  const eventLoaded = !!e;
+  useEffect(() => {
+    if (!eventLoaded || followTarget) return;
+    let cancelled = false;
+    (async () => {
+      const me = await probeSignedIn();
+      if (!cancelled && me !== null) setSignedIn(me);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [eventLoaded, followTarget]);
   const types = useMemo(() => data?.ticketTypes ?? [], [data]);
   const onSale = useMemo(() => types.filter((t) => t.salesStatus === "on_sale"), [types]);
   const selected = onSale.find((t) => t.id === selectedId) ?? (onSale.length === 1 ? onSale[0] : null);
@@ -154,11 +195,16 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
     }
   }
 
-  async function toggleFollow() {
+  function openAuth(pending: Pending, mode: QuickMode = "signup") {
+    setSheetKey((k) => k + 1);
+    setAuthSheet({ pending, mode });
+  }
+
+  async function toggleFollow(afterAuth = false) {
     const id = e?.host.followId;
     if (!id || followBusy) return;
-    if (signedIn === false) {
-      window.location.href = loginHref;
+    if (signedIn === false && !afterAuth) {
+      openAuth({ kind: "follow" });
       return;
     }
     setFollowBusy(true);
@@ -166,7 +212,8 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
     try {
       const res = await fetch(`/api/account/follow/${encodeURIComponent(id)}`, { method: following ? "DELETE" : "POST" });
       if (res.status === 401) {
-        window.location.href = loginHref;
+        setSignedIn(false);
+        openAuth({ kind: "follow" });
         return;
       }
       if (res.ok) {
@@ -182,8 +229,12 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
     }
   }
 
-  async function rsvp(t: TicketType) {
+  async function rsvp(t: TicketType, count: number = qty, afterAuth = false) {
     if (!e || busy) return;
+    if (signedIn === false && !afterAuth) {
+      openAuth({ kind: "rsvp", typeId: t.id, qty: count });
+      return;
+    }
     setBusy(true);
     setMsg("");
     if (!keyRef.current) keyRef.current = newKey();
@@ -191,10 +242,12 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
       const res = await fetch(`/api/events/${e.id}/rsvp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticketTypeId: t.id, quantity: qty, idempotencyKey: keyRef.current }),
+        body: JSON.stringify({ ticketTypeId: t.id, quantity: count, idempotencyKey: keyRef.current }),
       });
       if (res.status === 401) {
-        window.location.href = `/login?return=${encodeURIComponent(`/e/${slug}?rsvp=${encodeURIComponent(t.id)}&qty=${qty}`)}`;
+        // Signed out or the token expired: the sheet signs them in, then the same RSVP (same key) is sent.
+        setSignedIn(false);
+        openAuth({ kind: "rsvp", typeId: t.id, qty: count });
         return;
       }
       const body = await res.json().catch(() => null);
@@ -212,7 +265,7 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
     }
   }
 
-  function getTickets() {
+  async function getTickets() {
     if (!selected) {
       ticketsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       setMsg("Choose a ticket first.");
@@ -222,12 +275,58 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
       rsvp(selected);
       return;
     }
-    const checkoutPath = `/e/${slug}?checkout=${encodeURIComponent(selected.id)}&qty=${qty}`;
-    if (signedIn === false) {
-      window.location.href = `/login?return=${encodeURIComponent(checkoutPath)}`;
+    // Signed in state not known yet (probe still running): ask once, so a signed out tap opens the sheet.
+    if (signedIn === null && probingRef.current) return;
+    probingRef.current = signedIn === null;
+    let known: boolean | null;
+    try {
+      known = signedIn ?? (await probeSignedIn());
+    } finally {
+      probingRef.current = false;
+    }
+    if (known !== null && known !== signedIn) setSignedIn(known);
+    if (known === false) {
+      openAuth({ kind: "checkout", typeId: selected.id, qty });
       return;
     }
-    router.push(checkoutPath);
+    router.push(checkoutPathFor(selected.id, qty));
+  }
+
+  function checkoutPathFor(typeId: string, count: number) {
+    return `/e/${slug}?checkout=${encodeURIComponent(typeId)}&qty=${count}`;
+  }
+
+  async function onAuthDone(r: { email: string; created: boolean }) {
+    const pending = authSheet?.pending ?? null;
+    setAuthSheet(null);
+    setSignedIn(true);
+    if (r.created) setNewAccountEmail(r.email);
+    // Refresh what depends on who is signed in (holder, host, follow state), like the old /login round trip did.
+    setAuthVersion((v) => v + 1);
+    const refreshed = pending?.kind === "checkout" ? (void load(), null) : await load();
+    if (!pending) return;
+    if (pending.kind === "checkout") {
+      router.push(checkoutPathFor(pending.typeId, pending.qty));
+    } else if (pending.kind === "rsvp") {
+      const t = (refreshed?.ticketTypes ?? types).find((x) => x.id === pending.typeId);
+      if (t) void rsvp(t, pending.qty, true);
+    } else {
+      // Skip the follow for the host themselves or someone who already follows.
+      if (refreshed?.event.viewerIsHost) return;
+      const id = refreshed?.event.host.followId ?? e?.host.followId;
+      if (!id) return;
+      try {
+        const res = await fetch(`/api/account/follow/${encodeURIComponent(id)}`, { cache: "no-store" });
+        const body = res.ok ? await res.json().catch(() => null) : null;
+        if (body?.isFollowing === true) {
+          setFollowing(true);
+          return;
+        }
+      } catch {
+        /* fall through to the follow */
+      }
+      void toggleFollow(true);
+    }
   }
 
   function pick(t: TicketType) {
@@ -254,6 +353,7 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
   const hasFreeOnSale = onSale.some((t) => t.priceCents === 0);
   const holderOnlyFree = !!e?.viewerHasTicket && onSale.every((t) => t.priceCents === 0);
   const showBar = canBuy && !going && !holderOnlyFree;
+  const sheetPurpose: QuickPurpose = authSheet?.pending.kind ?? "checkout";
 
   const css = `
     *, *::before, *::after { box-sizing: border-box; }
@@ -369,7 +469,7 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
               </div>
             </div>
             {showFollow && (
-              <button type="button" className="ev-btn-outline" onClick={toggleFollow} disabled={followBusy} aria-pressed={following}>
+              <button type="button" className="ev-btn-outline" onClick={() => toggleFollow()} disabled={followBusy} aria-pressed={following}>
                 {following ? "Following" : "Follow"}
               </button>
             )}
@@ -384,6 +484,7 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
               </div>
             </div>
           )}
+          {going && <AppGetBlock newAccountEmail={newAccountEmail} />}
 
           <div className="ev-card">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8B930" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }}><path d="M12 21s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z" /><circle cx="12" cy="9" r="2.5" /></svg>
@@ -458,7 +559,7 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
           {started && !ended && !cancelled && !draft && <div className="ev-muted">This event has started.</div>}
           <div className="ev-muted">{refundLine}</div>
 
-          <div className="ev-card ev-app" data-testid="get-the-app">
+          {!going && <div className="ev-card ev-app" data-testid="get-the-app">
             <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 600 }}>Get the Outsyde app</div>
               <div className="ev-muted">Faster checkout and all your tickets in one place.</div>
@@ -467,7 +568,7 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
                 <a className="ev-app-link" href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer">Get it on Google Play</a>
               </div>
             </div>
-          </div>
+          </div>}
         </div>
 
         {showBar && (
@@ -495,8 +596,19 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
           </div>
         )}
         <Suspense fallback={null}>
-          <CheckoutHost slug={slug} event={e} ticketTypes={types} onPaid={load} />
+          <CheckoutHost slug={slug} event={e} ticketTypes={types} onPaid={load} newAccountEmail={newAccountEmail} />
         </Suspense>
+        {authSheet && (
+          <QuickAuthSheet
+            key={sheetKey}
+            open
+            initialMode={authSheet.mode}
+            purpose={sheetPurpose}
+            returnPath={pendingReturnPath(slug, authSheet.pending)}
+            onClose={() => setAuthSheet(null)}
+            onDone={onAuthDone}
+          />
+        )}
         {toast && <div className="ev-toast" role="status">{toast}</div>}
       </div>
     </>
