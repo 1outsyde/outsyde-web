@@ -32,7 +32,7 @@ export function chargedCentsFrom(
   fb: { amountChargedCents?: number; totalChargedToConsumerCents: number } | undefined,
   fallbackCents: number,
 ): number {
-  return fb ? fb.amountChargedCents ?? fb.totalChargedToConsumerCents : fallbackCents;
+  return fb?.amountChargedCents ?? fb?.totalChargedToConsumerCents ?? fallbackCents;
 }
 
 /** The order-success page's query, same for card and Apple Pay. */
@@ -54,4 +54,49 @@ export function shopApplePayClick(s: { inFlight: boolean; stage: PayStage }): "r
 /** Paid = Stripe says succeeded and there is no error. Anything else keeps the buyer on the payment step. */
 export function isPaid(r: { error?: unknown; paymentIntent?: { status?: string } | null } | null): boolean {
   return !!r && !r.error && r.paymentIntent?.status === "succeeded";
+}
+
+type StripeAnswer = {
+  error?: { code?: string; payment_intent?: { status?: string } | null } | null;
+  paymentIntent?: { status?: string } | null;
+} | null;
+
+/**
+ * One reading of a payment answer (card result, Apple Pay result, or Stripe's own status):
+ *  paid       succeeded, including Stripe's "already succeeded" error on a retry, so a buyer who paid always reaches the order page
+ *  refresh    the PaymentIntent was cancelled (another checkout took the same code): Continue again for a new one
+ *  processing Stripe is still working on it
+ *  failed     declined or unknown: try again on the same payment
+ */
+export function paymentAnswer(r: StripeAnswer): "paid" | "refresh" | "processing" | "failed" {
+  if (!r) return "failed";
+  const status = r.error ? r.error.payment_intent?.status : r.paymentIntent?.status;
+  if (status === "succeeded") return "paid";
+  if (status === "canceled") return "refresh";
+  if (status === "processing") return "processing";
+  return "failed";
+}
+
+type Totals = { subtotalCents: number; feeCents: number; discountCents: number; totalCents: number };
+
+/** What the summary shows: the server's breakdown field by field (multi shop sends only the total), else the estimate. */
+export function shownTotals(
+  fb: { basePriceCents?: number; consumerUpchargeCents?: number; discountCents?: number; amountChargedCents?: number; totalChargedToConsumerCents?: number } | null,
+  estimate: Totals,
+): Totals {
+  if (!fb) return estimate;
+  return {
+    subtotalCents: fb.basePriceCents ?? estimate.subtotalCents,
+    feeCents: fb.consumerUpchargeCents ?? estimate.feeCents,
+    discountCents: fb.discountCents ?? estimate.discountCents,
+    totalCents: fb.amountChargedCents ?? fb.totalChargedToConsumerCents ?? estimate.totalCents,
+  };
+}
+
+/** The contact and billing checks Continue makes, made again right before paying. Null = fine. */
+export function contactProblem(s: { email: string; phone: string; billingSame: boolean; billComplete: boolean; hasBillAddr: boolean }): string | null {
+  if (!s.email.includes("@")) return "Please enter a valid email.";
+  if (!s.phone.trim()) return "Please enter a phone number.";
+  if (!s.billingSame && (!s.billComplete || !s.hasBillAddr)) return "Please complete your billing address.";
+  return null;
 }

@@ -1,6 +1,6 @@
 /** Unit tests for the shop checkout payment step (Continue to payment, then Apple Pay or card). npx tsx tests/checkout-pay-logic.test.ts */
 import {
-  checkoutSignature, payStage, chargedCentsFrom, successQuery, shopApplePayClick, isPaid,
+  checkoutSignature, payStage, chargedCentsFrom, successQuery, shopApplePayClick, isPaid, paymentAnswer, shownTotals, contactProblem,
 } from "../app/checkout/payLogic";
 
 let passed = 0, failed = 0;
@@ -53,6 +53,31 @@ eq(isPaid({ paymentIntent: { status: "processing" } }), false, "processing is no
 eq(isPaid({ paymentIntent: { status: "requires_payment_method" } }), false, "declined");
 eq(isPaid({ error: { message: "x" }, paymentIntent: { status: "succeeded" } }), false, "an error never counts as paid");
 eq(isPaid(null), false, "no answer");
+
+console.log("chargedCentsFrom: a breakdown with neither field falls back like before");
+eq(chargedCentsFrom({} as never, 2025), 2025, "empty breakdown: estimate");
+
+console.log("paymentAnswer: one reading for card, Apple Pay and Stripe's own status");
+eq(paymentAnswer({ paymentIntent: { status: "succeeded" } }), "paid", "succeeded");
+eq(paymentAnswer({ error: { code: "payment_intent_unexpected_state", payment_intent: { status: "succeeded" } } }), "paid", "already succeeded (paid before, retried): paid, not an error");
+eq(paymentAnswer({ error: { code: "payment_intent_unexpected_state", payment_intent: { status: "canceled" } } }), "refresh", "cancelled payment (code taken by another checkout): Continue again");
+eq(paymentAnswer({ paymentIntent: { status: "canceled" } }), "refresh", "status cancelled: Continue again");
+eq(paymentAnswer({ paymentIntent: { status: "processing" } }), "processing", "processing");
+eq(paymentAnswer({ error: { code: "card_declined", payment_intent: { status: "requires_payment_method" } } }), "failed", "declined: try again on the same payment");
+eq(paymentAnswer(null), "failed", "no answer");
+
+console.log("shownTotals: the server's numbers where it sent them, the estimate field by field otherwise");
+eq(shownTotals(null, { subtotalCents: 3000, feeCents: 240, discountCents: 0, totalCents: 3240 }), { subtotalCents: 3000, feeCents: 240, discountCents: 0, totalCents: 3240 }, "no breakdown: estimate");
+eq(shownTotals({ totalChargedToConsumerCents: 3245 }, { subtotalCents: 3000, feeCents: 240, discountCents: 0, totalCents: 3240 }), { subtotalCents: 3000, feeCents: 240, discountCents: 0, totalCents: 3245 }, "multi shop (total only): no NaN, real total");
+eq(shownTotals({ basePriceCents: 3000, consumerUpchargeCents: 240, discountCents: 500, amountChargedCents: 2740, totalChargedToConsumerCents: 3240 }, { subtotalCents: 3000, feeCents: 240, discountCents: 400, totalCents: 2840 }), { subtotalCents: 3000, feeCents: 240, discountCents: 500, totalCents: 2740 }, "single shop with a code: server numbers");
+
+console.log("contactProblem: checked again right before paying");
+const ok = { email: "a@b.co", phone: "5551234567", billingSame: true, billComplete: false, hasBillAddr: false };
+eq(contactProblem(ok), null, "all good");
+eq(contactProblem({ ...ok, email: "nope" }), "Please enter a valid email.", "bad email");
+eq(contactProblem({ ...ok, phone: "  " }), "Please enter a phone number.", "no phone");
+eq(contactProblem({ ...ok, billingSame: false }), "Please complete your billing address.", "billing unchecked and empty");
+eq(contactProblem({ ...ok, billingSame: false, billComplete: true, hasBillAddr: true }), null, "separate billing filled in");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

@@ -17,7 +17,7 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import { getCart, clearCart, subscribe, type CartItem } from "@/lib/cart";
-import { checkoutSignature, payStage, chargedCentsFrom, successQuery, shopApplePayClick, isPaid } from "./payLogic";
+import { checkoutSignature, payStage, chargedCentsFrom, successQuery, shopApplePayClick, paymentAnswer, shownTotals, contactProblem } from "./payLogic";
 import { applePayButtonOptions, applePayConfirm, applePayElementsOptions } from "@/app/e/[slug]/checkoutLogic";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "");
@@ -129,6 +129,7 @@ function CheckoutForm() {
 
   const [prepared, setPrepared] = useState<Prepared | null>(null);
   const inFlight = useRef(false);
+  const continuing = useRef(false);
 
   // Use my points: the customer's codes and balance.
   const [pointsBalance, setPointsBalance] = useState(0);
@@ -200,15 +201,11 @@ function CheckoutForm() {
   const shownFb = stage === "payment" ? prepared?.breakdown ?? null : null;
 
   // After backend responds, show authoritative breakdown
-  const displaySubtotal = shownFb
-    ? shownFb.basePriceCents / 100
-    : subtotalCents / 100;
-  const displayFee = shownFb
-    ? shownFb.consumerUpchargeCents / 100
-    : serviceFeeCents / 100;
-  const displayTotal = shownFb
-    ? (shownFb.amountChargedCents ?? shownFb.totalChargedToConsumerCents) / 100
-    : estimatedTotalCents / 100;
+  // Field by field: the multi shop answer carries only the total, so the rest stays the estimate (never NaN).
+  const totals = shownTotals(shownFb, { subtotalCents, feeCents: serviceFeeCents, discountCents, totalCents: estimatedTotalCents });
+  const displaySubtotal = totals.subtotalCents / 100;
+  const displayFee = totals.feeCents / 100;
+  const displayTotal = totals.totalCents / 100;
   const codeTooBig = (cents: number) => subtotalCents < cents * 10;
   const displayPoints = shownFb?.outsydePointsEarned ?? 0;
 
@@ -281,13 +278,14 @@ function CheckoutForm() {
   /** Continue to payment: check the details, then the backend creates the order and its PaymentIntent. No charge yet. */
   async function handleContinue() {
     setError("");
-    if (!stripe || !elements || inFlight.current) return;
+    if (!stripe || !elements || inFlight.current || continuing.current) return;
     if (!f.email.includes("@")) return setError("Please enter a valid email.");
     if (!f.phone.trim()) return setError("Please enter a phone number.");
     if (!shipComplete || !shipAddr) return setError("Please complete your shipping address.");
     if (!billingSame && (!billComplete || !billAddr)) return setError("Please complete your billing address.");
     if (!cart.length) return setError("Your cart is empty.");
 
+    continuing.current = true;
     setProcessing(true);
     const signatureAtStart = currentSignature;
     try {
@@ -367,7 +365,29 @@ function CheckoutForm() {
     } catch {
       setError("Something went wrong. Please try again.");
       setProcessing(false);
+    } finally {
+      continuing.current = false;
     }
+  }
+
+  /** One reading of a payment answer for card and Apple Pay. True = the buyer left for the order page. */
+  function handleAnswer(p: Prepared, r: Parameters<typeof paymentAnswer>[0], failedMessage: string): boolean {
+    const a = paymentAnswer(r);
+    if (a === "paid") {
+      finish(p);
+      return true;
+    }
+    if (a === "refresh") {
+      // Another checkout took this order's code and Stripe cancelled this payment: get a fresh one.
+      setPrepared(null);
+      setError("Your total needs refreshing. Tap Continue to payment.");
+    } else if (a === "processing") {
+      setError("Your payment is processing. You'll get an email when it goes through.");
+    } else {
+      setError(r?.error && "message" in r.error && typeof r.error.message === "string" && r.error.message ? r.error.message : failedMessage);
+    }
+    setProcessing(false);
+    return false;
   }
 
   /** Paid: empty the cart and show the order, the same for card and Apple Pay. */
@@ -380,6 +400,11 @@ function CheckoutForm() {
   async function handlePayByCard() {
     setError("");
     if (!stripe || !elements || !prepared || stage !== "payment" || inFlight.current) return;
+    const problem = contactProblem({ email: f.email, phone: f.phone, billingSame, billComplete, hasBillAddr: !!billAddr });
+    if (problem) {
+      setError(problem);
+      return;
+    }
     const card = elements.getElement(CardElement);
     if (!card) {
       setError("Card field not ready.");
@@ -420,20 +445,17 @@ function CheckoutForm() {
         },
       });
 
-      if (result.error) {
-        setError(result.error.message || "Payment failed. Please try again.");
-        setProcessing(false);
-        return;
-      }
-
-      if (result.paymentIntent?.status === "succeeded") {
-        finish(p);
-      } else {
-        setProcessing(false);
-      }
+      handleAnswer(p, result, "Payment failed. Please try again.");
     } catch {
-      setError("Something went wrong. Please try again.");
-      setProcessing(false);
+      // The charge may have gone through: ask Stripe before saying it failed.
+      let status: { paymentIntent?: { status?: string } | null } | null = null;
+      try {
+        const r = await stripe.retrievePaymentIntent(p.clientSecret);
+        status = r.paymentIntent ? { paymentIntent: r.paymentIntent } : null;
+      } catch {
+        status = null;
+      }
+      handleAnswer(p, status, "Something went wrong. Please try again.");
     } finally {
       inFlight.current = false;
     }
@@ -441,7 +463,13 @@ function CheckoutForm() {
 
   /** Apple Pay asks before its sheet opens: only on the payment step with nothing else paying. */
   function canStartApplePay(): boolean {
-    return shopApplePayClick({ inFlight: inFlight.current, stage }) === "resolve";
+    if (shopApplePayClick({ inFlight: inFlight.current, stage }) !== "resolve") return false;
+    const problem = contactProblem({ email: f.email, phone: f.phone, billingSame: true, billComplete: true, hasBillAddr: true });
+    if (problem) {
+      setError(problem);
+      return false;
+    }
+    return true;
   }
   /** Apple Pay authorized: take the lock (released by endApplePay). False = something else is already paying. */
   function lockApplePay(): boolean {
@@ -456,15 +484,12 @@ function CheckoutForm() {
   }
   /** Apple Pay answer: paid goes to the order page; anything else stays on the payment step with a message. */
   function onApplePayResult(result: PaymentIntentResult | null) {
-    if (isPaid(result) && prepared) {
-      finish(prepared);
-      return;
-    }
-    setError(result?.error?.message || "Apple Pay didn't go through. Try again or pay with card.");
-    setProcessing(false);
+    if (!prepared) return;
+    handleAnswer(prepared, result, "Apple Pay didn't go through. Try again or pay with card.");
   }
 
-  const applePayOptions = stage === "payment" && prepared ? applePayElementsOptions(prepared.chargedCents) : null;
+  // Stays mounted while a payment runs, so a change elsewhere can't tear down Apple Pay mid-payment.
+  const applePayOptions = prepared && (stage === "payment" || processing) ? applePayElementsOptions(prepared.chargedCents) : null;
 
   return (
     <>
@@ -583,10 +608,10 @@ function CheckoutForm() {
               <div style={{ marginTop: "1rem" }}>
                 <div className="feerow"><span>Subtotal</span><span>${displaySubtotal.toFixed(2)}</span></div>
                 <div className="feerow"><span>Outsyde Service Fee</span><span>${displayFee.toFixed(2)}</span></div>
-                {discountCents > 0 && (
+                {totals.discountCents > 0 && (
                   <div className="feerow discount">
                     <span>Outsyde rewards</span>
-                    <span>${(discountCents / 100).toFixed(2)} off</span>
+                    <span>${(totals.discountCents / 100).toFixed(2)} off</span>
                   </div>
                 )}
                 <div className="feerow free"><span>Shipping</span><span>Free</span></div>
@@ -683,7 +708,7 @@ function CheckoutForm() {
                 />
                 <button
                   onClick={() => handleValidatePromo()}
-                  disabled={promoValidating || !promoCode.trim()}
+                  disabled={promoValidating || processing || !promoCode.trim()}
                 >
                   {promoValidating ? "Checking…" : "Apply"}
                 </button>
@@ -703,7 +728,7 @@ function CheckoutForm() {
                       <button
                         key={c.id}
                         type="button"
-                        disabled={promoValidating || codeTooBig(c.discountCents)}
+                        disabled={promoValidating || processing || codeTooBig(c.discountCents)}
                         onClick={() => applyMyCode(c)}
                         title={codeTooBig(c.discountCents) ? `For orders of $${(c.discountCents * 10) / 100} or more` : c.code}
                       >
@@ -715,7 +740,7 @@ function CheckoutForm() {
                       <button
                         key={t.points}
                         type="button"
-                        disabled={redeeming !== null || promoValidating || codeTooBig(t.discountCents)}
+                        disabled={redeeming !== null || promoValidating || processing || codeTooBig(t.discountCents)}
                         onClick={() => turnPointsIntoCode(t.points)}
                       >
                         {redeeming === t.points
@@ -898,7 +923,7 @@ function ShopApplePayButton({ clientSecret, shipping, email, phone, canStart, lo
               result = null;
             }
           }
-          if (!isPaid(result)) ev.paymentFailed({ reason: "fail" });
+          if (paymentAnswer(result) !== "paid") ev.paymentFailed({ reason: "fail" });
           onResult(result);
         } finally {
           onEnd();
