@@ -31,7 +31,7 @@ const STYLES = `
 .crumb a:hover{color:var(--lhb-sage);}
 .pd-wrap{max-width:1100px;margin:0 auto;padding:2rem 1.5rem 4rem;display:grid;grid-template-columns:1fr 1fr;gap:3.5rem;align-items:start;}
 .pd-media{position:relative;background:var(--lhb-cream);border:1px solid rgba(90,62,30,.12);}
-.pd-media img{display:block;width:100%;aspect-ratio:1/1;object-fit:contain;padding:2.5rem;}
+.pd-media img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;}
 .pd-media .ptype-badge{position:absolute;top:1rem;left:1rem;z-index:2;font-size:.58rem;letter-spacing:.18em;text-transform:uppercase;padding:.4rem .75rem;background:#fff;color:var(--lhb-text-mid);font-weight:500;}
 .pd-info{padding-top:.5rem;}
 .pd-eyebrow{font-size:.68rem;letter-spacing:.22em;text-transform:uppercase;color:var(--lhb-sage);font-weight:500;margin-bottom:.85rem;}

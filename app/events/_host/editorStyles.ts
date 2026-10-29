@@ -35,11 +35,11 @@ export const EDITOR_CSS = `
 .ed-in:disabled { opacity: 0.55; }
 .ed-area { min-height: 96px; padding: 10px 12px; resize: vertical; line-height: 1.5; }
 .ed-namerow { display: flex; gap: 12px; align-items: flex-end; }
-.ed-thumb { position: relative; width: 72px; height: 72px; flex: 0 0 72px; border-radius: 14px; background: #1A3C34; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; }
+.ed-thumb { position: relative; width: 64px; height: 80px; flex: 0 0 64px; border-radius: 14px; background: #1A3C34; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; }
 .ed-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .ed-thumb-plus { font-size: 24px; color: #9FC2B5; line-height: 1; }
 .ed-thumb-text { position: relative; font-size: 11px; font-weight: 700; color: #F5F0E6; background: rgba(0,0,0,0.55); padding: 2px 6px; border-radius: 8px; margin-top: 2px; }
-.ed-thumb img + .ed-thumb-text { margin-top: 40px; }
+.ed-thumb img + .ed-thumb-text { margin-top: 48px; }
 .ed-hidden-file { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
 .ed-choice-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
 .ed-choice { min-height: 44px; border-radius: 12px; border: 1px solid #38383A; background: #1C1C1E; color: #F5F0E6; font: 600 14px 'Hanken Grotesk', sans-serif; cursor: pointer; padding: 0 10px; }
@@ -106,7 +106,7 @@ export const EDITOR_CSS = `
 .ed-sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .ed-sheet-title { font-size: 18px; font-weight: 700; margin: 0; }
 .ed-card { background: #1C1C1E; border-radius: 16px; overflow: hidden; width: 100%; text-align: left; }
-.ed-card-cover { position: relative; height: 160px; background: #1A3C34; display: flex; align-items: center; justify-content: center; color: #9FC2B5; font-size: 13px; }
+.ed-card-cover { position: relative; aspect-ratio: 4 / 5; background: #1A3C34; display: flex; align-items: center; justify-content: center; color: #9FC2B5; font-size: 13px; }
 .ed-card-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .ed-card-tag { position: absolute; top: 10px; right: 10px; background: #E8B930; color: #000; font-weight: 700; font-size: 10px; letter-spacing: 1px; padding: 4px 8px; border-radius: 10px; }
 .ed-card-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
@@ -129,14 +129,14 @@ export const EDITOR_CSS = `
 .ed-check.off { opacity: 0.6; cursor: not-allowed; }
 .ed-check.off input { cursor: not-allowed; }
 .ed-accepted { font-size: 14px; color: #CFC7B8; margin: 0; line-height: 1.5; }
-.ed-cover-tile { position: relative; min-height: 320px; border-radius: 20px; border: 2px dashed #38383A; background: #0F0F10; color: #F5F0E6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; cursor: pointer; overflow: hidden; }
+.ed-cover-tile { position: relative; width: min(100%, 340px); aspect-ratio: 4 / 5; margin: 0 auto; border-radius: 20px; border: 2px dashed #38383A; background: #0F0F10; color: #F5F0E6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; cursor: pointer; overflow: hidden; }
 .ed-cover-tile.has { border-style: solid; }
 .ed-cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.55; }
 .ed-cover-icon { position: relative; width: 64px; height: 64px; border-radius: 32px; background: #1C1C1E; color: #E8B930; display: flex; align-items: center; justify-content: center; }
 .ed-cover-title { position: relative; font-family: 'Bebas Neue', sans-serif; font-size: 30px; line-height: 1; }
 .ed-cover-sub { position: relative; max-width: 260px; color: #CFC7B8; }
 .ed-draft { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 14px; background: #1C1C1E; color: #F5F0E6; text-decoration: none; min-height: 68px; }
-.ed-draft-thumb { position: relative; width: 48px; height: 48px; border-radius: 10px; background: #2E2A1E; flex: 0 0 48px; overflow: hidden; }
+.ed-draft-thumb { position: relative; width: 40px; height: 50px; border-radius: 10px; background: #2E2A1E; flex: 0 0 40px; overflow: hidden; }
 .ed-draft-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .ed-draft-main { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
 .ed-live { flex: 1 1 auto; padding: 16px 20px 32px; display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; }

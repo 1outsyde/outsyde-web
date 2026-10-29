@@ -199,7 +199,7 @@ const CSS = `
 .ev-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px}
 .ev-card{display:block;color:#F5F0E6;background:#141414;border:1px solid #2A2A2A;border-radius:18px;overflow:hidden;text-decoration:none;min-width:0}
 .ev-card:hover{border-color:#38383A}
-.ev-cover{height:170px;background:#1A3C34;overflow:hidden}
+.ev-cover{aspect-ratio:4/5;background:#1A3C34;overflow:hidden}
 .ev-cover img{width:100%;height:100%;object-fit:cover;display:block}
 .ev-body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:5px}
 .ev-when{font-size:12px;font-weight:700;color:#E8B930;letter-spacing:.5px}

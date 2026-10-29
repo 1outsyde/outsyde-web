@@ -361,8 +361,16 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
     a { color: #E8B930; text-decoration: none; }
     a:hover { color: #F5D26B; }
     .ev-wrap { max-width: 680px; margin: 0 auto; padding-bottom: 120px; min-height: 100vh; background: #0B0B0B; }
-    .ev-cover { position: relative; height: 270px; background: #1A3C34; display: flex; align-items: center; justify-content: center; color: #9FC2B5; font-size: 13px; overflow: hidden; }
-    .ev-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    /* The whole 4:5 flyer (photo ratios 3c): full width on phones; wider screens show it up to
+       480 wide, centered over a blurred copy of itself. */
+    .ev-cover { position: relative; width: 100%; aspect-ratio: 4 / 5; background: #1A3C34; display: flex; align-items: center; justify-content: center; color: #9FC2B5; font-size: 13px; overflow: hidden; }
+    .ev-cover .ev-flyer { position: relative; width: 100%; height: 100%; object-fit: cover; display: block; }
+    .ev-cover .ev-cover-bg { display: none; }
+    @media (min-width: 520px) {
+      .ev-cover { aspect-ratio: auto; height: 600px; }
+      .ev-cover .ev-flyer { width: auto; height: 100%; aspect-ratio: 4 / 5; max-width: 100%; }
+      .ev-cover .ev-cover-bg { display: block; position: absolute; inset: -40px; width: calc(100% + 80px); height: calc(100% + 80px); object-fit: cover; filter: blur(32px) brightness(0.6); }
+    }
     .ev-round { position: absolute; top: 16px; width: 44px; height: 44px; border-radius: 22px; border: 0; background: #0B0B0B; color: #F5F0E6; display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; }
     .ev-round:hover { color: #E8B930; }
     .ev-body { padding: 18px 20px 0; display: flex; flex-direction: column; gap: 16px; }
@@ -445,7 +453,14 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
         {cancelled && <div className="ev-banner" style={{ background: "#3B1414", color: "#ff8a80" }}>This event was cancelled.</div>}
 
         <div className="ev-cover">
-          {e.coverImageUrl ? <img src={e.coverImageUrl} alt="" /> : null}
+          {e.coverImageUrl ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element -- plain <img> as elsewhere on events; covers come from many hosts */}
+              <img className="ev-cover-bg" src={e.coverImageUrl} alt="" aria-hidden="true" />
+              {/* eslint-disable-next-line @next/next/no-img-element -- same flyer, shown whole */}
+              <img className="ev-flyer" src={e.coverImageUrl} alt="" />
+            </>
+          ) : null}
           <Link href="/" aria-label="Back" className="ev-round" style={{ left: 16, color: "#F5F0E6" }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
           </Link>

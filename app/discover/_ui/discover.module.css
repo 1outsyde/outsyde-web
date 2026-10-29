@@ -567,7 +567,8 @@ div.storySlot { cursor: default; }
   padding: 4px 8px;
   border-radius: 10px;
 }
-.eventCover { position: relative; height: 230px; background: #1A3C34; overflow: hidden; }
+/* Event covers are 4:5 flyers (photo ratios 3c). */
+.eventCover { position: relative; width: 100%; aspect-ratio: 4 / 5; background: #1A3C34; overflow: hidden; }
 .eventCoverLabel {
   position: absolute;
   inset: 0;
