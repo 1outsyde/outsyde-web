@@ -3,6 +3,7 @@ import { money as fmtMoney, errorCopy as sharedErr, clampQty as clampQ } from ".
 import {
   hasStarted,
   phaseForOrder, holdPhase, entryDecision, paramsKey, confirmOutcome, afterRetrieve, lateCopy, storageKey, parseSaved, storageAfterPhase, shouldQuietRestart, unavailableFrom,
+  applePayElementsOptions, applePayButtonOptions, canOpenApplePay,
 } from "../app/e/[slug]/checkoutLogic";
 
 let passed = 0, failed = 0;
@@ -120,6 +121,23 @@ eq(sharedErr(500, { code: "SOLD_OUT" }), "These tickets are sold out.", "known c
 eq(sharedErr(502, { error: "Could not reach server." }), "Something went wrong. Try again.", "no code: generic");
 eq(clampQ({ minPerOrder: 2, maxPerOrder: 6, remaining: 4, perAccountLimit: null }, 9), 4, "clamp to the smallest cap");
 eq(clampQ({ minPerOrder: 2, maxPerOrder: 6, remaining: 4, perAccountLimit: null }, 1), 2, "clamp to min");
+
+console.log("Apple Pay (goutsyde.com, Apple Pay only)");
+eq(applePayElementsOptions(2259), { mode: "payment", amount: 2259, currency: "usd" }, "sheet amount = the hold total the PaymentIntent charges");
+eq(applePayElementsOptions(0), null, "nothing to charge: no Apple Pay");
+eq(applePayElementsOptions(-5), null, "negative total: no Apple Pay");
+eq(applePayElementsOptions(22.5), null, "fractional cents: no Apple Pay");
+eq(
+  applePayButtonOptions().paymentMethods,
+  { applePay: "auto", googlePay: "never", link: "never", paypal: "never", amazonPay: "never", klarna: "never" },
+  "only Apple Pay can show; every other wallet is off",
+);
+eq(applePayButtonOptions().buttonTheme, { applePay: "white" }, "white button on the dark checkout");
+eq(applePayButtonOptions().buttonType, { applePay: "buy" }, "Buy with Apple Pay");
+eq(canOpenApplePay({ paying: false, remainingMs: 60_000 }), true, "held and idle: Apple Pay opens");
+eq(canOpenApplePay({ paying: true, remainingMs: 60_000 }), false, "a payment is already running: no second one");
+eq(canOpenApplePay({ paying: false, remainingMs: 0 }), false, "hold ended: no Apple Pay");
+eq(canOpenApplePay({ paying: false, remainingMs: -1 }), false, "hold past due: no Apple Pay");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

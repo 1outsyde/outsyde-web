@@ -14,13 +14,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { loadStripe, type Stripe } from "@stripe/stripe-js";
-import { Elements, CardElement, useElements, useStripe } from "@stripe/react-stripe-js";
+import { loadStripe, type Stripe, type PaymentIntentResult } from "@stripe/stripe-js";
+import { Elements, CardElement, ExpressCheckoutElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import type { EventInfo, TicketType } from "./types";
 import AppGetBlock from "./AppGetBlock";
 import { GENERIC_ERROR, failureCopy, money, newKey, startLine } from "../_shared/format";
 import {
-  afterRetrieve, confirmOutcome, entryDecision, holdPhase, lateCopy, paramsKey, parseSaved, phaseForOrder, shouldQuietRestart, unavailableFrom, storageAfterPhase, storageKey,
+  afterRetrieve, applePayButtonOptions, applePayElementsOptions, canOpenApplePay, confirmOutcome, entryDecision, holdPhase, lateCopy, paramsKey, parseSaved, phaseForOrder, shouldQuietRestart, unavailableFrom, storageAfterPhase, storageKey,
   type Entry, type Phase, type PiStatus, type Saved,
 } from "./checkoutLogic";
 
@@ -407,6 +407,7 @@ export default function Checkout({ slug, event, type, qty, onPaid, onFinished, o
     .co-hold { display: flex; align-items: center; gap: 8px; background: #2E2A1E; border-radius: 12px; padding: 10px 12px; font-size: 13px; color: #F5D26B; }
     .co-line { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
     .co-label { font-size: 12px; font-weight: 700; color: #B8B0A0; letter-spacing: 1px; }
+    .co-or { font-size: 12px; font-weight: 700; color: #B8B0A0; letter-spacing: 1px; text-align: center; }
     .co-cardbox { min-height: 48px; border-radius: 12px; border: 1px solid #2A2A2A; background: #141414; padding: 14px; }
     .co-foot { flex-shrink: 0; padding: 14px 20px 22px; border-top: 1px solid #1F1F1F; position: sticky; bottom: 0; background: #0B0B0B; }
     .co-pay { width: 100%; height: 54px; border-radius: 27px; border: 0; background: #E8B930; color: #0B0B0B; font: 700 16px 'Hanken Grotesk', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -580,7 +581,7 @@ function PayPanel(props: PayProps) {
   );
 }
 
-function PayForm({ hold, type, qty, remaining, paying, onChange, onPaying, onFailed, onPaid, onRetrySame }: PayProps) {
+function PayForm({ hold, type, qty, remaining, paying, stripe: stripeInstance, onChange, onPaying, onFailed, onPaid, onRetrySame }: PayProps) {
   const stripe = useStripe();
   const elements = useElements();
   const [cardError, setCardError] = useState("");
@@ -595,38 +596,58 @@ function PayForm({ hold, type, qty, remaining, paying, onChange, onPaying, onFai
     setError("");
     onPaying();
     try {
-      let out;
+      let result: PaymentIntentResult | null = null;
       try {
-        const result = await stripe.confirmCardPayment(hold.clientSecret, { payment_method: { card } });
-        out = { result, outcome: confirmOutcome({ error: result.error as { code?: string; payment_intent?: { status?: string } } | undefined, paymentIntentStatus: result.paymentIntent?.status }) };
+        result = await stripe.confirmCardPayment(hold.clientSecret, { payment_method: { card } });
       } catch {
-        out = { result: null, outcome: confirmOutcome({ thrown: true }) };
+        result = null;
       }
-      const o = out.outcome;
-      if (o.next === "confirming") {
-        onPaid(o.pi);
-      } else if (o.next === "check-payment") {
-        // The charge may have gone through. Ask Stripe, then ask the backend again with the same key.
-        let st: string | undefined;
-        try {
-          st = (await stripe.retrievePaymentIntent(hold.clientSecret)).paymentIntent?.status;
-        } catch { /* fall through to the backend */ }
-        const a = afterRetrieve(st);
-        if (a === "confirming-succeeded") onPaid("succeeded");
-        else if (a === "confirming-processing") onPaid("processing");
-        else onRetrySame();
-      } else {
-        setError(
-          o.showStripeError
-            ? out.result?.error?.message || "Your card couldn't be charged. Check the details and try again."
-            : "Your card couldn't be charged. Try again.",
-        );
-        onFailed();
-      }
+      await settle(stripe, result);
     } finally {
       inFlight.current = false;
     }
   }
+
+  /** Apple Pay asks before it opens its sheet: only while held and idle, and never twice at once. */
+  function startApplePay(): boolean {
+    if (inFlight.current || !canOpenApplePay({ paying, remainingMs: remaining })) return false;
+    inFlight.current = true;
+    setError("");
+    return true;
+  }
+  function endApplePay() {
+    inFlight.current = false;
+  }
+
+  /** One way to read a payment answer, card or Apple Pay. null = the confirm call threw. A paid buyer never stays on this form. */
+  async function settle(s: Stripe, result: PaymentIntentResult | null) {
+    const out = result
+      ? { result, outcome: confirmOutcome({ error: result.error as { code?: string; payment_intent?: { status?: string } } | undefined, paymentIntentStatus: result.paymentIntent?.status }) }
+      : { result: null, outcome: confirmOutcome({ thrown: true }) };
+    const o = out.outcome;
+    if (o.next === "confirming") {
+      onPaid(o.pi);
+    } else if (o.next === "check-payment") {
+      // The charge may have gone through. Ask Stripe, then ask the backend again with the same key.
+      let st: string | undefined;
+      try {
+        st = (await s.retrievePaymentIntent(hold.clientSecret)).paymentIntent?.status;
+      } catch { /* fall through to the backend */ }
+      const a = afterRetrieve(st);
+      if (a === "confirming-succeeded") onPaid("succeeded");
+      else if (a === "confirming-processing") onPaid("processing");
+      else onRetrySame();
+    } else {
+      setError(
+        o.showStripeError
+          ? out.result?.error?.message || "Your card couldn't be charged. Check the details and try again."
+          : "Your card couldn't be charged. Try again.",
+      );
+      onFailed();
+    }
+  }
+
+  const applePayOptions = applePayElementsOptions(hold.totalCents);
 
   return (
     <>
@@ -650,6 +671,18 @@ function PayForm({ hold, type, qty, remaining, paying, onChange, onPaying, onFai
           <div className="co-line" style={{ fontSize: 17, fontWeight: 700, paddingTop: 8, borderTop: "1px solid #1F1F1F" }}><div>Total</div><div>{money(hold.totalCents)}</div></div>
         </div>
 
+        {applePayOptions && (
+          <ApplePayBox
+            stripe={stripeInstance}
+            options={applePayOptions}
+            clientSecret={hold.clientSecret}
+            onStart={startApplePay}
+            onEnd={endApplePay}
+            onPaying={onPaying}
+            onFailed={(message) => { setError(message); onFailed(); }}
+            onResult={settle}
+          />
+        )}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div className="co-label" id="co-card-label">CARD</div>
           <div className="co-cardbox" aria-labelledby="co-card-label">
@@ -673,5 +706,74 @@ function PayForm({ hold, type, qty, remaining, paying, onChange, onPaying, onFai
         </button>
       </div>
     </>
+  );
+}
+
+interface ApplePayProps {
+  stripe: Stripe | null;
+  options: { mode: "payment"; amount: number; currency: "usd" };
+  clientSecret: string;
+  onStart: () => boolean;
+  onEnd: () => void;
+  onPaying: () => void;
+  onFailed: (message: string) => void;
+  onResult: (stripe: Stripe, result: PaymentIntentResult | null) => Promise<void>;
+}
+
+/**
+ * Apple Pay (2026-10-29), in its own Elements group so the card form above stays exactly as it was. Shows only when
+ * Stripe says Apple Pay is available on this device (Safari with a card in Wallet, domain registered in Stripe);
+ * everywhere else it takes no space and the card form is the only way to pay.
+ */
+function ApplePayBox(props: ApplePayProps) {
+  const [shown, setShown] = useState(false);
+  return (
+    <div style={{ display: shown ? "flex" : "none", flexDirection: "column", gap: 10 }}>
+      <Elements stripe={props.stripe} options={{ ...props.options, appearance, fonts: [{ cssSrc: FONTS_CSS }] }}>
+        <ApplePayButton {...props} onShown={setShown} />
+      </Elements>
+      <div className="co-or">OR PAY WITH CARD</div>
+    </div>
+  );
+}
+
+function ApplePayButton({ clientSecret, onStart, onEnd, onPaying, onFailed, onResult, onShown }: ApplePayProps & { onShown: (shown: boolean) => void }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  return (
+    <ExpressCheckoutElement
+      options={applePayButtonOptions()}
+      onReady={(e) => onShown(!!e.availablePaymentMethods?.applePay)}
+      onClick={(e) => {
+        // Not resolving keeps the sheet closed: the hold ended or a payment is already running.
+        if (onStart()) e.resolve();
+      }}
+      onCancel={() => onEnd()}
+      onConfirm={async () => {
+        if (!stripe || !elements) { onEnd(); return; }
+        onPaying();
+        try {
+          const { error: submitError } = await elements.submit();
+          if (submitError) {
+            onFailed(submitError.message || "Apple Pay couldn't start. Try again or pay with card.");
+            return;
+          }
+          let result: PaymentIntentResult | null = null;
+          try {
+            result = await stripe.confirmPayment({
+              elements,
+              clientSecret,
+              confirmParams: { return_url: window.location.href },
+              redirect: "if_required",
+            });
+          } catch {
+            result = null;
+          }
+          await onResult(stripe, result);
+        } finally {
+          onEnd();
+        }
+      }}
+    />
   );
 }

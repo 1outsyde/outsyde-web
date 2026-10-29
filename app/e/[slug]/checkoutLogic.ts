@@ -155,3 +155,31 @@ export function shouldQuietRestart(code: string, keyFromStorage: boolean, alread
 export function unavailableFrom(phase: Phase): Phase {
   return phase === "starting" ? "unavailable" : phase;
 }
+
+/**
+ * Apple Pay on goutsyde.com (2026-10-29, Apple Pay only by Legend's call).
+ * The Express Checkout Element runs in its own Elements group, beside the card one. Stripe requires the amount here
+ * to equal the PaymentIntent's, which the backend creates for the hold total (ticketCheckout.ts, fees.totalCents).
+ * Null means: show no Apple Pay (nothing valid to charge).
+ */
+export function applePayElementsOptions(totalCents: number): { mode: "payment"; amount: number; currency: "usd" } | null {
+  if (!Number.isInteger(totalCents) || totalCents <= 0) return null;
+  return { mode: "payment", amount: totalCents, currency: "usd" };
+}
+
+/**
+ * Only Apple Pay may show. Stripe would otherwise add every wallet the account allows (Google Pay, Link, PayPal,
+ * Amazon Pay, Klarna are on in Stripe's settings). White button: the checkout is dark.
+ */
+export function applePayButtonOptions() {
+  return {
+    paymentMethods: { applePay: "auto", googlePay: "never", link: "never", paypal: "never", amazonPay: "never", klarna: "never" },
+    buttonTheme: { applePay: "white" },
+    buttonType: { applePay: "buy" },
+  } as const;
+}
+
+/** Apple Pay opens only while the seats are held and no other payment is running. */
+export function canOpenApplePay(s: { paying: boolean; remainingMs: number }): boolean {
+  return !s.paying && s.remainingMs > 0;
+}
