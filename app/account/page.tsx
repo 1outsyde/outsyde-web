@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import CoverVideo from "@/components/CoverVideo";
 import { COVER_VIDEO_MAX_SECONDS, uploadCoverVideo } from "@/lib/coverMedia";
+import { useCropFile } from "@/components/crop/useCropFile";
 
 interface UserProfile {
   userId: string;
@@ -38,6 +39,8 @@ interface Post {
 }
 
 export default function AccountPage() {
+  // 16:9 crop box for the cover photo (photo ratios 3b).
+  const { crop, cropModal } = useCropFile();
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -112,8 +115,15 @@ export default function AccountPage() {
     setSaving(false);
   }
 
-  async function handleCoverFile(file: File, kind: "image" | "video") {
+  async function handleCoverFile(picked: File, kind: "image" | "video") {
     setSaveError("");
+    // Cover photos are 16:9 (photo ratios 3b): crop first. Cover videos are unchanged.
+    let file = picked;
+    if (kind === "image") {
+      const cropped = await crop(picked, "cover");
+      if (!cropped) return;
+      file = cropped.file;
+    }
     setCoverUploading(kind);
     try {
       let value: string;
@@ -508,6 +518,7 @@ export default function AccountPage() {
           </div>
         </div>
       </div>
+      {cropModal}
     </>
   );
 }

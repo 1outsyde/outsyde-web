@@ -17,6 +17,7 @@ import TicketTypeSheet from "./TicketTypeSheet";
 import ReviewStep, { type Agreement } from "./ReviewStep";
 import LiveStep from "./LiveStep";
 import { HostShell, useHostApi } from "./hostApi";
+import { useCropFile } from "@/components/crop/useCropFile";
 import {
   activeTypes, changedFields, createBody, emptyForm, emptySheet, formFromEvent, hostOptions, isHostEvent, isHostTicketType,
   nextStepLabel, patchBody, profilePayoutNote, publishFailure, sheetFromType, ticketBody, validateForm,
@@ -67,6 +68,8 @@ export default function EventEditor({ eventId: routeId }: { eventId?: string }) 
   const [drafts, setDrafts] = useState<HostEvent[]>([]);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  // 4:5 flyer crop box for the cover (photo ratios 3b).
+  const { crop, cropModal } = useCropFile();
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [sheet, setSheet] = useState<{ initial: TicketSheet; editing: HostTicketType | null } | null>(null);
@@ -204,11 +207,14 @@ export default function EventEditor({ eventId: routeId }: { eventId?: string }) 
     setError(null);
     if (!file.type.startsWith("image/")) { setError("Choose a photo file."); return; }
     if (file.size > MAX_UPLOAD_BYTES) { setError("That photo is too large. Choose one under 20 MB."); return; }
+    // Event covers are 4:5 flyers: crop first, then upload only the cropped JPEG.
+    const cropped = await crop(file, "eventCover");
+    if (!cropped) return; // cancelled: cover unchanged
     setUploading(true);
     try {
       const fd = new FormData();
       fd.append("folder", "covers");
-      fd.append("file", file);
+      fd.append("file", cropped.file);
       const res = await fetch("/api/vendor-dashboard/upload-image", { method: "POST", body: fd });
       if (res.status === 401) { toLogin(); return; }
       const body = await res.json().catch(() => null);
@@ -371,7 +377,7 @@ export default function EventEditor({ eventId: routeId }: { eventId?: string }) 
 
   /* ---------- render ---------- */
 
-  const page = (children: React.ReactNode) => <HostShell>{children}</HostShell>;
+  const page = (children: React.ReactNode) => <HostShell>{children}{cropModal}</HostShell>;
 
   const messages = (
     <>

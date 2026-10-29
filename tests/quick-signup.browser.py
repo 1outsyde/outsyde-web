@@ -162,6 +162,13 @@ WEB = os.environ.get("WEB", "http://localhost:3108")
 STUB = os.environ.get("STUB", "http://127.0.0.1:5098")
 SHOTS = os.environ.get("SHOTS")
 PHOTO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures-quick-photo.png")
+
+
+def use_crop(pg):
+    """Photo ratios 3b: a picked photo opens the 1:1 crop box first; take it as it opens."""
+    pg.locator("[data-testid=crop-modal]").wait_for(timeout=10000)
+    pg.locator("[data-testid=crop-done]:not([disabled])").click(timeout=10000)
+    pg.locator("[data-testid=crop-modal]").wait_for(state="detached", timeout=10000)
 passed = failed = 0
 
 
@@ -266,6 +273,7 @@ with sync_playwright() as pw:
     c, pg, navs = open_page(b, PAID)
     pg.click(".ev-cta")
     pg.set_input_files("#qa-photo", PHOTO)
+    use_crop(pg)
     pg.wait_for_timeout(300)
     check("Change photo" in sheet(pg).inner_text(), "photo picked shows Change photo")
     if SHOTS:
@@ -294,6 +302,7 @@ with sync_playwright() as pw:
     c, pg, navs = open_page(b, PAID)
     pg.click(".ev-cta")
     pg.set_input_files("#qa-photo", PHOTO)
+    use_crop(pg)
     fill_signup(pg, email="photofail@email.com")
     pg.click(".qa-cta")
     pg.wait_for_selector("text=We couldn't add your photo. You can add it later in your account.", timeout=10000)
