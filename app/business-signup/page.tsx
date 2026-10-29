@@ -20,6 +20,7 @@ import { normalizeReferralCode, BUSINESS_REFERRAL_COPY } from "@/lib/referral";
 import { Eye, EyeOff } from "lucide-react";
 import ExistingAccountHint, { isAlreadyRegistered } from "@/components/ExistingAccountHint";
 import { isOtherCode, isTaxonomy, specialtiesFor, type BusinessTaxonomy, type TaxonomySpecialty } from "@/lib/business-taxonomy";
+import { useCropFile } from "@/components/crop/useCropFile";
 
 const noopSubscribe = () => () => {};
 
@@ -116,6 +117,8 @@ export default function BusinessSignupPage() {
 
   // logo (optional)
   const [logoDataUrl, setLogoDataUrl] = useState("");
+  // 1:1 circle crop box for the logo (photo ratios 3b).
+  const { crop, cropModal } = useCropFile();
   const [logoError, setLogoError] = useState("");
 
   // business details
@@ -230,8 +233,11 @@ export default function BusinessSignupPage() {
       setLogoError("Please choose a JPG, PNG or WebP image.");
       return;
     }
+    // Crop to a 1:1 circle first; the cropped JPEG (512 at most, as before) becomes the data URL.
+    const cropped = await crop(file, "signupLogo");
+    if (!cropped) return;
     try {
-      const dataUrl = await resizeLogo(file);
+      const dataUrl = await resizeLogo(cropped.file);
       if (dataUrl.length > 2_000_000) {
         setLogoError("That image is too large. Please choose a smaller one.");
         return;
@@ -1253,6 +1259,7 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
           <a href="/" className="bs-back">← Back to Home</a>
         </div>
       </main>
+      {cropModal}
     </>
   );
 }

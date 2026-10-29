@@ -8,6 +8,7 @@ import { COVER_VIDEO_MAX_SECONDS, uploadCoverVideo } from "@/lib/coverMedia";
 import { isTaxonomy, type BusinessTaxonomy } from "@/lib/business-taxonomy";
 import IndustrySection, { industryProblem, offerTypeOf, type IndustryValue } from "./IndustrySection";
 import BusinessReferralCard from "@/components/referral/BusinessReferralCard";
+import { useCropFile } from "@/components/crop/useCropFile";
 import {
   BOOKING_FILTERS,
   bookingStatusColor,
@@ -400,6 +401,9 @@ export default function VendorDashboardPage() {
       setActionLoading(l => ({ ...l, [orderId]: false }));
     }
   }
+
+  // Crop box for the logo (1:1 circle) and cover photo (16:9), photo ratios 3b.
+  const { crop, cropModal } = useCropFile();
 
   async function handleUploadImage(file: File, folder: string): Promise<string> {
     const fd = new FormData();
@@ -1068,8 +1072,8 @@ export default function VendorDashboardPage() {
                   <label className="sf-label">Logo</label>
                   <div className="sf-img-row">
                     {sfForm.logoImage
-                      ? <img src={sfForm.logoImage} alt="logo" className="sf-img-preview" />
-                      : <div className="sf-img-placeholder">🖼</div>
+                      ? <img src={sfForm.logoImage} alt="logo" className="sf-img-preview" style={{ borderRadius: '50%' }} />
+                      : <div className="sf-img-placeholder" style={{ borderRadius: '50%' }}>🖼</div>
                     }
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <label>
@@ -1087,11 +1091,14 @@ export default function VendorDashboardPage() {
                           accept="image/*"
                           style={{ display: 'none' }}
                           onChange={async e => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
+                            const picked = e.target.files?.[0];
+                            e.target.value = '';
+                            if (!picked) return;
+                            const cropped = await crop(picked, 'logo');
+                            if (!cropped) return;
                             setSfLogoUploading(true);
                             try {
-                              const url = await handleUploadImage(file, 'logos');
+                              const url = await handleUploadImage(cropped.file, 'logos');
                               setSfForm(f => f && ({ ...f, logoImage: url }));
                             } catch (err) {
                               setSfError(err instanceof Error ? err.message : 'Logo upload failed');
@@ -1135,11 +1142,14 @@ export default function VendorDashboardPage() {
                           accept="image/*"
                           style={{ display: 'none' }}
                           onChange={async e => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
+                            const picked = e.target.files?.[0];
+                            e.target.value = '';
+                            if (!picked) return;
+                            const cropped = await crop(picked, 'cover');
+                            if (!cropped) return;
                             setSfCoverUploading(true);
                             try {
-                              const url = await handleUploadImage(file, 'covers');
+                              const url = await handleUploadImage(cropped.file, 'covers');
                               setSfForm(f => f && ({ ...f, coverImage: url, coverMediaType: 'image' }));
                             } catch (err) {
                               setSfError(err instanceof Error ? err.message : 'Cover upload failed');
@@ -1359,6 +1369,7 @@ export default function VendorDashboardPage() {
           })()}
         </div>
       </div>
+      {cropModal}
     </>
   );
 }

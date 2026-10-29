@@ -114,6 +114,11 @@ try:
         check(no_overflow(pg), "start: no horizontal overflow")
         shot(pg, "ee-start")
         pg.locator("input[type=file]").set_input_files({"name": "c.png", "mimeType": "image/png", "buffer": PNG})
+        # Photo ratios 3b: the 4:5 flyer crop box opens first.
+        pg.locator("[data-testid=crop-modal]").wait_for(timeout=10000)
+        check(pg.get_by_text("Crop flyer").count() == 1, "cover opens the 4:5 Crop flyer box")
+        pg.locator("[data-testid=crop-done]:not([disabled])").click(timeout=10000)
+        pg.locator("[data-testid=crop-modal]").wait_for(state="detached", timeout=10000)
         pg.wait_for_function("() => !document.body.innerText.includes('Uploading')", timeout=30000)
         uploaded = pg.locator("img.ed-cover-img").count() == 1
         upload_err = pg.get_by_text("We couldn't upload that photo").count() == 1

@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from "react";
 import { GENERIC_ERROR } from "../_shared/format";
 import { QUICK_COPY, existsCopy, loginOutcome, quickErrorCopy, validateQuickLogin, validateQuickSignup, type QuickMode, type QuickPurpose } from "./quickAuthLogic";
+import { useCropFile } from "@/components/crop/useCropFile";
 
 export type { QuickPurpose };
 
@@ -89,6 +90,8 @@ export default function QuickAuthSheet({ open, initialMode, purpose = "checkout"
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
+  // 1:1 circle crop box for the profile photo (photo ratios 3b).
+  const { crop, cropModal } = useCropFile();
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState("");
@@ -150,7 +153,10 @@ export default function QuickAuthSheet({ open, initialMode, purpose = "checkout"
     }
   }
 
-  function pickPhoto(f: File | null) {
+  async function pickPhoto(picked: File | null) {
+    // Crop to a 1:1 circle first; cancelling keeps the photo already chosen.
+    const f = picked ? (await crop(picked, "profile"))?.file ?? null : null;
+    if (picked && !f) return;
     if (photoUrlRef.current) URL.revokeObjectURL(photoUrlRef.current);
     photoUrlRef.current = f ? URL.createObjectURL(f) : null;
     setPhoto(f);
@@ -285,6 +291,7 @@ export default function QuickAuthSheet({ open, initialMode, purpose = "checkout"
   const fieldErr = (k: keyof Errors, id: string) => errors[k] ? <div id={id} className="qa-err" role="alert">{errors[k]}</div> : null;
 
   return (
+    <>
     <div className="qa-root" onKeyDown={(ev) => { if (ev.key === "Escape") { ev.stopPropagation(); close(); } else trapTab(ev); }}>
       <style dangerouslySetInnerHTML={{ __html: `
         .qa-root { position: fixed; inset: 0; z-index: 350; }
@@ -338,7 +345,7 @@ export default function QuickAuthSheet({ open, initialMode, purpose = "checkout"
                   <span style={{ fontSize: 12, color: "#8A8478" }}>Optional. You can skip this.</span>
                 </span>
                 <input id="qa-photo" className="qa-sr" type="file" accept="image/*" disabled={busy}
-                  onChange={(ev) => pickPhoto(ev.target.files?.[0] ?? null)} />
+                  onChange={(ev) => { const f = ev.target.files?.[0] ?? null; ev.target.value = ""; void pickPhoto(f); }} />
               </label>
               <label htmlFor="qa-first" className="qa-label">FIRST NAME</label>
               <input id="qa-first" ref={firstRef} autoComplete="given-name" value={firstName} onChange={(ev) => setFirstName(ev.target.value)}
@@ -390,5 +397,8 @@ export default function QuickAuthSheet({ open, initialMode, purpose = "checkout"
         </button>
       </div>
     </div>
+    {/* Outside qa-root, so its Escape and Tab handling don't reach the crop box. */}
+    {cropModal}
+    </>
   );
 }
