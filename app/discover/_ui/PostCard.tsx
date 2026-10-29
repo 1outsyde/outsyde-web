@@ -91,7 +91,7 @@ export default function PostCard({ post, viewerId, onSignIn, viewer }: {
         ) : null}
       </header>
 
-      <PostMedia media={post.media} onDoubleTap={onDoubleTap} />
+      <PostMedia media={post.media} aspect={post.aspect} onDoubleTap={onDoubleTap} />
 
       {post.commerce && href ? (
         <a className={styles.commercePill} href={href}>{post.commerce === "buy" ? "Buy Now" : "Book Now"}</a>

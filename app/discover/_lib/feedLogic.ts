@@ -19,6 +19,9 @@ export type PostMedia =
   | { kind: "carousel"; urls: string[] }
   | { kind: "video"; url: string | null; poster: string | null };
 
+/** Fill or Fit for Pulse videos and video stories (photo ratios, same rule as the app). */
+export type VideoFit = "fill" | "fit";
+
 export interface FeedPost {
   id: string;
   author: FeedAuthor;
@@ -30,6 +33,8 @@ export interface FeedPost {
   isSaved: boolean;
   authorIsFollowed: boolean;
   media: PostMedia;
+  /** The post's shape, width / height, held between 4:5 and 1.91:1 (4:5 when unknown). */
+  aspect: number;
   commerce: "buy" | "book" | null;
 }
 
@@ -39,6 +44,9 @@ export interface PulseVideo {
   caption: string;
   videoUrl: string;
   poster: string | null;
+  /** Picture for the blur behind a Fit video: the poster, else the Mux thumbnail. */
+  blurUrl: string | null;
+  fit: VideoFit;
   likesCount: number;
   commentsCount: number;
   isLiked: boolean;
@@ -50,7 +58,7 @@ export interface StoryGroup {
   userId: string;
   authorName: string;
   avatarUrl: string | null;
-  stories: { id: string; mediaUrl: string; mediaType: "image" | "video"; thumbnailUrl: string | null }[];
+  stories: { id: string; mediaUrl: string; mediaType: "image" | "video"; thumbnailUrl: string | null; fit: VideoFit; blurUrl: string | null }[];
 }
 
 type Rec = Record<string, unknown>;
@@ -80,6 +88,52 @@ function firstPlayable(...vals: unknown[]): string | null {
     if (isPlayableUrl(s)) return s;
   }
   return null;
+}
+
+// ── Photo ratios (port of the app's utils/postAspect.ts and utils/videoFit.ts) ──────────────────
+
+/** Post shapes run from 4:5 (tall) to 1.91:1 (wide), like Instagram. */
+export const POST_MIN_ASPECT = 4 / 5;
+export const POST_MAX_ASPECT = 1.91;
+
+const usable = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v > 0;
+
+function ratioOf(aspect: unknown, width: unknown, height: unknown): number | null {
+  if (usable(aspect)) return aspect;
+  if (usable(width) && usable(height)) return width / height;
+  return null;
+}
+
+/**
+ * A post's shape for its box: photo 1 of a multi-photo post (the whole carousel uses it), else the
+ * post's `aspectRatio` or `mediaWidth` / `mediaHeight`, else `media.aspectRatio` or `media.width` /
+ * `media.height`. Held between 4:5 and 1.91:1; nothing usable gives 4:5, the look before sizes.
+ */
+export function postAspect(r: Rec): number {
+  const items = Array.isArray(r.mediaItems) ? r.mediaItems : [];
+  const first = items.length > 1 && isRec(items[0]) ? items[0] : null;
+  const media = isRec(r.media) ? r.media : null;
+  const raw =
+    (first ? ratioOf(first.aspectRatio, first.width, first.height) : null) ??
+    ratioOf(r.aspectRatio, r.mediaWidth, r.mediaHeight) ??
+    (media ? ratioOf(media.aspectRatio, media.width, media.height) : null);
+  if (raw === null) return POST_MIN_ASPECT;
+  return Math.min(POST_MAX_ASPECT, Math.max(POST_MIN_ASPECT, raw));
+}
+
+/** Anything other than "fit" is fill, so every older video looks as the app shows it. */
+export function videoFitOf(v: unknown): VideoFit {
+  return v === "fit" ? "fit" : "fill";
+}
+
+const isImageUrl = (u: string) => /^https?:\/\//i.test(u) && !/\.m3u8(\?|$)/i.test(u) && !/\.mp4(\?|$)/i.test(u);
+
+/** The blur picture behind a Fit video: its thumbnail, else the Mux thumbnail of a Mux stream URL. */
+export function videoBlurUrl(thumbnailUrl: unknown, videoUrl: unknown): string | null {
+  const t = str(thumbnailUrl);
+  if (t && isImageUrl(t) && isPlayableUrl(t)) return t;
+  const m = str(videoUrl).match(/^https:\/\/stream\.mux\.com\/([A-Za-z0-9]+)(\.m3u8)?(\?|$)/);
+  return m ? `https://image.mux.com/${m[1]}/thumbnail.jpg` : null;
 }
 
 function postMedia(r: Rec): PostMedia {
@@ -114,6 +168,7 @@ export function toFeedPost(raw: unknown): FeedPost | null {
     isSaved: raw.isSaved === true,
     authorIsFollowed: raw.authorIsFollowed === true,
     media: postMedia(raw),
+    aspect: postAspect(raw),
     commerce,
   };
 }
@@ -131,6 +186,8 @@ export function toPulseVideo(raw: unknown): PulseVideo | null {
     caption: str(raw.caption),
     videoUrl,
     poster: firstPlayable(raw.thumbnailUrl),
+    blurUrl: videoBlurUrl(raw.thumbnailUrl, videoUrl),
+    fit: videoFitOf(raw.videoFit),
     likesCount: num(raw.likeCount),
     commentsCount: num(raw.commentCount),
     isLiked: raw.isLiked === true,
@@ -156,6 +213,8 @@ export function toStoryGroups(raw: unknown): StoryGroup[] {
         mediaUrl,
         mediaType: s.mediaType === "video" ? ("video" as const) : ("image" as const),
         thumbnailUrl: firstPlayable(s.thumbnailUrl),
+        fit: videoFitOf(s.videoFit),
+        blurUrl: videoBlurUrl(s.thumbnailUrl, mediaUrl),
       }];
     });
     if (stories.length === 0) continue;

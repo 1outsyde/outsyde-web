@@ -141,6 +141,11 @@ a.cardName:hover { text-decoration: underline; }
   font-weight: 600;
 }
 .video { display: block; width: 100%; height: 100%; object-fit: cover; background: #1A3C34; }
+/* Fit: the whole video over its blurred still (photo ratios). Fill keeps the cover above. */
+.video[data-fit="fit"] { object-fit: contain; background: transparent; }
+.fitBackdrop, .fitBackdropBlack { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.fitBackdropBlack { background: #000; }
+.fitBackdrop img { width: 100%; height: 100%; object-fit: cover; filter: blur(28px) brightness(0.75); transform: scale(1.15); }
 .soundBtn, .carouselBtn {
   position: absolute;
   width: 44px;
@@ -516,7 +521,8 @@ div.storySlot { cursor: default; }
 .storyHead { display: flex; align-items: center; gap: 10px; padding: 6px 4px 6px 12px; }
 .storyName { flex: 1; min-width: 0; font-weight: 700; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .storyMedia { position: relative; flex: 1; min-height: 0; background: #1A3C34; }
-.storyMedia video { object-fit: contain; background: #000; }
+/* Story videos follow Fill / Fit like the app: no choice saved means Fill. */
+.storyMedia video { position: absolute; inset: 0; background: #000; }
 .storyImg { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; }
 .storyNav {
   position: absolute;
@@ -639,6 +645,7 @@ div.storySlot { cursor: default; }
 }
 .pulseStage .video { position: absolute; inset: 0; }
 .pulsePoster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #1A3C34; }
+.pulsePoster[data-fit="fit"] { object-fit: contain; background: transparent; }
 .pulseUnavailable {
   position: absolute;
   top: 50%;
