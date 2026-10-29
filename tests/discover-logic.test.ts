@@ -54,7 +54,7 @@ console.log("toStoryGroups");
 const sg = (stories: unknown[]) => ({ feed: [{ userId: "a", authorName: "A", authorAvatarUrl: null, stories }] });
 eq(toStoryGroups(sg([{ id: "s1", mediaUrl: "upl_y", mediaType: "video" }])), [], "drops unplayable-only group");
 eq(toStoryGroups(sg([{ id: "s1", mediaUrl: "upl_y", mediaType: "video" }, { id: "s2", mediaUrl: "https://cdn.x/a.jpg", mediaType: "image", thumbnailUrl: "" }])),
-  [{ userId: "a", authorName: "A", avatarUrl: null, stories: [{ id: "s2", mediaUrl: "https://cdn.x/a.jpg", mediaType: "image", thumbnailUrl: null }] }], "keeps playable stories");
+  [{ userId: "a", authorName: "A", avatarUrl: null, stories: [{ id: "s2", mediaUrl: "https://cdn.x/a.jpg", mediaType: "image", thumbnailUrl: null, fit: "fill", blurUrl: null }] }], "keeps playable stories");
 eq(toStoryGroups(null), [], "bad input");
 
 console.log("sortPro");
@@ -228,6 +228,29 @@ eq(parseFollowingPage(bad, undefined), { posts: [], nextOffset: 30, hasMore: tru
 eq(parseFollowingPage({ posts: [], nextOffset: 30, hasMore: true }, 30).hasMore, false, "stuck offset ends paging");
 eq(parseFollowingPage({ posts: [], nextOffset: 60, hasMore: "yes" }, 30).hasMore, false, "hasMore must be exactly true");
 eq(parseFollowingPage(null, undefined), { posts: [], nextOffset: undefined, hasMore: false }, "null body: empty, done");
+
+console.log("photo ratios: post shape");
+const sized = (o: Record<string, unknown>) => (toFeedPost(row(o)) as FeedPost).aspect;
+eq(sized({}), 0.8, "no size: 4:5");
+eq(sized({ aspectRatio: 1 }), 1, "aspectRatio used");
+eq(sized({ mediaWidth: 1920, mediaHeight: 1080 }), 1920 / 1080, "mediaWidth / mediaHeight");
+eq(sized({ aspectRatio: 0 , mediaWidth: 1080, mediaHeight: 1080 }), 1, "zero aspectRatio falls back to the size");
+eq(sized({ media: { width: 1080, height: 1350 } }), 0.8, "media {} size");
+eq(sized({ mediaWidth: 1080, mediaHeight: 1920 }), 0.8, "tall video held at 4:5");
+eq(sized({ aspectRatio: 3 }), 1.91, "very wide held at 1.91");
+eq(sized({ aspectRatio: 1, mediaItems: [{ url: "https://cdn.x/0.jpg", width: 1920, height: 1080 }, { url: "https://cdn.x/1.jpg", width: 1080, height: 1350 }] }), 1920 / 1080, "multi photo: photo 1 wins");
+eq(sized({ aspectRatio: 1, mediaItems: [{ url: "https://cdn.x/0.jpg", width: 1920, height: 1080 }] }), 1, "one item: post size, not the item");
+eq(sized({ aspectRatio: "1.5", mediaWidth: "1080" }), 0.8, "strings ignored");
+
+console.log("photo ratios: Fill / Fit");
+eq(toPulseVideo(vc())?.fit, "fill", "no choice: fill");
+eq(toPulseVideo(vc({ videoFit: "fit" }))?.fit, "fit", "fit kept");
+eq(toPulseVideo(vc({ videoFit: "FIT" }))?.fit, "fill", "anything else: fill");
+eq(toPulseVideo(vc({ videoUrl: "https://stream.mux.com/AbC123.m3u8" }))?.blurUrl, "https://image.mux.com/AbC123/thumbnail.jpg", "blur from the Mux stream");
+eq(toPulseVideo(vc({ thumbnailUrl: "https://image.mux.com/T/thumbnail.jpg" }))?.blurUrl, "https://image.mux.com/T/thumbnail.jpg", "blur prefers the thumbnail");
+eq(toPulseVideo(vc({ videoUrl: "https://cdn.x/v.mp4" }))?.blurUrl, null, "no still: null (black)");
+const st = toStoryGroups(sg([{ id: "v", mediaUrl: "https://stream.mux.com/Zz9.m3u8", mediaType: "video", thumbnailUrl: "", videoFit: "fit" }]))[0]?.stories[0];
+eq([st?.fit, st?.blurUrl], ["fit", "https://image.mux.com/Zz9/thumbnail.jpg"], "video story Fit with blur");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

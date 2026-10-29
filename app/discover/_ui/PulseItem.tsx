@@ -9,6 +9,7 @@ import { SIGN_IN_COMMENT, SIGN_IN_LIKE, SIGN_IN_SAVE, type Viewer } from "../_li
 import CommentsPanel from "./CommentsPanel";
 import FollowButton from "./FollowButton";
 import HlsVideo from "./HlsVideo";
+import FitBackdrop from "./FitBackdrop";
 import { useToggle } from "./useToggle";
 import styles from "./discover.module.css";
 
@@ -106,15 +107,16 @@ export default function PulseItem({ video, active, near, paused, muted, viewer, 
 
   return (
     <article className={styles.pulseItem} data-post-id={video.id} data-active={active ? "true" : undefined} aria-label={`Video by ${author.displayName}`}>
-      <div className={styles.pulseStage}>
+      <div className={styles.pulseStage} data-fit={video.fit}>
+        {video.fit === "fit" ? <FitBackdrop src={video.blurUrl} /> : null}
         {failed || !near ? (
           video.poster ? (
-            <img className={styles.pulsePoster} src={video.poster} alt="" loading="lazy" />
+            <img className={styles.pulsePoster} data-fit={video.fit} src={video.poster} alt="" loading="lazy" />
           ) : (
             <div className={styles.mediaPlaceholder} />
           )
         ) : (
-          <HlsVideo src={video.videoUrl} poster={video.poster} active={active} paused={paused} muted={muted} loop onTime={onTime} onError={onError} />
+          <HlsVideo src={video.videoUrl} poster={video.poster} active={active} paused={paused} muted={muted} loop fit={video.fit} onTime={onTime} onError={onError} />
         )}
         {failed ? <span className={styles.pulseUnavailable}>Video unavailable</span> : null}
 

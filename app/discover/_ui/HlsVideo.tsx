@@ -36,13 +36,15 @@ function play(video: HTMLVideoElement, muted: boolean) {
  * duration and the loop count, each time the video stops being active or goes away.
  * `onError` is called when the stream cannot play (a fatal hls.js error, or a native media error).
  */
-export default function HlsVideo({ src, poster, active, muted, loop, paused = false, onTime, onError }: {
+export default function HlsVideo({ src, poster, active, muted, loop, paused = false, fit = "fill", onTime, onError }: {
   src: string;
   poster: string | null;
   active: boolean;
   muted: boolean;
   loop: boolean;
   paused?: boolean;
+  /** Fill (cover, the default) or Fit (whole video, contain) for Pulse and video stories. */
+  fit?: "fill" | "fit";
   onTime?(watchedMs: number, durationMs: number, loops: number): void;
   onError?(): void;
 }) {
@@ -182,6 +184,7 @@ export default function HlsVideo({ src, poster, active, muted, loop, paused = fa
     <video
       ref={ref}
       className={styles.video}
+      data-fit={fit}
       poster={poster ?? undefined}
       muted={muted}
       loop={loop}

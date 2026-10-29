@@ -6,6 +6,7 @@ import { isPlayableUrl } from "@/lib/coverMedia";
 import type { StoryGroup } from "../_lib/feedLogic";
 import { clientApi } from "../_lib/clientApi";
 import HlsVideo from "./HlsVideo";
+import FitBackdrop from "./FitBackdrop";
 import { storyName } from "./StoriesBar";
 import styles from "./discover.module.css";
 
@@ -157,7 +158,10 @@ export default function StoryViewer({ groups, start, signedIn, onShown, onClose 
         </div>
         <div ref={mediaRef} className={styles.storyMedia}>
           {story.mediaType === "video" ? (
-            <HlsVideo key={story.id} src={story.mediaUrl} poster={story.thumbnailUrl} active muted={muted} loop={false} />
+            <>
+              {story.fit === "fit" ? <FitBackdrop key={`b-${story.id}`} src={story.blurUrl} /> : null}
+              <HlsVideo key={story.id} src={story.mediaUrl} poster={story.thumbnailUrl} active muted={muted} loop={false} fit={story.fit} />
+            </>
           ) : (
             <img key={story.id} className={styles.storyImg} src={story.mediaUrl} alt="" />
           )}

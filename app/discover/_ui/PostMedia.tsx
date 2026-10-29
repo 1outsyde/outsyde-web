@@ -144,7 +144,8 @@ function Carousel({ urls }: { urls: string[] }) {
  * Post media: image, carousel or feed video. A double click (mouse) or double tap
  * (touch) calls onDoubleTap; when it returns true, a heart pops over the media.
  */
-export default function PostMedia({ media, onDoubleTap }: { media: Media; onDoubleTap(): boolean }) {
+/** `aspect` is the post's shape (width / height, 4:5 to 1.91:1); the box takes it. */
+export default function PostMedia({ media, aspect, onDoubleTap }: { media: Media; aspect: number; onDoubleTap(): boolean }) {
   const [heart, setHeart] = useState(0);
   const lastTap = useRef({ t: 0, x: 0, y: 0 });
   const down = useRef({ x: 0, y: 0 });
@@ -183,7 +184,7 @@ export default function PostMedia({ media, onDoubleTap }: { media: Media; onDoub
   };
 
   return (
-    <div className={styles.media} onPointerDown={onPointerDown} onPointerUp={onPointerUp} onDoubleClick={fire}>
+    <div className={styles.media} style={{ aspectRatio: String(aspect) }} data-aspect={aspect.toFixed(3)} onPointerDown={onPointerDown} onPointerUp={onPointerUp} onDoubleClick={fire}>
       {media.kind === "image" ? <img className={styles.mediaImg} src={media.url} alt="" loading="lazy" draggable={false} /> : null}
       {media.kind === "carousel" ? <Carousel urls={media.urls} /> : null}
       {media.kind === "video" ? <FeedVideo url={media.url} poster={media.poster} /> : null}
