@@ -5,17 +5,20 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { loadStripe } from "@stripe/stripe-js";
+import { loadStripe, type Stripe, type PaymentIntentResult } from "@stripe/stripe-js";
 import {
   Elements,
   CardElement,
   AddressElement,
+  ExpressCheckoutElement,
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
 import { getCart, clearCart, subscribe, type CartItem } from "@/lib/cart";
+import { checkoutSignature, payStage, chargedCentsFrom, successQuery, shopApplePayClick, isPaid } from "./payLogic";
+import { applePayButtonOptions, applePayConfirm, applePayElementsOptions } from "@/app/e/[slug]/checkoutLogic";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "");
 
@@ -72,6 +75,18 @@ const POINT_TIERS = [
 ];
 type MyCode = { id: string; code: string; discountCents: number };
 
+/** The payment made by Continue: one PaymentIntent for exactly this order (signature) and its exact charge. */
+type Prepared = {
+  signature: string;
+  clientSecret: string;
+  chargedCents: number;
+  pointsEarned: number;
+  itemCount: number;
+  breakdown: FeeBreakdown | null;
+  orderId?: string;
+  orderGroupId?: string;
+};
+
 export default function CheckoutPage() {
   return (
     <Elements stripe={stripePromise} options={{ appearance }}>
@@ -112,7 +127,8 @@ function CheckoutForm() {
     message: string;
   } | null>(null);
 
-  const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
+  const [prepared, setPrepared] = useState<Prepared | null>(null);
+  const inFlight = useRef(false);
 
   // Use my points: the customer's codes and balance.
   const [pointsBalance, setPointsBalance] = useState(0);
@@ -177,18 +193,24 @@ function CheckoutForm() {
   const discountCents = promoResult?.valid && singleShop ? promoResult.discountCents : 0;
   const estimatedTotalCents = subtotalCents + serviceFeeCents - discountCents;
 
+  // On the payment step the server's breakdown is the truth; change the order and it's an estimate again.
+  const promoCodeIdForOrder = promoResult?.valid && singleShop ? promoResult.codeId : null;
+  const currentSignature = checkoutSignature({ items: cart, shipping: shipAddr, promoCodeId: promoCodeIdForOrder });
+  const stage = payStage(prepared, currentSignature);
+  const shownFb = stage === "payment" ? prepared?.breakdown ?? null : null;
+
   // After backend responds, show authoritative breakdown
-  const displaySubtotal = feeBreakdown
-    ? feeBreakdown.basePriceCents / 100
+  const displaySubtotal = shownFb
+    ? shownFb.basePriceCents / 100
     : subtotalCents / 100;
-  const displayFee = feeBreakdown
-    ? feeBreakdown.consumerUpchargeCents / 100
+  const displayFee = shownFb
+    ? shownFb.consumerUpchargeCents / 100
     : serviceFeeCents / 100;
-  const displayTotal = feeBreakdown
-    ? (feeBreakdown.amountChargedCents ?? feeBreakdown.totalChargedToConsumerCents) / 100
+  const displayTotal = shownFb
+    ? (shownFb.amountChargedCents ?? shownFb.totalChargedToConsumerCents) / 100
     : estimatedTotalCents / 100;
   const codeTooBig = (cents: number) => subtotalCents < cents * 10;
-  const displayPoints = feeBreakdown?.outsydePointsEarned ?? 0;
+  const displayPoints = shownFb?.outsydePointsEarned ?? 0;
 
   async function handleValidatePromo(codeOverride?: string) {
     const code = (codeOverride ?? promoCode).trim();
@@ -197,7 +219,6 @@ function CheckoutForm() {
       setPromoResult({ valid: false, discountCents: 0, codeId: "", message: "Codes work on orders from one shop. Check out each shop separately to use one." });
       return;
     }
-    setFeeBreakdown(null);
     setPromoValidating(true);
     setPromoResult(null);
     try {
@@ -257,9 +278,10 @@ function CheckoutForm() {
     }
   }
 
-  async function handlePay() {
+  /** Continue to payment: check the details, then the backend creates the order and its PaymentIntent. No charge yet. */
+  async function handleContinue() {
     setError("");
-    if (!stripe || !elements) return;
+    if (!stripe || !elements || inFlight.current) return;
     if (!f.email.includes("@")) return setError("Please enter a valid email.");
     if (!f.phone.trim()) return setError("Please enter a phone number.");
     if (!shipComplete || !shipAddr) return setError("Please complete your shipping address.");
@@ -267,6 +289,7 @@ function CheckoutForm() {
     if (!cart.length) return setError("Your cart is empty.");
 
     setProcessing(true);
+    const signatureAtStart = currentSignature;
     try {
       const sv = shipAddr;
 
@@ -288,7 +311,7 @@ function CheckoutForm() {
             state: sv.address.state,
             zipCode: sv.address.postal_code,
           },
-          ...(promoResult?.valid && singleShop ? { promoCodeId: promoResult.codeId } : {}),
+          ...(promoCodeIdForOrder ? { promoCodeId: promoCodeIdForOrder } : {}),
         }),
       });
 
@@ -330,18 +353,45 @@ function CheckoutForm() {
         return;
       }
 
-      if (fb) setFeeBreakdown(fb);
+      setPrepared({
+        signature: signatureAtStart,
+        clientSecret,
+        chargedCents: chargedCentsFrom(fb, estimatedTotalCents),
+        pointsEarned: fb?.outsydePointsEarned ?? 0,
+        itemCount: cart.reduce((n, i) => n + i.qty, 0),
+        breakdown: fb ?? null,
+        orderId,
+        orderGroupId,
+      });
+      setProcessing(false);
+    } catch {
+      setError("Something went wrong. Please try again.");
+      setProcessing(false);
+    }
+  }
 
-      // Step 2 — Confirm card payment
-      const ba = billingSame ? sv : (billAddr as AddrValue);
-      const card = elements.getElement(CardElement);
-      if (!card) {
-        setError("Card field not ready.");
-        setProcessing(false);
-        return;
-      }
+  /** Paid: empty the cart and show the order, the same for card and Apple Pay. */
+  function finish(p: Prepared) {
+    clearCart();
+    router.push(`/order-success?${successQuery({ itemCount: p.itemCount, totalCharged: p.chargedCents, pointsEarned: p.pointsEarned, orderId: p.orderId, orderGroupId: p.orderGroupId })}`);
+  }
 
-      const result = await stripe.confirmCardPayment(clientSecret, {
+  /** Pay the prepared order by card (same confirmCardPayment call as before Apple Pay). */
+  async function handlePayByCard() {
+    setError("");
+    if (!stripe || !elements || !prepared || stage !== "payment" || inFlight.current) return;
+    const card = elements.getElement(CardElement);
+    if (!card) {
+      setError("Card field not ready.");
+      return;
+    }
+    const p = prepared;
+    const sv = shipAddr as AddrValue;
+    const ba = billingSame ? sv : (billAddr as AddrValue);
+    inFlight.current = true;
+    setProcessing(true);
+    try {
+      const result = await stripe.confirmCardPayment(p.clientSecret, {
         payment_method: {
           card,
           billing_details: {
@@ -377,26 +427,44 @@ function CheckoutForm() {
       }
 
       if (result.paymentIntent?.status === "succeeded") {
-        const itemCount = cart.reduce((n, i) => n + i.qty, 0);
-        const totalCharged = fb?.amountChargedCents ?? fb?.totalChargedToConsumerCents ?? estimatedTotalCents;
-        const pointsEarned = fb?.outsydePointsEarned ?? 0;
-        clearCart();
-        const params = new URLSearchParams({
-          itemCount: String(itemCount),
-          totalCharged: String(totalCharged),
-          pointsEarned: String(pointsEarned),
-          ...(orderId ? { orderId } : {}),
-          ...(orderGroupId ? { orderGroupId } : {}),
-        });
-        router.push(`/order-success?${params.toString()}`);
+        finish(p);
       } else {
         setProcessing(false);
       }
     } catch {
       setError("Something went wrong. Please try again.");
       setProcessing(false);
+    } finally {
+      inFlight.current = false;
     }
   }
+
+  /** Apple Pay asks before its sheet opens: only on the payment step with nothing else paying. */
+  function canStartApplePay(): boolean {
+    return shopApplePayClick({ inFlight: inFlight.current, stage }) === "resolve";
+  }
+  /** Apple Pay authorized: take the lock (released by endApplePay). False = something else is already paying. */
+  function lockApplePay(): boolean {
+    if (applePayConfirm({ inFlight: inFlight.current }) === "fail") return false;
+    inFlight.current = true;
+    setError("");
+    setProcessing(true);
+    return true;
+  }
+  function endApplePay() {
+    inFlight.current = false;
+  }
+  /** Apple Pay answer: paid goes to the order page; anything else stays on the payment step with a message. */
+  function onApplePayResult(result: PaymentIntentResult | null) {
+    if (isPaid(result) && prepared) {
+      finish(prepared);
+      return;
+    }
+    setError(result?.error?.message || "Apple Pay didn't go through. Try again or pay with card.");
+    setProcessing(false);
+  }
+
+  const applePayOptions = stage === "payment" && prepared ? applePayElementsOptions(prepared.chargedCents) : null;
 
   return (
     <>
@@ -464,6 +532,7 @@ function CheckoutForm() {
 .pay{width:100%;padding:1.05rem;background:var(--emerald);color:var(--gold);border:1px solid var(--emerald-light);border-radius:8px;font-family:'Bebas Neue';font-size:1.2rem;letter-spacing:3px;cursor:pointer;transition:background .2s,opacity .2s;margin-bottom:1rem;}
 .pay:hover{background:var(--emerald-light);}
 .pay:disabled{opacity:.5;cursor:not-allowed;}
+.ap-or{text-align:center;color:var(--muted);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;margin:.75rem 0 1.25rem;}
 .secure{text-align:center;color:#555;font-size:.72rem;}
 .refund-note{font-size:.7rem;color:var(--muted);margin-top:1rem;line-height:1.7;text-align:center;}
 .empty{text-align:center;padding:5rem 1.5rem;color:var(--muted);}
@@ -663,6 +732,21 @@ function CheckoutForm() {
               )}
             </div>
 
+            {applePayOptions && prepared && (
+              <ShopApplePayBox
+                stripe={stripe}
+                options={applePayOptions}
+                clientSecret={prepared.clientSecret}
+                shipping={shipAddr as AddrValue}
+                email={f.email}
+                phone={f.phone}
+                canStart={canStartApplePay}
+                lock={lockApplePay}
+                onEnd={endApplePay}
+                onResult={onApplePayResult}
+              />
+            )}
+
             {/* Card Details */}
             <div className="sec">
               <div className="label-sec">Card Details</div>
@@ -688,13 +772,23 @@ function CheckoutForm() {
 
             {error && <div className="gen-err">{error}</div>}
 
-            <button
-              className="pay"
-              onClick={handlePay}
-              disabled={!stripe || processing}
-            >
-              {processing ? "Processing…" : `Pay $${displayTotal.toFixed(2)}`}
-            </button>
+            {stage === "payment" ? (
+              <button
+                className="pay"
+                onClick={handlePayByCard}
+                disabled={!stripe || processing}
+              >
+                {processing ? "Processing…" : `Pay $${displayTotal.toFixed(2)} by card`}
+              </button>
+            ) : (
+              <button
+                className="pay"
+                onClick={handleContinue}
+                disabled={!stripe || processing}
+              >
+                {processing ? "Getting your total…" : "Continue to payment"}
+              </button>
+            )}
 
             <p className="secure">🔒 Payments secured by Stripe. Your card details never touch our servers.</p>
 
@@ -708,5 +802,108 @@ function CheckoutForm() {
         )}
       </div>
     </>
+  );
+}
+
+interface ShopApplePayProps {
+  stripe: Stripe | null;
+  options: { mode: "payment"; amount: number; currency: "usd" };
+  clientSecret: string;
+  shipping: AddrValue;
+  email: string;
+  phone: string;
+  canStart: () => boolean;
+  lock: () => boolean;
+  onEnd: () => void;
+  onResult: (result: PaymentIntentResult | null) => void;
+}
+
+/**
+ * Apple Pay for the shop (2026-10-29), in its own Elements group so the address and card boxes stay as they were.
+ * Shows only where Stripe says Apple Pay is available. Amount = the server's charge for the prepared order.
+ */
+function ShopApplePayBox(props: ShopApplePayProps) {
+  const [shown, setShown] = useState(false);
+  return (
+    // Hidden with visibility, not display:none, so Stripe can size the button while it checks availability.
+    <div
+      aria-hidden={!shown}
+      style={shown ? undefined : { visibility: "hidden", height: 0, overflow: "hidden" }}
+    >
+      <div className="sec" style={{ marginBottom: 0 }}>
+        <div className="label-sec">Express Checkout</div>
+        <Elements stripe={props.stripe} options={{ ...props.options, appearance }}>
+          <ShopApplePayButton {...props} onShown={setShown} />
+        </Elements>
+      </div>
+      <div className="ap-or">Or pay with card</div>
+    </div>
+  );
+}
+
+function ShopApplePayButton({ clientSecret, shipping, email, phone, canStart, lock, onEnd, onResult, onShown }: ShopApplePayProps & { onShown: (shown: boolean) => void }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  return (
+    <ExpressCheckoutElement
+      options={applePayButtonOptions()}
+      onReady={(e) => onShown(!!e.availablePaymentMethods?.applePay)}
+      onAvailablePaymentMethodsChange={(e) => onShown(!!e.paymentMethods?.applePay?.available)}
+      onClick={(e) => {
+        // Always answer: open the sheet, or refuse it when the order changed or a card payment is running.
+        if (canStart()) e.resolve();
+        else e.reject();
+      }}
+      onConfirm={async (ev) => {
+        if (!stripe || !elements || !lock()) {
+          ev.paymentFailed({ reason: "fail" });
+          return;
+        }
+        try {
+          const { error: submitError } = await elements.submit();
+          if (submitError) {
+            ev.paymentFailed({ reason: "fail" });
+            onResult({ error: submitError } as PaymentIntentResult);
+            return;
+          }
+          let result: PaymentIntentResult | null = null;
+          try {
+            result = await stripe.confirmPayment({
+              elements,
+              clientSecret,
+              confirmParams: {
+                return_url: `${window.location.origin}/checkout`,
+                // Apple Pay fills the billing name and address; email and phone come from the form when it doesn't.
+                payment_method_data: { billing_details: { email, phone } },
+                shipping: {
+                  name: shipping.name,
+                  phone,
+                  address: {
+                    line1: shipping.address.line1,
+                    city: shipping.address.city,
+                    state: shipping.address.state,
+                    postal_code: shipping.address.postal_code,
+                    country: shipping.address.country,
+                  },
+                },
+              },
+              redirect: "if_required",
+            });
+          } catch {
+            // The charge may have gone through: ask Stripe before saying it failed.
+            try {
+              const r = await stripe.retrievePaymentIntent(clientSecret);
+              result = r.paymentIntent ? ({ paymentIntent: r.paymentIntent } as PaymentIntentResult) : null;
+            } catch {
+              result = null;
+            }
+          }
+          if (!isPaid(result)) ev.paymentFailed({ reason: "fail" });
+          onResult(result);
+        } finally {
+          onEnd();
+        }
+      }}
+    />
   );
 }
