@@ -20,7 +20,7 @@ import type { EventInfo, TicketType } from "./types";
 import AppGetBlock from "./AppGetBlock";
 import { GENERIC_ERROR, failureCopy, money, newKey, startLine } from "../_shared/format";
 import {
-  afterRetrieve, applePayButtonOptions, applePayElementsOptions, canOpenApplePay, confirmOutcome, entryDecision, holdPhase, lateCopy, paramsKey, parseSaved, phaseForOrder, shouldQuietRestart, unavailableFrom, storageAfterPhase, storageKey,
+  afterRetrieve, applePayButtonOptions, applePayClick, applePayConfirm, applePayElementsOptions, confirmOutcome, entryDecision, holdPhase, lateCopy, paramsKey, parseSaved, phaseForOrder, shouldQuietRestart, unavailableFrom, storageAfterPhase, storageKey,
   type Entry, type Phase, type PiStatus, type Saved,
 } from "./checkoutLogic";
 
@@ -608,9 +608,13 @@ function PayForm({ hold, type, qty, remaining, paying, stripe: stripeInstance, o
     }
   }
 
-  /** Apple Pay asks before it opens its sheet: only while held and idle, and never twice at once. */
-  function startApplePay(): boolean {
-    if (inFlight.current || !canOpenApplePay({ paying, remainingMs: remaining })) return false;
+  /** Apple Pay asks before its sheet opens: only while held and idle. No lock yet (see applePayClick). */
+  function canStartApplePay(): boolean {
+    return applePayClick({ inFlight: inFlight.current, paying, remainingMs: remaining }) === "resolve";
+  }
+  /** Apple Pay authorized: take the lock now, released by endApplePay. False = something else is already paying. */
+  function lockApplePay(): boolean {
+    if (applePayConfirm({ inFlight: inFlight.current }) === "fail") return false;
     inFlight.current = true;
     setError("");
     return true;
@@ -676,7 +680,8 @@ function PayForm({ hold, type, qty, remaining, paying, stripe: stripeInstance, o
             stripe={stripeInstance}
             options={applePayOptions}
             clientSecret={hold.clientSecret}
-            onStart={startApplePay}
+            canStart={canStartApplePay}
+            lock={lockApplePay}
             onEnd={endApplePay}
             onPaying={onPaying}
             onFailed={(message) => { setError(message); onFailed(); }}
@@ -713,7 +718,8 @@ interface ApplePayProps {
   stripe: Stripe | null;
   options: { mode: "payment"; amount: number; currency: "usd" };
   clientSecret: string;
-  onStart: () => boolean;
+  canStart: () => boolean;
+  lock: () => boolean;
   onEnd: () => void;
   onPaying: () => void;
   onFailed: (message: string) => void;
@@ -728,7 +734,13 @@ interface ApplePayProps {
 function ApplePayBox(props: ApplePayProps) {
   const [shown, setShown] = useState(false);
   return (
-    <div style={{ display: shown ? "flex" : "none", flexDirection: "column", gap: 10 }}>
+    // Hidden with visibility, not display:none, so Stripe can size the button while it waits to know if Apple Pay is available.
+    <div
+      aria-hidden={!shown}
+      style={shown
+        ? { display: "flex", flexDirection: "column", gap: 10 }
+        : { display: "flex", flexDirection: "column", gap: 10, visibility: "hidden", height: 0, overflow: "hidden" }}
+    >
       <Elements stripe={props.stripe} options={{ ...props.options, appearance, fonts: [{ cssSrc: FONTS_CSS }] }}>
         <ApplePayButton {...props} onShown={setShown} />
       </Elements>
@@ -737,24 +749,29 @@ function ApplePayBox(props: ApplePayProps) {
   );
 }
 
-function ApplePayButton({ clientSecret, onStart, onEnd, onPaying, onFailed, onResult, onShown }: ApplePayProps & { onShown: (shown: boolean) => void }) {
+function ApplePayButton({ clientSecret, canStart, lock, onEnd, onPaying, onFailed, onResult, onShown }: ApplePayProps & { onShown: (shown: boolean) => void }) {
   const stripe = useStripe();
   const elements = useElements();
   return (
     <ExpressCheckoutElement
       options={applePayButtonOptions()}
       onReady={(e) => onShown(!!e.availablePaymentMethods?.applePay)}
+      onAvailablePaymentMethodsChange={(e) => onShown(!!e.paymentMethods?.applePay?.available)}
       onClick={(e) => {
-        // Not resolving keeps the sheet closed: the hold ended or a payment is already running.
-        if (onStart()) e.resolve();
+        // Always answer: open the sheet, or refuse it when the hold ended or a card payment is running.
+        if (canStart()) e.resolve();
+        else e.reject();
       }}
-      onCancel={() => onEnd()}
-      onConfirm={async () => {
-        if (!stripe || !elements) { onEnd(); return; }
+      onConfirm={async (ev) => {
+        if (!stripe || !elements || !lock()) {
+          ev.paymentFailed({ reason: "fail" });
+          return;
+        }
         onPaying();
         try {
           const { error: submitError } = await elements.submit();
           if (submitError) {
+            ev.paymentFailed({ reason: "fail" });
             onFailed(submitError.message || "Apple Pay couldn't start. Try again or pay with card.");
             return;
           }
@@ -769,6 +786,7 @@ function ApplePayButton({ clientSecret, onStart, onEnd, onPaying, onFailed, onRe
           } catch {
             result = null;
           }
+          if (!result || result.error) ev.paymentFailed({ reason: "fail" });
           await onResult(stripe, result);
         } finally {
           onEnd();

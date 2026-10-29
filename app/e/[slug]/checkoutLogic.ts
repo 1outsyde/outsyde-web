@@ -183,3 +183,17 @@ export function applePayButtonOptions() {
 export function canOpenApplePay(s: { paying: boolean; remainingMs: number }): boolean {
   return !s.paying && s.remainingMs > 0;
 }
+
+/**
+ * Apple Pay click: the sheet must be answered within a second, so always resolve or reject, never leave it waiting.
+ * No lock is taken here: the lock starts at confirm, so a sheet that closes without a cancel event can't leave the
+ * card Pay button dead.
+ */
+export function applePayClick(s: { inFlight: boolean; paying: boolean; remainingMs: number }): "resolve" | "reject" {
+  return !s.inFlight && canOpenApplePay(s) ? "resolve" : "reject";
+}
+
+/** Apple Pay authorized: pay only if nothing else is paying; otherwise tell the sheet it failed. */
+export function applePayConfirm(s: { inFlight: boolean }): "start" | "fail" {
+  return s.inFlight ? "fail" : "start";
+}

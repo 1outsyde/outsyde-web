@@ -3,7 +3,7 @@ import { money as fmtMoney, errorCopy as sharedErr, clampQty as clampQ } from ".
 import {
   hasStarted,
   phaseForOrder, holdPhase, entryDecision, paramsKey, confirmOutcome, afterRetrieve, lateCopy, storageKey, parseSaved, storageAfterPhase, shouldQuietRestart, unavailableFrom,
-  applePayElementsOptions, applePayButtonOptions, canOpenApplePay,
+  applePayElementsOptions, applePayButtonOptions, canOpenApplePay, applePayClick, applePayConfirm,
 } from "../app/e/[slug]/checkoutLogic";
 
 let passed = 0, failed = 0;
@@ -138,6 +138,11 @@ eq(canOpenApplePay({ paying: false, remainingMs: 60_000 }), true, "held and idle
 eq(canOpenApplePay({ paying: true, remainingMs: 60_000 }), false, "a payment is already running: no second one");
 eq(canOpenApplePay({ paying: false, remainingMs: 0 }), false, "hold ended: no Apple Pay");
 eq(canOpenApplePay({ paying: false, remainingMs: -1 }), false, "hold past due: no Apple Pay");
+eq(applePayClick({ inFlight: false, paying: false, remainingMs: 60_000 }), "resolve", "click while held and idle: open the sheet");
+eq(applePayClick({ inFlight: true, paying: false, remainingMs: 60_000 }), "reject", "card payment running: refuse the sheet (reject, never leave it hanging)");
+eq(applePayClick({ inFlight: false, paying: false, remainingMs: 0 }), "reject", "hold ended: refuse the sheet");
+eq(applePayConfirm({ inFlight: false }), "start", "authorized and nothing else running: take the lock and pay");
+eq(applePayConfirm({ inFlight: true }), "fail", "something already paying: tell the sheet it failed");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
