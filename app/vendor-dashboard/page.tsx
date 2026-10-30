@@ -923,7 +923,9 @@ export default function VendorDashboardPage() {
                           })()}
                         </div>
 
-                        {(o.status === "paid" || o.status === "pending") && (
+                        {/* Paid orders only. A pending order is an unpaid checkout: nothing to
+                            refund, and the backend refuses cancelling it (409 ORDER_NOT_PAID). */}
+                        {o.status === "paid" && (
                           <div className="order-actions">
                             {o.status === "paid" && (
                               <button
