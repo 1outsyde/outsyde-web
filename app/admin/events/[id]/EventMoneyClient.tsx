@@ -356,6 +356,9 @@ export default function EventMoneyClient({ id }: { id: string }) {
                 <div className="aem-kv">
                   <div><span>Earned when the payout was made</span><span>{usd(payout.grossCents)}</span></div>
                   <div><span>Taken back for an earlier refund</span><span>{usd(payout.deductedCents)}</span></div>
+                  {typeof payout.teamCents === "number" ? (
+                    <div data-testid="aem-payout-team"><span>Paid to the event team</span><span>{usd(payout.teamCents)}</span></div>
+                  ) : null}
                   <div><span>Due</span><span>{dayLong(payout.dueAt) || "Not set"}</span></div>
                   {payout.paidAt ? <div><span>Paid</span><span>{dayLong(payout.paidAt)}</span></div> : null}
                   <div><span>Tries</span><span>{payout.attempts}</span></div>

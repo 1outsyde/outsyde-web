@@ -29,6 +29,8 @@ export interface AdminEventPayout {
   grossCents: number;
   amountCents: number;
   deductedCents: number;
+  /** Event team pay taken from this payout (backend 4b-1). Missing on older backends. */
+  teamCents?: number;
   attempts: number;
   lastError: string | null;
   holdReason: "no_account" | "not_complete" | "stripe_not_ready" | "event_paused" | null;
