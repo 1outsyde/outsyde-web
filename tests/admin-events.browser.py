@@ -410,6 +410,10 @@ try:
         check("Early" in tt and "Total" in tt and "$60.00" in tt, "detail shows ticket types with a total row", tt)
         pc = pg.locator("[data-testid='aem-payout-card']").inner_text()
         check("$58.46" in pc and "acct_••••4f2a" in pc and "acct_1TEST" not in pg.content(), "payout card shows the amount and a masked account", pc)
+        # p4-team 4b-1: the team pay taken from the payout, so earned, taken back, team and payout add up.
+        team_line = pg.locator("[data-testid='aem-payout-team']")
+        check(team_line.count() == 1 and "Paid to the event team" in team_line.inner_text() and "$0.00" in team_line.inner_text(),
+              "payout card shows the team pay line", team_line.inner_text() if team_line.count() else None)
         check("Payout set to try again by @" in pg.locator("[data-testid='aem-activity']").inner_text(), "activity lists the retry")
         head_pill = pg.locator("[data-testid='aem-payout-pill']").inner_text().strip()
         card_pill = pg.locator("[data-testid='aem-payout-card-pill']").inner_text().strip()
