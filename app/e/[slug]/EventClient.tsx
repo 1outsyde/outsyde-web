@@ -11,6 +11,7 @@ import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/app-stores";
 import QuickAuthSheet, { type QuickPurpose } from "./QuickAuthSheet";
 import AppGetBlock from "./AppGetBlock";
 import { pendingReturnPath, type Pending, type QuickMode } from "./quickAuthLogic";
+import { browserStorage, readRef, rememberRefFromUrl, withLinkCode } from "./promoterRef";
 
 const whenLine = rangeLine;
 
@@ -102,6 +103,14 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
   }, [load]);
 
   const e = data?.event ?? null;
+
+  // Event team step 3: a promoter link (`?ref=`) is saved for this event when the page opens, because later steps
+  // (checkout, the sign in sheet, /login, /claim) drop the query. The last link opened wins; kept 7 days.
+  const eventId = e?.id ?? null;
+  useEffect(() => {
+    if (!eventId) return;
+    try { rememberRefFromUrl(browserStorage(), eventId, window.location.search, Date.now()); } catch { /* never breaks the page */ }
+  }, [eventId]);
   const followTarget = e && !e.viewerIsHost ? e.host.followId ?? null : null;
 
   // Follow state doubles as the signed-in probe: 401 means signed out.
@@ -242,7 +251,7 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
       const res = await fetch(`/api/events/${e.id}/rsvp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticketTypeId: t.id, quantity: count, idempotencyKey: keyRef.current }),
+        body: JSON.stringify(withLinkCode({ ticketTypeId: t.id, quantity: count, idempotencyKey: keyRef.current }, readRef(browserStorage(), e.id, Date.now()))),
       });
       if (res.status === 401) {
         // Signed out or the token expired: the sheet signs them in, then the same RSVP (same key) is sent.

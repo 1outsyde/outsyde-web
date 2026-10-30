@@ -18,6 +18,7 @@ import { loadStripe, type Stripe, type PaymentIntentResult } from "@stripe/strip
 import { Elements, CardElement, ExpressCheckoutElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import type { EventInfo, TicketType } from "./types";
 import AppGetBlock from "./AppGetBlock";
+import { browserStorage, readRef, withLinkCode } from "./promoterRef";
 import { GENERIC_ERROR, failureCopy, money, newKey, startLine } from "../_shared/format";
 import {
   afterRetrieve, applePayButtonOptions, applePayClick, applePayConfirm, applePayElementsOptions, confirmOutcome, entryDecision, holdPhase, lateCopy, paramsKey, parseSaved, phaseForOrder, shouldQuietRestart, unavailableFrom, storageAfterPhase, storageKey,
@@ -245,7 +246,8 @@ export default function Checkout({ slug, event, type, qty, onPaid, onFinished, o
         const res = await fetch(`/api/events/${encodeURIComponent(event.id)}/checkout`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ticketTypeId: type.id, quantity: qty, idempotencyKey: attempt.key }),
+          // Event team step 3: the promoter link remembered for this event (saved when the event page opened).
+          body: JSON.stringify(withLinkCode({ ticketTypeId: type.id, quantity: qty, idempotencyKey: attempt.key }, readRef(browserStorage(), event.id, Date.now()))),
         });
         if (cancelled) return;
         if (res.status === 401) {
