@@ -141,6 +141,8 @@ export default function TicketsPage() {
                 return (
                   <div key={t.id} className="tk-block">
                     <article className="tk-card">
+                      {/* 4:5 flyer beside the event name (photo ratios 3c). */}
+                      <div className="tk-top">
                       {cover ? (
                         <img className="tk-cover" src={cover} alt="" />
                       ) : (
@@ -154,6 +156,7 @@ export default function TicketsPage() {
                           {place.lines.length > 0 && <div>{place.lines.join(", ")}</div>}
                           {place.note && <div>{place.note}</div>}
                         </div>
+                      </div>
                       </div>
                       <div className="tk-qrbox">
                         {qr ? (
@@ -254,9 +257,10 @@ body{background:#0B0B0B;margin:0}
 .tk-muted{font-size:14px;color:#B8B0A0}
 .tk-block{display:flex;flex-direction:column;gap:6px}
 .tk-card{background:#F5F0E6;color:#0B0B0B;border-radius:22px;overflow:hidden}
-.tk-cover{display:block;width:100%;height:92px;object-fit:cover}
+.tk-top{display:flex;gap:14px;align-items:flex-start;padding:16px 18px 6px}
+.tk-cover{display:block;width:64px;height:80px;flex:0 0 64px;border-radius:12px;object-fit:cover}
 .tk-cover-plain{background:#1A3C34}
-.tk-info{padding:16px 18px 6px;display:flex;flex-direction:column;gap:4px}
+.tk-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
 .tk-title{font-family:'Bebas Neue',sans-serif;font-size:28px;line-height:1;margin:0;font-weight:400;overflow-wrap:anywhere}
 .tk-card .tk-title a{color:#0B0B0B}
 .tk-cancelled{font-size:12px;font-weight:700;color:#9B2C2C}
@@ -286,7 +290,7 @@ body{background:#0B0B0B;margin:0}
 .tk-past{margin-top:22px}
 .tk-past summary{font-size:12px;font-weight:700;color:#B8B0A0;letter-spacing:1px;text-transform:uppercase;cursor:pointer;min-height:44px;display:flex;align-items:center}
 .tk-row{display:flex;gap:12px;background:#141414;border:1px solid #2A2A2A;border-radius:16px;padding:10px;align-items:center}
-.tk-thumb{width:60px;height:60px;border-radius:10px;background:#2E2A1E;flex-shrink:0;object-fit:cover}
+.tk-thumb{width:48px;height:60px;border-radius:10px;background:#2E2A1E;flex-shrink:0;object-fit:cover}
 .tk-rowdate{font-size:12px;font-weight:700;color:#E8B930}
 .tk-rowtitle{font-family:'Bebas Neue',sans-serif;font-size:20px;line-height:1.1;overflow-wrap:anywhere}
 .tk-small-d{font-size:12px;color:#B8B0A0}

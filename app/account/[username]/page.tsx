@@ -146,7 +146,8 @@ export default function PublicProfilePage() {
     <div className="min-h-screen bg-[#0F0F0F]">
 
       {/* ── Cover media ───────────────────────────────────────────────────── */}
-      <div className="relative w-full h-56 bg-[#1A1A1A] overflow-hidden">
+      {/* Covers are 16:9 (photo ratios 3c), kept inside the page column on wide screens. */}
+      <div className="relative w-full max-w-[988px] mx-auto aspect-video bg-[#1A1A1A] overflow-hidden">
         {coverIsVideo ? (
           <CoverVideo
             src={user.coverMediaUrl}

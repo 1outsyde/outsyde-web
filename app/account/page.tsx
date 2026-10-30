@@ -176,8 +176,9 @@ export default function AccountPage() {
       color: rgba(245,240,230,0.5); font-size: 15px; cursor: pointer;
     }
 
+    /* Covers are 16:9 (photo ratios 3c), kept inside the page column on wide screens. */
     .cover {
-      position: relative; width: 100%; height: 280px;
+      position: relative; width: 100%; max-width: 988px; margin: 0 auto; aspect-ratio: 16 / 9;
       background: linear-gradient(120deg, #1A1208 0%, #0D0D00 100%);
       overflow: hidden;
     }
