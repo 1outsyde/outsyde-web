@@ -83,6 +83,8 @@ def run_stub(port):
                 if slug in (PAID, FREE):
                     return self._send(200, event_payload(slug))
                 return self._send(404, {"success": False, "error": {"code": "EVENT_NOT_FOUND", "message": "Event not found."}})
+            if self.path.startswith("/api/stripe/config"):
+                return self._send(200, {"publishableKey": "pk_test_promoter_ref"})
             if self._authed() and self.path.startswith("/api/auth/me"):
                 return self._send(200, {"user": {"id": "u-1", "email": "x@y.z"}})
             return self._send(401, {"success": False, "error": "Unauthorized"})
@@ -136,15 +138,39 @@ def reset():
     urllib.request.urlopen(f"{STUB}/__reset").read()
 
 
+def posts(suffix):
+    return [c for c in json.loads(urllib.request.urlopen(f"{STUB}/__log").read()) if c["p"].endswith(suffix)]
+
+
 def rsvps():
-    return [c for c in json.loads(urllib.request.urlopen(f"{STUB}/__log").read()) if c["p"].endswith("/rsvp")]
+    return posts("/rsvp")
 
 
-def new_context(b):
+# A stand in for Stripe.js (the sandbox can't reach js.stripe.com): enough for loadStripe and the hold request.
+FAKE_STRIPE = """
+window.Stripe = function () {
+  const el = { mount() {}, unmount() {}, destroy() {}, on() {}, off() {}, update() {}, focus() {}, blur() {}, clear() {} };
+  return {
+    _registerWrapper() {},
+    registerAppInfo() {},
+    elements() { return { create() { return el; }, getElement() { return null; }, update() {}, on() {}, fetchUpdates() { return Promise.resolve({}); }, submit() { return Promise.resolve({}); } }; },
+    confirmCardPayment() { return Promise.resolve({}); },
+    confirmPayment() { return Promise.resolve({}); },
+    retrievePaymentIntent() { return Promise.resolve({}); },
+  };
+};
+window.Stripe.version = 3;
+"""
+
+
+def new_context(b, fake_stripe=False):
     c = b.new_context(viewport={"width": 390, "height": 844}, color_scheme="dark")
     c.route("**/fonts.googleapis.com/**", lambda r: r.abort())
     c.route("**/fonts.gstatic.com/**", lambda r: r.abort())
-    c.route("**/js.stripe.com/**", lambda r: r.abort())
+    if fake_stripe:
+        c.route("**/js.stripe.com/**", lambda r: r.fulfill(status=200, content_type="application/javascript", body=FAKE_STRIPE))
+    else:
+        c.route("**/js.stripe.com/**", lambda r: r.abort())
     return c
 
 
@@ -254,7 +280,57 @@ with sync_playwright() as pw:
     rsvp_signing_in(pg)
     rs = rsvps()
     check(len(rs) == 1, "the RSVP still goes through", rs)
+    check(len(rs) == 1 and rs[0]["body"].get("linkCode") == "ABCD2345", "same visit still sends the code (kept in memory)", rs)
     check(not any("SecurityError" in e for e in errors), "no page error from storage", errors)
+    c.close()
+
+    print("paid checkout request carries the code (with a stand in Stripe.js)")
+    reset()
+    c = new_context(b, fake_stripe=True); pg = c.new_page()
+    visit(pg, f"/e/{PAID}?ref=ABCD2345")
+    pg.click(".ev-cta")
+    pg.wait_for_selector("[data-testid=quick-auth-sheet]", timeout=15000)
+    pg.click("text=Already have an account? Log in")
+    pg.fill("#qa-email", "maya@email.com")
+    pg.fill("#qa-pass", GOOD_PASS)
+    pg.click(".qa-cta")
+    pg.wait_for_url(f"**checkout={TT_PAID}**", timeout=15000)
+    for _ in range(40):
+        if posts("/checkout"):
+            break
+        pg.wait_for_timeout(250)
+    co = posts("/checkout")
+    check(len(co) >= 1 and co[0]["body"].get("linkCode") == "ABCD2345" and co[0]["body"].get("ticketTypeId") == TT_PAID,
+          "the checkout request carries the code", co)
+
+    print("opened straight at checkout with a new link: that link is sent")
+    reset()
+    pg.goto(f"{WEB}/e/{PAID}?ref=WXYZ6789&checkout={TT_PAID}&qty=1")
+    for _ in range(60):
+        if posts("/checkout"):
+            break
+        pg.wait_for_timeout(250)
+    co = posts("/checkout")
+    check(len(co) >= 1 and co[0]["body"].get("linkCode") == "WXYZ6789", "direct checkout link: newest code sent", co)
+    c.close()
+
+    print("paid checkout with no code: same three fields as before")
+    reset()
+    c = new_context(b, fake_stripe=True); pg = c.new_page()
+    visit(pg, f"/e/{PAID}")
+    pg.click(".ev-cta")
+    pg.wait_for_selector("[data-testid=quick-auth-sheet]", timeout=15000)
+    pg.click("text=Already have an account? Log in")
+    pg.fill("#qa-email", "maya@email.com")
+    pg.fill("#qa-pass", GOOD_PASS)
+    pg.click(".qa-cta")
+    pg.wait_for_url(f"**checkout={TT_PAID}**", timeout=15000)
+    for _ in range(40):
+        if posts("/checkout"):
+            break
+        pg.wait_for_timeout(250)
+    co = posts("/checkout")
+    check(len(co) >= 1 and sorted(co[0]["body"].keys()) == ["idempotencyKey", "quantity", "ticketTypeId"], "no linkCode key on checkout", co)
     c.close()
     b.close()
 

@@ -88,11 +88,22 @@ eq(readRef(s3, EV, T0), null, "saved in the future (clock moved back): nothing")
 s3.raw.set(refStorageKey(EV), JSON.stringify({ code: "ABCD2345" }));
 eq(readRef(s3, EV, T0), null, "no time: nothing");
 
-console.log("storage missing or throwing never breaks the page");
-eq(rememberRefFromUrl(null, EV, "?ref=ABCD2345", T0), "ABCD2345", "no storage: code still read from the address");
-eq(readRef(null, EV, T0), null, "no storage: nothing to read");
-eq(rememberRefFromUrl(throwing, EV, "?ref=ABCD2345", T0), "ABCD2345", "throwing storage: no throw");
-eq(readRef(throwing, EV, T0), null, "throwing storage read: null, no throw");
+console.log("storage missing or throwing never breaks the page, and this visit still counts");
+const EVN = "aaaaaaaa-2222-3333-4444-555555555555";
+const EVT = "bbbbbbbb-2222-3333-4444-555555555555";
+eq(readRef(null, EVN, T0), null, "no storage, nothing opened yet: nothing");
+eq(rememberRefFromUrl(null, EVN, "?ref=ABCD2345", T0), "ABCD2345", "no storage: code still read from the address");
+eq(readRef(null, EVN, T0 + 60000), "ABCD2345", "no storage: kept in memory for this visit");
+eq(readRef(null, EVT, T0 + 60000), null, "no storage: not for another event");
+eq(readRef(null, EVN, T0 + 7 * DAY), null, "no storage: memory also stops at 7 days");
+eq(rememberRefFromUrl(throwing, EVT, "?ref=WXYZ6789", T0), "WXYZ6789", "throwing storage: no throw");
+eq(readRef(throwing, EVT, T0 + 1000), "WXYZ6789", "throwing storage: kept in memory for this visit, no throw");
+eq(rememberRefFromUrl(throwing, EVT, "?ref=ABCD2345", T0 + 2000), "ABCD2345", "throwing storage: last link still wins");
+eq(readRef(throwing, EVT, T0 + 3000), "ABCD2345", "throwing storage: reads the last one");
+const s5 = memStorage();
+rememberRefFromUrl(s5, EVT, "?ref=ABCD2345", T0);
+s5.raw.delete(refStorageKey(EVT));
+eq(readRef(s5, EVT, T0 + 1000), null, "working storage is the source of truth (cleared there = gone)");
 eq(rememberRefFromUrl(memStorage(), "", "?ref=ABCD2345", T0), null, "no event id: nothing saved");
 
 console.log("request bodies");

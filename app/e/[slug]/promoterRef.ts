@@ -5,7 +5,8 @@
  * closing checkout, the sign in sheet, /login and /claim round trips), so the code is saved when the page opens
  * and sent as `linkCode` with checkout and RSVP. Rules (Legend 2026-10-30): kept per event, in this browser, for
  * 7 days; the last link opened wins. The backend decides whether the code counts; a code it doesn't count never
- * blocks the sale. Storage that is missing or throws (private mode, blocked site data) means nothing is remembered.
+ * blocks the sale. Storage that is missing or throws (private mode, blocked site data) never breaks the page: the
+ * code is then kept in memory for this visit only (lost on a full reload).
  */
 
 /** Same shape the backend accepts: 8 of A-Z (no I, O) and 2-9. */
@@ -14,6 +15,14 @@ const CODE_RE = /^[A-HJ-NP-Z2-9]{8}$/;
 export const REF_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 type RefStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+type Saved = { code: string; savedAt: number };
+
+/** Used only when storage is missing or throws, so this visit still counts. Working storage is the source of truth. */
+const memory = new Map<string, Saved>();
+
+function isFresh(savedAt: unknown, now: number): savedAt is number {
+  return typeof savedAt === "number" && savedAt <= now && now - savedAt < REF_TTL_MS;
+}
 
 export function refStorageKey(eventId: string): string {
   return `outsyde:promoter-ref:${eventId}`;
@@ -42,17 +51,19 @@ export function rememberRefFromUrl(storage: RefStorage | null, eventId: string, 
   if (!eventId) return null;
   const code = refFromSearch(search);
   if (!code) return null;
+  memory.set(eventId, { code, savedAt: now });
   try {
     storage?.setItem(refStorageKey(eventId), JSON.stringify({ code, savedAt: now }));
   } catch {
-    /* storage unavailable: this visit still sends the code it was opened with */
+    /* storage unavailable: the in-memory copy covers this visit */
   }
   return code;
 }
 
 /** The code remembered for this event while it is under 7 days old, else null. Never throws. */
 export function readRef(storage: RefStorage | null, eventId: string, now: number): string | null {
-  if (!storage || !eventId) return null;
+  if (!eventId) return null;
+  if (!storage) return fromMemory(eventId, now);
   const key = refStorageKey(eventId);
   try {
     const raw = storage.getItem(key);
@@ -61,13 +72,19 @@ export function readRef(storage: RefStorage | null, eventId: string, now: number
     try { saved = JSON.parse(raw); } catch { saved = null; }
     const code = normalizeRef((saved as { code?: unknown } | null)?.code);
     const savedAt = (saved as { savedAt?: unknown } | null)?.savedAt;
-    const fresh = typeof savedAt === "number" && savedAt <= now && now - savedAt < REF_TTL_MS;
-    if (code && fresh) return code;
+    if (code && isFresh(savedAt, now)) return code;
     storage.removeItem(key);
     return null;
   } catch {
-    return null;
+    return fromMemory(eventId, now);
   }
+}
+
+function fromMemory(eventId: string, now: number): string | null {
+  const m = memory.get(eventId);
+  if (m && isFresh(m.savedAt, now)) return m.code;
+  memory.delete(eventId);
+  return null;
 }
 
 /** The request body with `linkCode` added only when there is a code, so a visit without a link sends exactly what it did before. */
