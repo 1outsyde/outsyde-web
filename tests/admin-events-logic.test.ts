@@ -2,6 +2,7 @@
 import {
   usd, shortDate, nyMidnightIso, rangeFor, RANGE_PRESETS, bucketOf, BUCKETS, groupByBucket, groupByHost,
   FILTERS, filterOf, filterCounts, filterEvents, matchesSearch, payoutPill, allCopy, type AdminEventRow,
+  teamAttentionCopy, teamPayoutPill, teamCopyAll, type AdminTeamPayout, type TeamAttentionItem,
 } from "../app/admin/events/_lib/money";
 
 let passed = 0, failed = 0;
@@ -246,6 +247,35 @@ console.log("copy");
   eq(copy.length > 25, true, "copy list is populated");
   eq(copy.filter((s) => s.includes(" - ") || s.includes("—") || s.includes("–") || s.includes(" -- ")), [], "no dash breaks in exported copy");
   eq(copy.filter((s) => /\d\s*%/.test(s)), [], "no fee percentages in copy");
+}
+
+console.log("\nevent team pay (p4-team 4b-2)");
+{
+  const item = (o: Partial<TeamAttentionItem>): TeamAttentionItem => ({
+    kind: "team_held", teamPayoutId: "t1", eventId: "e1", eventTitle: "Night", memberUserId: "u1",
+    member: { username: "dj", firstName: "Ana" }, amountCents: 5000, reason: null, since: "2026-10-20T15:00:00Z", ...o,
+  });
+  eq(teamAttentionCopy(item({ kind: "team_held", reason: "event_paused" })),
+    { label: "Team pay on hold", why: "@dj. The event is paused, so team pay waits. On hold since Oct 20." }, "held, event paused");
+  eq(teamAttentionCopy(item({ kind: "team_held", reason: "stripe_not_ready" })).why.includes("Stripe isn't ready to pay this team member yet."), true, "held, Stripe not ready");
+  eq(teamAttentionCopy(item({ kind: "team_review", reason: "the transfer failed 5 times" })).why, "@dj. the transfer failed 5 times. In review since Oct 20.", "review, reason kept");
+  eq(teamAttentionCopy(item({ kind: "team_not_received", member: { username: null, firstName: "Ana" } })).label, "Team member says the host hasn't paid", "not received label");
+  eq(teamAttentionCopy(item({ kind: "team_not_received", member: { username: null, firstName: "Ana" } })).why.startsWith("Ana says"), true, "first name when no username");
+  const t = (o: Partial<AdminTeamPayout>): AdminTeamPayout => ({
+    id: "x", amountCents: 1, outcome: "covered", status: "pending", sentAt: null, hostPaidAt: null, confirmedAt: null, notYetAt: null,
+    member: { userId: "u", firstName: null, username: "a" }, ...o,
+  });
+  eq(teamPayoutPill(t({ status: "paid" })), { text: "Sent by Outsyde", tone: "green" }, "sent");
+  eq(teamPayoutPill(t({ status: "pending" })), { text: "Waiting to send", tone: "gold" }, "waiting");
+  eq(teamPayoutPill(t({ status: "host_to_pay", outcome: "no_setup" })).text, "Host pays, no payout setup", "no setup");
+  eq(teamPayoutPill(t({ status: "host_to_pay", outcome: "not_covered" })).text, "Host pays, not covered", "not covered");
+  eq(teamPayoutPill(t({ status: "host_to_pay", outcome: "no_setup", hostPaidAt: "x" })).text, "Host says paid", "I paid them");
+  eq(teamPayoutPill(t({ status: "host_to_pay", outcome: "no_setup", hostPaidAt: "x", notYetAt: "x" })), { text: "Host paid, not received", tone: "red" }, "Not yet");
+  eq(teamPayoutPill(t({ status: "host_to_pay", outcome: "no_setup", hostPaidAt: "x", notYetAt: "x", confirmedAt: "x" })).text, "Host paid, confirmed", "Got it wins");
+  const copy = teamCopyAll();
+  eq(copy.length > 10, true, "team copy listed");
+  eq(copy.filter((s) => s.includes(" - ") || s.includes("—") || s.includes("–")), [], "no dashes in team copy");
+  eq(copy.filter((s) => /\d\s*%/.test(s)), [], "no percentages in team copy");
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -16,9 +16,11 @@ import {
   payoutPill,
   rangeFor,
   shortDate,
+  teamAttentionCopy,
   totalsOf,
   usd,
   type AdminEventHost,
+  type TeamAttentionItem,
   type AdminEventRow,
   type FilterId,
   type RangePreset,
@@ -58,6 +60,8 @@ interface AttentionItem {
 interface ListData {
   events: AdminEventRow[];
   attention: AttentionItem[];
+  /** p4-team 4b-2: team pay items, from their own field (older backends send none). */
+  teamAttention: TeamAttentionItem[];
   now: Date;
 }
 
@@ -127,7 +131,15 @@ async function fetchList(p: RangePreset): Promise<ListResult> {
     if (res.status === 403) return { kind: "auth", auth: "forbidden" };
     const body = await res.json().catch(() => null);
     if (!res.ok || !body || !Array.isArray(body.events)) return { kind: "error", text: "Couldn't load events money. Try again in a moment." };
-    return { kind: "ok", data: { events: body.events, attention: Array.isArray(body.attention) ? body.attention : [], now: new Date() } };
+    return {
+      kind: "ok",
+      data: {
+        events: body.events,
+        attention: Array.isArray(body.attention) ? body.attention : [],
+        teamAttention: Array.isArray(body.teamAttention) ? body.teamAttention : [],
+        now: new Date(),
+      },
+    };
   } catch {
     return { kind: "error", text: "Couldn't reach the server. Check your connection and try again." };
   }
@@ -215,7 +227,7 @@ export default function EventsMoneyClient() {
     { label: "Owed to hosts", value: usd(totals.owedCents), hint: "Earned, not paid out yet" },
     { label: "Paid to hosts", value: usd(totals.paidCents), hint: "Sent to their Stripe accounts" },
     { label: "Refunded", value: usd(sum(events, (e) => e.refundedCents)), hint: "Ticket price only" },
-    { label: "Needs attention", value: String(data.attention.length), hint: "Stuck, on hold or owed" },
+    { label: "Needs attention", value: String(data.attention.length + data.teamAttention.length), hint: "Stuck, on hold or owed" },
   ];
 
   const tableBody = (() => {
@@ -301,9 +313,9 @@ export default function EventsMoneyClient() {
       <section style={{ display: "flex", flexDirection: "column", gap: 12 }} aria-labelledby="aem-attn-h">
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <h2 className="aem-h2" id="aem-attn-h">Needs attention</h2>
-          <span className="aem-count">{data.attention.length}</span>
+          <span className="aem-count">{data.attention.length + data.teamAttention.length}</span>
         </div>
-        {data.attention.length === 0 ? (
+        {data.attention.length + data.teamAttention.length === 0 ? (
           <div className="aem-none">Nothing needs you right now.</div>
         ) : (
           <div className="aem-attn">
@@ -345,6 +357,22 @@ export default function EventsMoneyClient() {
                     onCancel={() => setConfirmKey(null)}
                     onConfirm={confirmAction}
                   /> : null}
+                </div>
+              );
+            })}
+            {data.teamAttention.map((a) => {
+              const c = teamAttentionCopy(a);
+              return (
+                <div className="aem-attn-card" key={`${a.kind}:${a.teamPayoutId}`} data-attention={a.kind} data-item-id={a.teamPayoutId}>
+                  <div className="aem-attn-top">
+                    <div className="aem-attn-kind">{c.label}</div>
+                    <div className="aem-attn-amt">{usd(a.amountCents)}</div>
+                  </div>
+                  <div className="aem-attn-what">{a.eventTitle} · Event team</div>
+                  <div className="aem-attn-why">{c.why}</div>
+                  <div className="aem-actions">
+                    <Link href={`/admin/events/${encodeURIComponent(a.eventId)}`} className="aem-btn aem-btn-ghost">View event</Link>
+                  </div>
                 </div>
               );
             })}

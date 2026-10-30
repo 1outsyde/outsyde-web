@@ -346,3 +346,87 @@ export function payoutPill(e: AdminEventRow, now: Date): { text: string; tone: P
   }
   return { text: withDate(PILL.scheduled, dueOf(e)), tone: "gold" };
 }
+
+/* ---------- Event team pay (p4-team step 4b-2) ---------- */
+
+/** One team pay item that needs a look (backend `teamAttention`, its own list next to `attention`). */
+export interface TeamAttentionItem {
+  kind: "team_review" | "team_held" | "team_not_received";
+  teamPayoutId: string;
+  eventId: string;
+  eventTitle: string;
+  memberUserId: string;
+  member: { username: string | null; firstName: string | null };
+  amountCents: number;
+  reason: string | null;
+  since: string | null;
+}
+
+/** One person's pay for an event (backend event detail `teamPayouts`). */
+export interface AdminTeamPayout {
+  id: string;
+  amountCents: number;
+  outcome: "covered" | "not_covered" | "no_setup";
+  status: "pending" | "paid" | "held" | "review" | "host_to_pay";
+  sentAt: string | null;
+  hostPaidAt: string | null;
+  confirmedAt: string | null;
+  notYetAt: string | null;
+  member: { userId: string; firstName: string | null; username: string | null };
+}
+
+const memberName = (m: { username: string | null; firstName: string | null }) =>
+  m.username ? `@${m.username}` : (m.firstName?.trim() || "A team member");
+
+const TEAM_HOLD: Record<string, string> = {
+  event_paused: "The event is paused, so team pay waits.",
+  no_account: "The team member has no payout account any more.",
+  not_complete: "The team member hasn't finished payout setup.",
+  stripe_not_ready: "Stripe isn't ready to pay this team member yet.",
+};
+
+/** Label and why line for a team pay item. No dashes. */
+export function teamAttentionCopy(a: TeamAttentionItem): { label: string; why: string } {
+  const since = shortDate(a.since);
+  const who = memberName(a.member);
+  if (a.kind === "team_review") {
+    const why = (a.reason || "Stripe couldn't send this team pay").trim();
+    return { label: "Team pay stuck in review", why: `${who}. ${/[.!?]$/.test(why) ? why : `${why}.`}${since ? ` In review since ${since}.` : ""}` };
+  }
+  if (a.kind === "team_held") {
+    return { label: "Team pay on hold", why: `${who}. ${TEAM_HOLD[a.reason ?? ""] ?? "Team pay is on hold."}${since ? ` On hold since ${since}.` : ""}` };
+  }
+  return {
+    label: "Team member says the host hasn't paid",
+    why: `${who} says they still haven't got it after the host marked it paid.${since ? ` Since ${since}.` : ""}`,
+  };
+}
+
+/** Pill for one person's pay on the event page. */
+export function teamPayoutPill(t: AdminTeamPayout): { text: string; tone: PillTone } {
+  if (t.status === "paid") return { text: "Sent by Outsyde", tone: "green" };
+  if (t.status === "review") return { text: "In review", tone: "red" };
+  if (t.status === "held") return { text: "On hold", tone: "red" };
+  if (t.status === "pending") return { text: "Waiting to send", tone: "gold" };
+  // host_to_pay
+  if (t.confirmedAt) return { text: "Host paid, confirmed", tone: "green" };
+  if (t.notYetAt) return { text: "Host paid, not received", tone: "red" };
+  if (t.hostPaidAt) return { text: "Host says paid", tone: "gold" };
+  return { text: t.outcome === "no_setup" ? "Host pays, no payout setup" : "Host pays, not covered", tone: "grey" };
+}
+
+export function teamCopyAll(): string[] {
+  const base = { id: "x", amountCents: 1, sentAt: null, hostPaidAt: null, confirmedAt: null, notYetAt: null, member: { userId: "u", firstName: null, username: "a" } };
+  const pills = ([
+    { status: "paid", outcome: "covered" }, { status: "review", outcome: "covered" }, { status: "held", outcome: "covered" },
+    { status: "pending", outcome: "covered" }, { status: "host_to_pay", outcome: "no_setup" }, { status: "host_to_pay", outcome: "not_covered" },
+    { status: "host_to_pay", outcome: "no_setup", hostPaidAt: "x" }, { status: "host_to_pay", outcome: "no_setup", hostPaidAt: "x", notYetAt: "x" },
+    { status: "host_to_pay", outcome: "no_setup", hostPaidAt: "x", confirmedAt: "x" },
+  ] as const).map((o) => teamPayoutPill({ ...base, ...o } as AdminTeamPayout).text);
+  const item = { teamPayoutId: "t", eventId: "e", eventTitle: "E", memberUserId: "u", member: { username: "a", firstName: null }, amountCents: 1, since: null };
+  const items = [
+    { kind: "team_review", reason: null }, ...Object.keys(TEAM_HOLD).map((r) => ({ kind: "team_held", reason: r })),
+    { kind: "team_held", reason: "other" }, { kind: "team_not_received", reason: null },
+  ].flatMap((o) => Object.values(teamAttentionCopy({ ...item, ...o } as TeamAttentionItem)));
+  return [...pills, ...items];
+}

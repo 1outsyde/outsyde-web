@@ -6,7 +6,7 @@
  */
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { payoutPill, shortDate, usd, type AdminEventHost, type AdminEventPayout, type AdminEventRow } from "../_lib/money";
+import { payoutPill, shortDate, teamPayoutPill, usd, type AdminEventHost, type AdminEventPayout, type AdminEventRow, type AdminTeamPayout } from "../_lib/money";
 import {
   ACTION_DONE,
   ActionGroup,
@@ -82,6 +82,8 @@ interface Detail {
   checkIns: { checkedIn: number; validTickets: number };
   payout: PayoutDetail | null;
   recoveries: Recovery[];
+  /** p4-team 4b-2: each team member's pay (older backends send none). */
+  teamPayouts?: AdminTeamPayout[];
   host: AdminEventHost & { connectedAccount?: string | null };
   activity: Activity[];
 }
@@ -180,6 +182,7 @@ export default function EventMoneyClient({ id }: { id: string }) {
   if (!data) return <StateScreen title="Loading…" />;
 
   const { event: e, ticketTypes, orders, checkIns, payout, recoveries, host, now } = data;
+  const teamPayouts = Array.isArray(data.teamPayouts) ? data.teamPayouts : [];
   const activity = [...data.activity].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   const pill = payoutPill(e, now);
   const setup = setupText(host.payoutSetup);
@@ -341,6 +344,27 @@ export default function EventMoneyClient({ id }: { id: string }) {
               })
             )}
           </div>
+
+          {teamPayouts.length > 0 ? (
+            <div className="aem-box" data-testid="aem-team-payouts">
+              <div className="aem-box-title">Event team pay</div>
+              {teamPayouts.map((t) => {
+                const pill = teamPayoutPill(t);
+                const who = t.member.username ? `@${t.member.username}` : (t.member.firstName ?? "Team member");
+                return (
+                  <div className="aem-rec" key={t.id} data-team-payout-id={t.id}>
+                    <div className="aem-rec-top">
+                      <div>
+                        <span className="aem-strong">{usd(t.amountCents)}</span>
+                        <span className="aem-muted"> · {who}{t.sentAt ? ` · sent ${shortDate(t.sentAt)}` : ""}</span>
+                      </div>
+                      <div className="aem-pills"><span className={`aem-pill aem-pill-${pill.tone}`}>{pill.text}</span></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
 
         <div className="aem-col-side">
