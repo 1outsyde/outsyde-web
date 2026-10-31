@@ -63,7 +63,7 @@ export default function DoorClient() {
     setBusy(inv.id);
     setInviteError(null);
     setAnswered(null);
-    const r = await call("POST", `/api/events/door/invites/${inv.id}/${a}`);
+    const r = await call("POST", `/api/events/door/invites/${inv.id}/${a}?roles=all`);
     busyRef.current = false;
     setBusy(null);
     if (!r) return;

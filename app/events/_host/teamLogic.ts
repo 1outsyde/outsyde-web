@@ -81,9 +81,14 @@ export function earningLines(p: RolePay): { label: string; value: string }[] {
   if (p.payType === "hourly") {
     out.push(p.needsShift || p.hours === null
       ? { label: `${dollars(p.hourlyRateCents ?? 0)} an hour`, value: "Once your shift is set" }
-      : { label: `${p.hours} ${p.hours === 1 ? "hour" : "hours"} at ${dollars(p.hourlyRateCents ?? 0)}`, value: dollars(p.hourlyCents ?? 0) });
+      : { label: `${p.hours} ${p.hours === 1 ? "hour" : "hours"} at ${dollars(p.hourlyRateCents ?? 0)}${p.hourlyCapped ? ", up to $10,000" : ""}`, value: dollars(p.hourlyCents ?? 0) });
   }
   if (p.commissionPercent) out.push({ label: `${p.commissionPercent}% of your link sales`, value: dollars(p.commissionCents ?? 0) });
+  // Over the role's $10,000 the backend cuts the extras (extraCapped): one line with what's actually paid.
+  if (p.extraCapped) {
+    out.push({ label: "Staying longer, up to the $10,000 for this role", value: dollars(p.extraCents ?? 0) });
+    return out;
+  }
   for (const x of p.extras ?? []) {
     if (x.payKind === "none") continue;
     out.push({ label: `Stayed ${durationText(x.minutes)}`, value: x.tbd && x.cents === null ? "To be discussed" : dollars(x.cents ?? 0) });
@@ -246,7 +251,8 @@ export function removeQuery(r: TeamRow, reason: RemovalReason | null, note: stri
     if (reason === "other" && !note.trim()) return { ok: false, message: "Say why in a few words." };
     if (note.trim().length > 200) return { ok: false, message: "Up to 200 characters." };
     q.set("reason", reason);
-    if (note.trim()) q.set("note", note.trim());
+    // Only Other carries a note (a note typed under Other then switched to Late isn't sent).
+    if (reason === "other") q.set("note", note.trim());
   } else if (needsReason(r)) return { ok: false, message: "Choose why you're taking them off." };
   return { ok: true, query: q.toString() };
 }

@@ -89,6 +89,11 @@ eq(removeQuery(marcus, null, ""), { ok: false, message: "Choose why you're takin
 eq(removeQuery(marcus, "late", ""), { ok: true, query: "scope=event&role=security&reason=late" }, "role and reason go along");
 eq(removeQuery(marcus, "other", " "), { ok: false, message: "Say why in a few words." }, "other needs a note");
 eq(removeQuery(marcus, "other", "Left early"), { ok: true, query: "scope=event&role=security&reason=other&note=Left+early" }, "other with a note");
+eq(removeQuery(marcus, "late", "typed under Other first"), { ok: true, query: "scope=event&role=security&reason=late" }, "a note only goes with Other (review M6)");
+eq(earningLines({ ...fixed, fixedCents: 990000, extraCents: 10000, extraCapped: true, extras: [{ id: "a", minutes: 60, payKind: "fixed", cents: 20000, tbd: false }] }),
+  [{ label: "Fixed", value: "$9,900" }, { label: "Staying longer, up to the $10,000 for this role", value: "$100" }], "extras cut at $10,000: what's actually paid (review M2)");
+eq(earningLines({ ...hourly, hours: 12, hourlyRateCents: 100000, hourlyCents: 1000000, hourlyCapped: true, commissionPercent: null })[0],
+  { label: "12 hours at $1,000, up to $10,000", value: "$10,000" }, "hourly cut at $10,000 says so");
 eq(removeQuery(rows.find((r) => r.userId === "u3") as TeamRow, null, ""), { ok: true, query: "scope=event&role=entertainment" }, "an invite: no reason");
 eq([say(removeConfirm(marcus)), say(removeConfirm(rows.find((r) => r.userId === "u3") as TeamRow)), say(removeConfirm(rows.find((r) => r.userId === "u1") as TeamRow))],
   ["Take Marcus off this event's team?", "Cancel @nova's invite? They won't be able to accept it.", "Take Tasha off your Event team for all your events?"], "confirm copy");

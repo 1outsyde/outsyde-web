@@ -7,7 +7,7 @@
  * what the viewer can't use and shows the backend's message when something is refused.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { money } from "../../../e/_shared/format";
 import { parsePriceCents } from "../../_host/editorLogic";
 import { backendMessage, guestName } from "../../_host/manageLogic";
@@ -45,7 +45,9 @@ export default function PersonPanel({ row, event, asHost, requests, call, now, o
   const hourly = row.pay?.payType === "hourly";
   const [stayMin, setStayMin] = useState<number | null>(60);
   const [stayEnd, setStayEnd] = useState({ date: "", time: "" });
-  const [stayPay, setStayPay] = useState<StayPay>(hourly ? "hourly" : "fixed");
+  const [stayPayPick, setStayPay] = useState<StayPay>(hourly ? "hourly" : "fixed");
+  // Their pay type can change while the panel is open: never keep a choice the other set doesn't have (call 43).
+  const stayPay: StayPay = hourly && stayPayPick === "fixed" ? "hourly" : !hourly && stayPayPick === "hourly" ? "fixed" : stayPayPick;
   const [stayFixed, setStayFixed] = useState("");
   /* amounts and removal */
   const [amounts, setAmounts] = useState<Record<string, string>>({});
@@ -54,13 +56,17 @@ export default function PersonPanel({ row, event, asHost, requests, call, now, o
   const [reasonNote, setReasonNote] = useState("");
 
   const [busy, setBusy] = useState<string | null>(null);
+  // Set before any await, so a double tap sends once (state updates a render too late).
+  const busyRef = useRef(false);
   const [msg, setMsg] = useState<{ where: string; text: string; ok: boolean } | null>(null);
 
   async function send(where: string, method: string, path: string, body: unknown, ok: string, after?: (b: any) => void) { // eslint-disable-line @typescript-eslint/no-explicit-any
-    if (busy) return;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(where);
     setMsg(null);
     const r = await call(method, path, body);
+    busyRef.current = false;
     setBusy(null);
     if (!r) return;
     if ((r.status === 200 || r.status === 201) && r.body?.success) {
@@ -100,10 +106,12 @@ export default function PersonPanel({ row, event, asHost, requests, call, now, o
   async function remove() {
     const q = removeQuery(row, reason, reasonNote);
     if (!q.ok) { setMsg({ where: "remove", text: q.message, ok: false }); return; }
-    if (busy) return;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy("remove");
     setMsg(null);
     const r = await call("DELETE", `${base}?${q.query}`);
+    busyRef.current = false;
     setBusy(null);
     if (!r) return;
     if ((r.status === 200 && r.body?.success) || r.body?.code === "NOT_ON_TEAM") {
@@ -114,13 +122,15 @@ export default function PersonPanel({ row, event, asHost, requests, call, now, o
   }
 
   const set = (k: keyof TimeInputs, part: "date" | "time", v: string) => setTimes((t) => ({ ...t, [k]: { ...t[k], [part]: v } }));
-  const canTimes = !ended && row.role !== "cohost" && (asHost || row.scope === "event");
+  // The backend lets co-hosts set this event's times for anyone but co-hosts, standing members included.
+  const canTimes = !ended && row.role !== "cohost";
   const canPay = asHost && !ended && row.role !== "cohost";
   const canStay = asHost && accepted && !ended && STAY_LONGER_ROLES.includes(row.role) && new Date(event.startsAt).getTime() <= now;
   // The backend: the event's team locks at its end (standing spots can still go); co-hosts never touch the standing team or co-hosts.
   const canRemove = (row.scope === "standing" || !ended) && (asHost || (row.scope === "event" && row.role !== "cohost"));
   const mine = requests.filter((r) => r.role === row.role);
-  const open = mine.some((r) => r.status === "open");
+  // One open request per person, whatever the role (backend REQUEST_OPEN).
+  const open = requests.some((r) => r.status === "open");
 
   return (
     <div className="tm-panel" data-testid="person-panel" role="region" aria-label={`${who}, ${roleName(row.role, row.roleLabel)}`}>

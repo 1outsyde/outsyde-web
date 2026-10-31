@@ -68,8 +68,8 @@ P = "et" + format(int(time.time()), "x")
 def mkuser(slug, first):
     return sql(f"INSERT INTO users (id,email,name,first_name,username,is_active) VALUES (gen_random_uuid(),'{P}-{slug}@test.local','{first} Lastname','{first}','{P}{slug}',true) RETURNING id").splitlines()[0]
 
-host = mkuser("host", "Hana"); sec = mkuser("sec", "Marcus"); dj = mkuser("dj", "Nova"); co = mkuser("co", "Ray")
-users = [host, sec, dj, co]
+host = mkuser("host", "Hana"); sec = mkuser("sec", "Marcus"); dj = mkuser("dj", "Nova"); co = mkuser("co", "Ray"); kim = mkuser("kim", "Kim")
+users = [host, sec, dj, co, kim]
 title = f"{P} Rooftop"
 eid = sql(f"""INSERT INTO events (host_user_id, slug, title, status, starts_at, ends_at, timezone, published_at, venue_name)
   VALUES ('{host}', '{P}-roof', '{title}', 'published', now() - interval '1 hour', now() + interval '4 hours', 'America/New_York', now() - interval '5 days', 'The Loft') RETURNING id""").splitlines()[0]
@@ -77,6 +77,7 @@ def member(u, role):
     sql(f"""INSERT INTO event_door_members (event_id, member_user_id, added_by_user_id, role, cohost_level, invited_at, accepted_at)
       VALUES ('{eid}', '{u}', '{host}', '{role}', {"'team'" if role == "cohost" else "NULL"}, now() - interval '3 days', now() - interval '2 days')""")
 member(sec, "security"); member(dj, "entertainment"); member(co, "cohost")
+sql(f"INSERT INTO event_door_members (event_id, member_user_id, added_by_user_id, role, invited_at) VALUES ('{eid}', '{kim}', '{host}', 'media', now())")
 sql(f"INSERT INTO event_team_pay (event_id, member_user_id, role, pay_type, fixed_cents, updated_by_user_id) VALUES ('{eid}', '{sec}', 'security', 'fixed', 16000, '{host}')")
 sql(f"INSERT INTO event_team_pay (event_id, member_user_id, role, pay_type, hourly_cents, updated_by_user_id) VALUES ('{eid}', '{dj}', 'entertainment', 'hourly', 5000, '{host}')")
 sql(f"""INSERT INTO event_team_schedules (event_id, member_user_id, role, starts_at, ends_at, call_at, updated_by_user_id)
@@ -85,7 +86,7 @@ sql(f"""INSERT INTO event_team_schedules (event_id, member_user_id, role, starts
 team_url = f"{WEB}/events/{eid}/team"
 
 try:
-    ht, st, djt, cot = (tok(u) for u in users)
+    ht, st, djt, cot, kimt = (tok(u) for u in users)
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
 
@@ -94,7 +95,7 @@ try:
         pg.goto(team_url)
         pg.locator("[data-testid=team-section]").first.wait_for(timeout=20000)
         titles = pg.locator("[data-testid=team-section] h2").all_inner_texts()
-        check(titles == ["CO-HOST", "SECURITY", "ENTERTAINMENT"], "sections by role, co-hosts first", titles)
+        check(titles == ["CO-HOST", "SECURITY", "ENTERTAINMENT", "MEDIA"], "sections by role, co-hosts first", titles)
         marcus = pg.locator("[data-testid=team-row]", has_text="Marcus")
         check(re.search(r"Call \d{1,2}:\d{2} (AM|PM) · Fixed \$160", marcus.inner_text()) is not None and "On the team" in marcus.inner_text(), "Marcus: call time and pay", marcus.inner_text())
         check("$50 an hour" in pg.locator("[data-testid=team-row]", has_text="Nova").inner_text(), "Nova: hourly")
@@ -229,6 +230,26 @@ try:
         check(real(errs) == [], "no console or page errors (manage)", errs)
         ctx.close()
 
+        print("a Media invite from the email link (review C1)")
+        ctx, pg, errs = new_ctx(browser, kimt)
+        pg.goto(WEB + "/events/door")
+        inv = pg.locator("[data-testid=door-invite]")
+        inv.first.wait_for(timeout=20000)
+        check("invited you to be Media" in inv.first.inner_text(), "the Media invite shows", inv.first.inner_text())
+        inv.first.get_by_role("button", name="Accept").click()
+        pg.get_by_text("You're on the Event team. The event is in your list below.").wait_for(timeout=10000)
+        row = pg.locator("[data-testid=door-row]", has_text=title)
+        row.wait_for(timeout=10000)
+        check("Media" in row.inner_text() and row.get_by_role("link", name="Open").count() == 1, "accepted: listed as Media with their page", row.inner_text())
+        check(sql(f"SELECT accepted_at IS NOT NULL FROM event_door_members WHERE event_id='{eid}' AND member_user_id='{kim}'") == "t", "DB: accepted")
+        row.get_by_role("link", name="Open").click()
+        pg.get_by_role("button", name="Leave as Media").click()
+        pg.get_by_role("group", name="Confirm leave").get_by_role("button", name="Yes, leave").click()
+        pg.get_by_text("YOU LEFT").wait_for(timeout=10000)
+        check(sql(f"SELECT removed_by_user_id FROM event_door_members WHERE event_id='{eid}' AND member_user_id='{kim}'") == kim, "left as Media, and told so")
+        check(real([e for e in errs if "404" not in e]) == [], "no console or page errors (Media)", errs)
+        ctx.close()
+
         print("co-host")
         ctx, pg, errs = new_ctx(browser, cot)
         pg.goto(WEB + "/events/mine")
@@ -237,6 +258,9 @@ try:
         check(title in grp.inner_text(), "Your events: Co-hosting", grp.inner_text())
         grp.get_by_text(title).click()
         pg.wait_for_url(f"**/events/{eid}/manage", timeout=20000)
+        pg.locator("[data-testid=status]").wait_for(timeout=20000)
+        check(pg.get_by_role("link", name="Edit").count() == 0 and pg.get_by_role("button", name="Cancel event").count() == 0
+              and pg.get_by_role("button", name="Refund").count() == 0, "Team co-host: no Edit, Cancel event or Refund on Manage (review I2)")
         pg.goto(team_url)
         pg.locator("[data-testid=team-row]", has_text="Nova").click()
         panel = pg.locator("[data-testid=person-panel]")

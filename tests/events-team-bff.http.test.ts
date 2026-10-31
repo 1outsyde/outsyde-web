@@ -76,6 +76,20 @@ const relayed = (w: Res, b: Res) => w.status === b.status && (JSON.stringify(w.b
     [w, b] = await both("GET", "/api/events/cohosting", C);
     assert(w.status === 200 && JSON.stringify(w.body) === JSON.stringify(b.body) && w.body.events.some((e: any) => e.id === ev), "events I co-host", w.body); // eslint-disable-line @typescript-eslint/no-explicit-any
 
+    console.log("invites for every role: view, accept, leave (review C1)");
+    const inv = (await q(`INSERT INTO event_door_members (event_id, member_user_id, added_by_user_id, role, invited_at) VALUES ($1, $2, $3, 'media', now()) RETURNING id`, [ev, stranger, host]))[0].id as string;
+    w = await call(WEB, "GET", `/api/events/door/invites/${inv}`, { token: X });
+    assert(w.status === 404, "without ?roles=all a Media invite stays hidden (old app builds)", w);
+    w = await call(WEB, "GET", `/api/events/door/invites/${inv}?roles=all`, { token: X });
+    assert(w.status === 200 && w.body?.invite?.role === "media", "with ?roles=all: the invite", w);
+    w = await call(WEB, "POST", `/api/events/door/invites/${inv}/accept?roles=all`, { token: X });
+    assert(w.status === 200 && w.body?.invite?.status === "accepted", "accept a Media invite through the site", w);
+    w = await call(WEB, "POST", `/api/events/door/invites/${inv}/leave?roles=all`, { token: X });
+    assert(w.status === 200, "leave it through the site", w);
+    const inv2 = (await q(`INSERT INTO event_door_members (event_id, member_user_id, added_by_user_id, role, role_label, invited_at) VALUES ($1, $2, $3, 'other', 'Coat check', now()) RETURNING id`, [ev, stranger, host]))[0].id as string;
+    w = await call(WEB, "POST", `/api/events/door/invites/${inv2}/decline?roles=all`, { token: X });
+    assert(w.status === 200, "decline an Other invite through the site", w);
+
     console.log("times, pay, co-host level");
     const sched = { callAt: new Date(Date.now() + 30 * 60e3).toISOString(), startsAt: null, endsAt: new Date(Date.now() + 3 * 3600e3).toISOString(), loadInAt: null, placeNote: "Side door", hostNote: null };
     w = await call(WEB, "PUT", `/api/events/${ev}/door/team/${sec}/schedule`, { token: H, body: sched });

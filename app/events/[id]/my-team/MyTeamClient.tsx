@@ -38,6 +38,8 @@ export default function MyTeamClient({ eventId }: { eventId: string }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ where: string; ok: boolean; text: string } | null>(null);
   const [leaving, setLeaving] = useState<string | null>(null);
+  // Leaving the last spot makes /team/me answer 404: keep the confirmation on that screen.
+  const [left, setLeft] = useState(false);
   // Read when the data loads, never during render.
   const [now, setNow] = useState(0);
   const busyRef = useRef(false);
@@ -72,7 +74,7 @@ export default function MyTeamClient({ eventId }: { eventId: string }) {
     busyRef.current = false;
     setBusy(null);
     if (!r) return;
-    if (r.status === 200 && r.body?.success) { setNote({ where, ok: true, text: ok }); setLeaving(null); await load(); return; }
+    if (r.status === 200 && r.body?.success) { if (where.startsWith("leave:")) setLeft(true); setNote({ where, ok: true, text: ok }); setLeaving(null); await load(); return; }
     setNote({ where, ok: false, text: backendMessage(r.status, r.body) });
     if (r.status === 409 || r.status === 404) await load();
   }
@@ -89,8 +91,8 @@ export default function MyTeamClient({ eventId }: { eventId: string }) {
   if (state === "notfound" || !me) {
     return page(
       <div className="ed-card-msg" role="alert" data-testid="not-found">
-        <h1 className="ed-h1">{state === "error" ? "EVENT TEAM" : "NOT ON THIS TEAM"}</h1>
-        <p className="ed-text">{state === "error" ? loadError ?? GENERIC_ERROR : "You're not on the Event team for this event, or it was removed."}</p>
+        <h1 className="ed-h1">{state === "error" ? "EVENT TEAM" : left ? "YOU LEFT" : "NOT ON THIS TEAM"}</h1>
+        <p className="ed-text">{state === "error" ? loadError ?? GENERIC_ERROR : left ? "You're no longer on the Event team for this event." : "You're not on the Event team for this event, or it was removed."}</p>
         <Link href="/events/door" className="ed-primary ed-auto">Event team</Link>
       </div>,
     );
@@ -138,7 +140,7 @@ export default function MyTeamClient({ eventId }: { eventId: string }) {
               {timeFields(r.role).filter((f) => s?.[f.key]).map((f) => (
                 <div key={f.key} className="mg-trow"><span>{f.label}</span><b>{timeOf(s![f.key] as string, tz)}</b></div>
               ))}
-              {until && <div className="mg-trow"><span>Staying longer</span><b>{until}</b></div>}
+              {until && <div className="mg-gold" style={{ fontWeight: 600, fontSize: 14 }} data-testid="stay-until">{until}</div>}
               {s?.placeNote && <div className="mg-trow"><span>Where to go</span><b style={{ overflowWrap: "anywhere" }}>{s.placeNote}</b></div>}
               {s?.hostNote && <div className="tm-msg"><div className="mg-sub">From the host</div><div className="tm-msg-text">{s.hostNote}</div></div>}
               {r.role === "door" && !ended && <Link href={`/events/${eventId}/scan`} className="ed-primary tm-btn" style={{ textAlign: "center" }}>Open the scanner</Link>}
@@ -208,7 +210,7 @@ export default function MyTeamClient({ eventId }: { eventId: string }) {
                     <p>{leaveSpotCopy(sp, me.event.title)}</p>
                     {say(`leave:${sp.inviteId}`)}
                     <div className="mg-confirm-actions">
-                      <button type="button" className="mg-danger" disabled={busy !== null} onClick={() => act(`leave:${sp.inviteId}`, `/api/events/door/invites/${sp.inviteId}/leave`, "You left.")}>
+                      <button type="button" className="mg-danger" disabled={busy !== null} onClick={() => act(`leave:${sp.inviteId}`, `/api/events/door/invites/${sp.inviteId}/leave?roles=all`, "You left.")}>
                         {busy === `leave:${sp.inviteId}` ? "Leaving…" : "Yes, leave"}
                       </button>
                       <button type="button" className="mg-small" disabled={busy !== null} onClick={() => setLeaving(null)}>Stay</button>

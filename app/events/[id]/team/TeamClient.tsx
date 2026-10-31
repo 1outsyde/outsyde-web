@@ -54,6 +54,8 @@ export default function TeamClient({ eventId }: { eventId: string }) {
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const sendingRef = useRef(false);
+  const msgRef = useRef(false);
+  const payRef = useRef(false);
 
   // messages
   const [aud, setAud] = useState<string>("team");
@@ -90,11 +92,12 @@ export default function TeamClient({ eventId }: { eventId: string }) {
     setLoadError(null);
     if (!(await refresh())) return;
     const m = await call("GET", `/api/events/${eventId}/manage`);
-    const e = m && m.status === 200 ? m.body?.event : null;
-    if (e && typeof e.title === "string") {
-      setEvent({ id: eventId, title: e.title, timezone: e.timezone, startsAt: e.startsAt, endsAt: e.endsAt, status: e.status });
-      setAsHost(m?.body?.access?.as !== "cohost");
-    }
+    if (!m) return;
+    const e = m.status === 200 ? m.body?.event : null;
+    // Without the event (times, zone) and who's looking, the page would offer the wrong things: say so instead.
+    if (!e || typeof e.title !== "string") { setLoadError(errorCopy(m.status, m.body)); setScreen("error"); return; }
+    setEvent({ id: eventId, title: e.title, timezone: e.timezone, startsAt: e.startsAt, endsAt: e.endsAt, status: e.status });
+    setAsHost(m.body?.access?.as !== "cohost");
     setScreen("ready");
   }, [call, eventId, refresh]);
 
@@ -127,10 +130,12 @@ export default function TeamClient({ eventId }: { eventId: string }) {
     const a: Audience = aud === "team" ? { to: "team" } : aud.startsWith("role:") ? { to: "role", role: aud.slice(5) as TeamRole } : { to: "person", userId: aud.slice(7) };
     const b = messageBody(a, text);
     if (!b.ok) { setMsgNote({ ok: false, text: b.message }); return; }
-    if (msgBusy) return;
+    if (msgRef.current) return;
+    msgRef.current = true;
     setMsgBusy(true);
     setMsgNote(null);
     const r = await call("POST", `/api/events/${eventId}/team/messages`, b.body);
+    msgRef.current = false;
     setMsgBusy(false);
     if (!r) return;
     if ((r.status === 200 || r.status === 201) && r.body?.success) {
@@ -143,10 +148,12 @@ export default function TeamClient({ eventId }: { eventId: string }) {
   }
 
   async function markPaid(userId: string, undo: boolean) {
-    if (payBusy) return;
+    if (payRef.current) return;
+    payRef.current = true;
     setPayBusy(userId);
     setPayErr(null);
     const r = await call(undo ? "DELETE" : "POST", `/api/events/${eventId}/team-payouts/${userId}/paid`);
+    payRef.current = false;
     setPayBusy(null);
     if (!r) return;
     if (r.status === 200 && r.body?.success) { await refresh(); return; }

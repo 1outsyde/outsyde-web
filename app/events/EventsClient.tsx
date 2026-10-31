@@ -113,7 +113,7 @@ export default function EventsClient() {
           <div className="ev-actions">
             <Link href="/tickets" className="ev-btn ghost">My Tickets</Link>
             {auth === "in" && <Link href="/events/mine" className="ev-btn ghost">Your events</Link>}
-            {auth === "in" && <Link href="/events/door" className="ev-btn ghost">Scan tickets</Link>}
+            {auth === "in" && <Link href="/events/door" className="ev-btn ghost">Event team</Link>}
             <Link href={auth === "out" ? HOST_LOGIN : HOST_HREF} className="ev-btn gold">Host an event</Link>
           </div>
         </div>
