@@ -11,6 +11,7 @@ import {
   takenLine, typeRowText, typeRows, whenWhere,
   type DoorGuest, type HostOrder, type Summary,
 } from "./manageLogic";
+import { isSummaryTeamPay, teamPayCard } from "./teamLogic";
 import { errorCopy, money, GENERIC_ERROR } from "../../e/_shared/format";
 
 type Screen = "loading" | "ready" | "notfound" | "error";
@@ -176,6 +177,8 @@ export default function ManageClient({ eventId }: { eventId: string }) {
   const earnings = summary ? summary.totals.hostEarningsCents : 0;
   const payout = summary ? payoutCard(summary.payout, event.timezone, earnings) : null;
   const refunded = summary ? refundedLine(summary.totals) : null;
+  // Step 8 (call 54): team pay and what the host takes home, from the backend (nothing worked out here).
+  const team = summary && isSummaryTeamPay(summary.teamPay) ? teamPayCard(summary.teamPay) : null;
   const shownGuests = showAllGuests ? guests : guests.slice(0, GUEST_PREVIEW);
 
   return page(
@@ -233,6 +236,14 @@ export default function ManageClient({ eventId }: { eventId: string }) {
                 <div className="mg-stat-mid">{payout ? payout.value : missing}</div>
                 {payout?.hint && <div className="mg-stat-hint">{payout.hint}</div>}
               </div>
+              {team && (
+                <div className="mg-stat" style={{ gridColumn: "1 / -1" }} data-testid="team-pay">
+                  <div className="mg-stat-label">Event team pay</div>
+                  <div className="mg-stat-mid">{team.team}</div>
+                  <div className="mg-stat-hint">{team.note}</div>
+                  <Link href={`/events/${event.id}/team`} className="ed-link" style={{ fontSize: 13 }}>See who gets what</Link>
+                </div>
+              )}
               <div className="mg-stat">
                 <div className="mg-stat-label">Refunded</div>
                 <div className="mg-stat-mid">{refunded ? refunded.value : missing}</div>
@@ -311,7 +322,7 @@ export default function ManageClient({ eventId }: { eventId: string }) {
         <div className="mg-actions">
           {live && (
             <div className="mg-quick">
-              <Link href={`/events/${event.id}/team`} className="ed-outline">Door team</Link>
+              <Link href={`/events/${event.id}/team`} className="ed-outline">Event team</Link>
               {scannable && <Link href={`/events/${event.id}/scan`} className="ed-primary" style={{ minHeight: 48 }}>Scan tickets</Link>}
             </div>
           )}

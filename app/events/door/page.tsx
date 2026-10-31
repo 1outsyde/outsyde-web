@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import DoorClient from "./DoorClient";
 
 export const metadata: Metadata = {
-  title: "Door check in",
+  title: "Event team",
   robots: { index: false, follow: false },
 };
 

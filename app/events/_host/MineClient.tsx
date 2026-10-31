@@ -8,10 +8,10 @@ import { isHostEvent, type HostEvent } from "./editorLogic";
 import { eventHref, groupMine, statusLabel, takenLine, whenWhere } from "./manageLogic";
 import { errorCopy } from "../../e/_shared/format";
 
-function EventRow({ e }: { e: HostEvent }) {
+function EventRow({ e, href }: { e: HostEvent; href?: string }) {
   const label = statusLabel(e);
   return (
-    <Link href={eventHref(e)} className="mg-evrow" data-testid="mine-row">
+    <Link href={href ?? eventHref(e)} className="mg-evrow" data-testid="mine-row">
       <div className="mg-evrow-main">
         <div className="mg-evrow-title">{e.title}</div>
         <div className="mg-sub">{whenWhere(e)}</div>
@@ -28,11 +28,14 @@ export default function MineClient() {
   const { call } = useHostApi();
   const [events, setEvents] = useState<HostEvent[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Step 8 (call 53): events I co-host. A failure leaves the list empty; my own events still show.
+  const [cohosting, setCohosting] = useState<HostEvent[]>([]);
 
   const load = useCallback(async () => {
     setError(null);
-    const r = await call("GET", "/api/events/mine");
+    const [r, c] = await Promise.all([call("GET", "/api/events/mine"), call("GET", "/api/events/cohosting")]);
     if (!r) return;
+    setCohosting(c && c.status === 200 && Array.isArray(c.body?.events) ? (c.body.events as unknown[]).filter(isHostEvent) : []);
     if (r.status !== 200 || !r.body?.success || !Array.isArray(r.body.events)) { setError(errorCopy(r.status, r.body)); return; }
     setEvents((r.body.events as unknown[]).filter(isHostEvent));
   }, [call]);
@@ -56,7 +59,7 @@ export default function MineClient() {
           </Link>
           <h1 className="mg-head-h">YOUR EVENTS</h1>
           <div className="mg-head-actions">
-            <Link href="/events/door" className="ed-outline mg-head-btn">Scan tickets</Link>
+            <Link href="/events/door" className="ed-outline mg-head-btn">Event team</Link>
             <Link href="/events/new" className="ed-primary ed-auto">Host an event</Link>
           </div>
         </header>
@@ -67,7 +70,7 @@ export default function MineClient() {
               {error} <button type="button" className="ed-textbtn ed-inline-btn" onClick={load}>Try again</button>
             </div>
           )}
-          {events !== null && shownCount === 0 && (
+          {events !== null && shownCount === 0 && cohosting.length === 0 && (
             <div className="ed-card-msg">
               <h2 className="ed-h1">NO EVENTS YET</h2>
               <p className="ed-text">Host your first event. Free RSVPs and paid tickets both work.</p>
@@ -80,6 +83,12 @@ export default function MineClient() {
               {s.list.map((e) => <EventRow key={e.id} e={e} />)}
             </section>
           ))}
+          {cohosting.length > 0 && (
+            <section className="mg-group" aria-label="CO-HOSTING" data-testid="group-cohosting">
+              <h2 className="mg-section">CO-HOSTING</h2>
+              {cohosting.map((e) => <EventRow key={e.id} e={e} href={`/events/${e.id}/manage`} />)}
+            </section>
+          )}
         </div>
     </HostShell>
   );
