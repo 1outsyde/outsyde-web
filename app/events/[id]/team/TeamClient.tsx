@@ -7,6 +7,9 @@
  *   The team by role (GET /door/team?roles=all), each row opens PersonPanel (times, pay, stay longer, take off).
  *   Team pay and what the host takes home (all or nothing), messages to the team, and once the payout is worked out,
  *   who Outsyde paid and who the host pays (I paid them).
+ * Step 9-0 (backend #402): invite by Username, Email (that address gets its own link), Phone (the host's own Messages app
+ * opens with the link) or Link (copy or share). Links can carry pay for This event (host only). Waiting links are listed
+ * with Copy and Cancel.
  * GET /door/team answers 404 for anyone but the host and accepted co-hosts.
  */
 
@@ -23,6 +26,8 @@ import {
 } from "../../_host/teamLogic";
 import PersonPanel from "./PersonPanel";
 import { TEAM_CSS } from "../../_host/teamStyles";
+import { INVITE_WAYS, isHostLink, linkBody, linkRowLine, linkShareText, phoneError, smsHref, type HostLink, type InviteWay } from "../../_host/teamLinksLogic";
+import { LINK_ROLES, type PayForm } from "../../_host/teamLogic";
 
 
 type Screen = "loading" | "ready" | "notfound" | "error";
@@ -41,6 +46,7 @@ export default function TeamClient({ eventId }: { eventId: string }) {
   const [requests, setRequests] = useState<StayRequest[]>([]);
   const [payouts, setPayouts] = useState<(TeamPayout & { member: { userId: string; firstName: string | null; username: string | null } })[]>([]);
   const [sent, setSent] = useState<Sent[]>([]);
+  const [links, setLinks] = useState<HostLink[]>([]);
   const [open, setOpen] = useState<string | null>(null); // "userId:role:scope"
   const [notice, setNotice] = useState<string | null>(null);
   // Read when the data loads, never during render.
@@ -53,6 +59,15 @@ export default function TeamClient({ eventId }: { eventId: string }) {
   const [scope, setScope] = useState<"standing" | "event">("event");
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  // step 9-0: how to invite, and what a link carries
+  const [way, setWay] = useState<InviteWay>("username");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [payOn, setPayOn] = useState(false);
+  const [linkPay, setLinkPay] = useState<PayForm>({ payType: "fixed", fixed: "", hourly: "", commission: "" });
+  const [made, setMade] = useState<{ url: string; text: string } | null>(null);
+  const [linkBusy, setLinkBusy] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
   const sendingRef = useRef(false);
   const msgRef = useRef(false);
   const payRef = useRef(false);
@@ -76,11 +91,13 @@ export default function TeamClient({ eventId }: { eventId: string }) {
     setRows(teamRows(t.body));
     setTotals(t.body.payTotals && typeof t.body.payTotals.teamCents === "number" ? t.body.payTotals : null);
     // Extras: a failure leaves them empty, the team still shows.
-    const [s, m, p] = await Promise.all([
+    const [s, m, p, l] = await Promise.all([
       call("GET", `/api/events/${eventId}/team/stay-longer`),
       call("GET", `/api/events/${eventId}/team/messages`),
       call("GET", `/api/events/${eventId}/team-payouts`),
+      call("GET", `/api/events/${eventId}/team/links`),
     ]);
+    setLinks(l && l.status === 200 && Array.isArray(l.body?.links) ? (l.body.links as unknown[]).filter(isHostLink) : []);
     setRequests(s && s.status === 200 && Array.isArray(s.body?.requests) ? (s.body.requests as unknown[]).filter(isStayRequest) : []);
     setSent(m && m.status === 200 && Array.isArray(m.body?.messages) ? m.body.messages : []);
     setPayouts(p && p.status === 200 && Array.isArray(p.body?.payouts) ? (p.body.payouts as unknown[]).filter((x) => isTeamPayout(x) && !!(x as TeamPayout).member) as never[] : []);
@@ -105,6 +122,7 @@ export default function TeamClient({ eventId }: { eventId: string }) {
 
   async function invite(e: React.FormEvent) {
     e.preventDefault();
+    if (way !== "username") { await makeLink(); return; }
     const name = cleanUsername(username);
     if (!name || sendingRef.current) return;
     if (role === "other") { const le = roleLabelError(label); if (le) { setAddError(le); return; } }
@@ -124,6 +142,74 @@ export default function TeamClient({ eventId }: { eventId: string }) {
     setUsername("");
     setLabel("");
     await refresh();
+  }
+
+  /** Email, Phone and Link (step 9-0): make a one person link, then email it, open Messages with it, or show it. */
+  async function makeLink() {
+    if (sendingRef.current || !event) return;
+    if (way === "phone") { const pe = phoneError(phone); if (pe) { setAddError(pe); return; } }
+    const b = linkBody({ role, label, scope, pay: linkPay, payOn, asHost, email: way === "email" ? email : undefined });
+    if (!b.ok) { setAddError(b.message); return; }
+    sendingRef.current = true;
+    setAdding(true);
+    setAddError(null);
+    setNotice(null);
+    setMade(null);
+    const r = await call("POST", `/api/events/${eventId}/team/links`, b.body);
+    if (!r) { sendingRef.current = false; setAdding(false); return; }
+    if (r.status !== 201 || !r.body?.success || !isHostLink(r.body.link)) {
+      sendingRef.current = false; setAdding(false);
+      setAddError(backendMessage(r.status, r.body));
+      return;
+    }
+    const link: HostLink = r.body.link;
+    const who = roleName(role, role === "other" ? label : null);
+    if (way === "email") {
+      setNotice(r.body.emailed === true
+        ? `Invite emailed to ${link.sentToEmail}. It's for one person: the first to accept gets the spot as ${who}.`
+        : "The link is ready, but it couldn't be emailed today (you've sent 10 invite emails, or this address got one already). Copy it below and send it yourself.");
+      if (r.body.emailed !== true) setMade({ url: link.url, text: link.url });
+      setEmail("");
+    } else {
+      // The host's public name, the same one the invitee sees on the link page.
+      const pg = await call("GET", `/api/events/team-links/${link.code}`);
+      const hostName = typeof pg?.body?.link?.host?.name === "string" ? pg.body.link.host.name : "Your host";
+      const text = linkShareText({ hostName, role, roleLabel: role === "other" ? label.trim() : null, eventTitle: event.title, scope: link.scope, url: link.url });
+      if (way === "phone") {
+        setNotice("Your Messages app should open with the invite. Send it from there. Didn't open? Copy the link below.");
+        setMade({ url: link.url, text });
+        window.location.href = smsHref(phone, text);
+        setPhone("");
+      } else {
+        setNotice(`Link ready. It's for one person: the first to accept gets the spot as ${who}.`);
+        setMade({ url: link.url, text });
+      }
+    }
+    sendingRef.current = false;
+    setAdding(false);
+    setLabel("");
+    await refresh();
+  }
+
+  async function copy(key: string, text: string) {
+    try { await navigator.clipboard.writeText(text); setCopied(key); setTimeout(() => setCopied((c) => (c === key ? null : c)), 2000); }
+    catch { setCopied(null); }
+  }
+
+  async function share(text: string, url: string) {
+    const nav = navigator as Navigator & { share?: (d: { text?: string; url?: string }) => Promise<void> };
+    if (nav.share) { try { await nav.share({ text: text.replace(url, "").trim(), url }); return; } catch { return; } }
+    await copy("made", text);
+  }
+
+  async function cancelLink(l: HostLink) {
+    if (linkBusy) return;
+    setLinkBusy(l.id);
+    const r = await call("DELETE", `/api/events/${eventId}/team/links/${l.id}`);
+    setLinkBusy(null);
+    if (!r) return;
+    if (r.status === 200 && r.body?.success) { setNotice("Link cancelled. Nobody can use it now."); await refresh(); return; }
+    setAddError(backendMessage(r.status, r.body));
   }
 
   async function sendMessage() {
@@ -210,8 +296,31 @@ export default function TeamClient({ eventId }: { eventId: string }) {
         {!ended && (
           <form className="ed-stack-sm" onSubmit={invite} data-testid="team-add">
             <label htmlFor="team-user" className="ed-label">INVITE SOMEONE</label>
-            <input id="team-user" className="ed-in" value={username} placeholder="@username" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false}
-              maxLength={usernameMax(username)} onChange={(e) => { setUsername(e.target.value.slice(0, usernameMax(e.target.value))); setAddError(null); }} />
+            <div className="tm-chips" role="radiogroup" aria-label="Invite by" data-testid="invite-way">
+              {INVITE_WAYS.map((w) => (
+                <button key={w.key} type="button" role="radio" aria-checked={way === w.key} className={way === w.key ? "on" : ""}
+                  onClick={() => { setWay(w.key); setAddError(null); setMade(null); }}>{w.label}</button>
+              ))}
+            </div>
+            {way === "username" && (
+              <input id="team-user" className="ed-in" value={username} placeholder="@username" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                maxLength={usernameMax(username)} onChange={(e) => { setUsername(e.target.value.slice(0, usernameMax(e.target.value))); setAddError(null); }} />
+            )}
+            {way === "email" && (
+              <input id="team-user" className="ed-in" type="email" value={email} placeholder="name@email.com" autoComplete="off" autoCapitalize="none" maxLength={254}
+                onChange={(e) => { setEmail(e.target.value); setAddError(null); }} />
+            )}
+            {way === "phone" && (
+              <input id="team-user" className="ed-in" type="tel" value={phone} placeholder="(516) 555 0134" autoComplete="off" maxLength={24}
+                onChange={(e) => { setPhone(e.target.value); setAddError(null); }} />
+            )}
+            {way !== "username" && (
+              <div className="ed-hint" data-testid="way-hint">
+                {way === "email" ? "They get an email with their own invite link. New to Outsyde? They can join from it in a minute."
+                  : way === "phone" ? "Your Messages app opens with their invite link. Outsyde never texts them."
+                  : "Copy or share the link. It's for one person: the first to accept gets the spot."}
+              </div>
+            )}
             <div className="ed-box" style={{ padding: 12, gap: 10 }}>
               <div className="tm-chips" role="radiogroup" aria-label="Role">
                 {roleChoices.map((r) => (
@@ -225,13 +334,65 @@ export default function TeamClient({ eventId }: { eventId: string }) {
                   <button type="button" role="radio" aria-checked={scope === "event"} className={scope === "event" ? "on" : ""} onClick={() => setScope("event")}>Only this event</button>
                 </div>
               )}
-              <div className="ed-hint">{role === "cohost" ? "Co-hosts see everything you see for the event." : `${roleName(role, role === "other" ? label : null)}: you set their times and pay after you invite them.`}</div>
-              <button type="submit" className="ed-primary tm-btn" disabled={adding || !cleanUsername(username)}>{adding ? "Sending…" : "Send invite"}</button>
+              {way !== "username" && asHost && role !== "cohost" && scope === "event" && (
+                <div className="ed-stack-sm" style={{ gap: 8 }} data-testid="link-pay">
+                  <label className="ed-label" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input type="checkbox" checked={payOn} onChange={(e) => { setPayOn(e.target.checked); setAddError(null); }} /> Add their pay now (shown on the invite)
+                  </label>
+                  {payOn && (
+                    <>
+                      <div className="ed-seg" role="radiogroup" aria-label="Pay type">
+                        {(["none", "fixed", "hourly"] as const).map((t) => (
+                          <button key={t} type="button" role="radio" aria-checked={linkPay.payType === t} className={linkPay.payType === t ? "on" : ""} onClick={() => setLinkPay((p) => ({ ...p, payType: t }))}>
+                            {t === "none" ? "No pay" : t === "fixed" ? "Fixed" : "Hourly"}
+                          </button>
+                        ))}
+                      </div>
+                      {linkPay.payType === "fixed" && <input className="ed-in" inputMode="decimal" aria-label="Fixed amount" placeholder="$160" value={linkPay.fixed} onChange={(e) => setLinkPay((p) => ({ ...p, fixed: e.target.value }))} />}
+                      {linkPay.payType === "hourly" && <input className="ed-in" inputMode="decimal" aria-label="Hourly rate" placeholder="$50 an hour" value={linkPay.hourly} onChange={(e) => setLinkPay((p) => ({ ...p, hourly: e.target.value }))} />}
+                      {LINK_ROLES.includes(role) && <input className="ed-in" inputMode="decimal" aria-label="Commission on their link sales" placeholder="Commission, like 10%" value={linkPay.commission} onChange={(e) => setLinkPay((p) => ({ ...p, commission: e.target.value }))} />}
+                    </>
+                  )}
+                </div>
+              )}
+              <div className="ed-hint">{role === "cohost" ? "Co-hosts see everything you see for the event." : way !== "username" && payOn && scope === "event" ? `${roleName(role, role === "other" ? label : null)}: you set their times after they join.` : `${roleName(role, role === "other" ? label : null)}: you set their times and pay after you invite them.`}</div>
+              <button type="submit" className="ed-primary tm-btn"
+                disabled={adding || (way === "username" ? !cleanUsername(username) : way === "email" ? !email.trim() : way === "phone" ? !phone.trim() : false)}>
+                {adding ? "Sending…" : way === "email" ? "Email the invite" : way === "phone" ? "Text the invite" : way === "link" ? "Make the link" : "Send invite"}
+              </button>
             </div>
             {addError && <p className="ed-err" role="alert" data-testid="add-error">{addError}</p>}
           </form>
         )}
         {notice && <p className="ed-ok" role="status">{notice}</p>}
+        {made && (
+          <div className="ed-box" style={{ padding: 12, gap: 8 }} data-testid="made-link">
+            <input className="ed-in" readOnly aria-label="Invite link" value={made.url} onFocus={(e) => e.currentTarget.select()} />
+            <div className="ed-row-actions">
+              <button type="button" className="ed-primary ed-auto" onClick={() => share(made.text, made.url)}>Share</button>
+              <button type="button" className="mg-small" onClick={() => copy("made", made.url)}>{copied === "made" ? "Copied" : "Copy link"}</button>
+            </div>
+          </div>
+        )}
+        {links.length > 0 && (
+          <section className="ed-stack-sm" style={{ gap: 6 }} aria-label="Waiting to join" data-testid="team-links">
+            <h2 className="mg-section">WAITING TO JOIN</h2>
+            {links.map((l) => (
+              <div key={l.id} className="tm-row" style={{ cursor: "default", flexWrap: "wrap" }} data-testid="link-row">
+                <div style={{ minWidth: 0 }}>
+                  <div className="tm-row-name">Invite link</div>
+                  <div className="mg-sub" style={{ overflowWrap: "anywhere" }}>{linkRowLine(l, tz)}</div>
+                </div>
+                <div className="ed-row-actions">
+                  <button type="button" className="mg-small" onClick={() => copy(l.id, l.url)}>{copied === l.id ? "Copied" : "Copy"}</button>
+                  {(asHost || (l.scope === "event" && l.role !== "cohost")) && (
+                    <button type="button" className="mg-small" disabled={linkBusy !== null} onClick={() => cancelLink(l)}>{linkBusy === l.id ? "Cancelling…" : "Cancel"}</button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
 
         {rows.length === 0 && <div className="mg-sub" data-testid="team-empty">No one on the team yet. Invite someone above.</div>}
         {sections(rows).map((sec) => (

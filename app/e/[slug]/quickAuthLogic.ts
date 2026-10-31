@@ -2,7 +2,8 @@
 import { GENERIC_ERROR } from "../_shared/format";
 
 export type QuickMode = "signup" | "login";
-export type QuickPurpose = "checkout" | "rsvp" | "follow";
+/** team: an Event team invite link (p4-team step 9-0, goutsyde.com/team/CODE). */
+export type QuickPurpose = "checkout" | "rsvp" | "follow" | "team";
 
 /** What to do once the person is signed in. */
 export type Pending =
@@ -18,6 +19,7 @@ export const QUICK_COPY = {
   passwordRequired: "Enter your password.",
   exists: "That email already has an Outsyde account. Log in to get your tickets.",
   existsFollow: "That email already has an Outsyde account. Log in to follow.",
+  existsTeam: "That email already has an Outsyde account. Log in to join the team.",
   oauth: "This account uses Apple or Google sign in. Continue on the log in page.",
   limit: "Too many sign ups from this network. Please try again in a few minutes.",
   loginLimit: "Too many tries. Please wait a few minutes and try again.",
@@ -79,7 +81,7 @@ export function quickErrorCopy(status: number, body: unknown, mode: QuickMode = 
 
 /** The mockup 43 note, worded for what the sheet was opened for. */
 export function existsCopy(purpose: QuickPurpose): string {
-  return purpose === "follow" ? QUICK_COPY.existsFollow : QUICK_COPY.exists;
+  return purpose === "follow" ? QUICK_COPY.existsFollow : purpose === "team" ? QUICK_COPY.existsTeam : QUICK_COPY.exists;
 }
 
 export type LoginOutcome =
