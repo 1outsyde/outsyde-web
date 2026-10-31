@@ -11,6 +11,7 @@ import {
   takenLine, typeRowText, typeRows, whenWhere,
   type DoorGuest, type HostOrder, type Summary,
 } from "./manageLogic";
+import { isSummaryTeamPay, teamPayCard } from "./teamLogic";
 import { errorCopy, money, GENERIC_ERROR } from "../../e/_shared/format";
 
 type Screen = "loading" | "ready" | "notfound" | "error";
@@ -35,6 +36,8 @@ export default function ManageClient({ eventId }: { eventId: string }) {
   const [discarded, setDiscarded] = useState(false); // a draft was discarded: the page says so and points back
 
   const [refundId, setRefundId] = useState<string | null>(null);
+  // Step 8 (review): who's looking. Co-hosts never cancel or refund; "Team" co-hosts don't edit (backend cohostBlocked).
+  const [access, setAccess] = useState<{ as: "host" | "cohost"; level: "team" | "edit" | null }>({ as: "host", level: null });
   const [refunding, setRefunding] = useState(false);
   const [refundError, setRefundError] = useState<string | null>(null);
 
@@ -72,6 +75,8 @@ export default function ManageClient({ eventId }: { eventId: string }) {
       return;
     }
     const e = r.body.event as HostEvent;
+    const a = r.body.access;
+    setAccess(a?.as === "cohost" ? { as: "cohost", level: a.level === "edit" ? "edit" : "team" } : { as: "host", level: null });
     setEvent(e);
     setTypes(Array.isArray(r.body.ticketTypes) ? (r.body.ticketTypes as unknown[]).filter(isHostTicketType) : []);
     setScreen("ready");
@@ -176,6 +181,8 @@ export default function ManageClient({ eventId }: { eventId: string }) {
   const earnings = summary ? summary.totals.hostEarningsCents : 0;
   const payout = summary ? payoutCard(summary.payout, event.timezone, earnings) : null;
   const refunded = summary ? refundedLine(summary.totals) : null;
+  // Step 8 (call 54): team pay and what the host takes home, from the backend (nothing worked out here).
+  const team = summary && isSummaryTeamPay(summary.teamPay) ? teamPayCard(summary.teamPay) : null;
   const shownGuests = showAllGuests ? guests : guests.slice(0, GUEST_PREVIEW);
 
   return page(
@@ -196,7 +203,7 @@ export default function ManageClient({ eventId }: { eventId: string }) {
         </div>
 
         <div className="mg-toprow">
-          {event.status !== "cancelled" && <Link href={`/events/${event.id}/edit`} className="ed-outline">Edit</Link>}
+          {event.status !== "cancelled" && (access.as === "host" || access.level === "edit") && <Link href={`/events/${event.id}/edit`} className="ed-outline">Edit</Link>}
           {kind !== "paused" && <Link href={`/e/${event.slug}`} className="ed-outline">View page</Link>}
           {!isDraft && scannable && (
             <button type="button" className="ed-outline mg-share" onClick={copyLink}>
@@ -233,6 +240,14 @@ export default function ManageClient({ eventId }: { eventId: string }) {
                 <div className="mg-stat-mid">{payout ? payout.value : missing}</div>
                 {payout?.hint && <div className="mg-stat-hint">{payout.hint}</div>}
               </div>
+              {team && (
+                <div className="mg-stat" style={{ gridColumn: "1 / -1" }} data-testid="team-pay">
+                  <div className="mg-stat-label">Event team pay</div>
+                  <div className="mg-stat-mid">{team.team}</div>
+                  <div className="mg-stat-hint">{team.note}</div>
+                  <Link href={`/events/${event.id}/team`} className="ed-link" style={{ fontSize: 13 }}>See who gets what</Link>
+                </div>
+              )}
               <div className="mg-stat">
                 <div className="mg-stat-label">Refunded</div>
                 <div className="mg-stat-mid">{refunded ? refunded.value : missing}</div>
@@ -289,7 +304,7 @@ export default function ManageClient({ eventId }: { eventId: string }) {
                     <div className="mg-li-name">{guestName(o.guest)}</div>
                     <div className="mg-li-sub">{[guestHandle(o.guest), orderLine(o)].filter(Boolean).join(" · ")}</div>
                   </div>
-                  {refundId !== o.id && (
+                  {access.as === "host" && refundId !== o.id && (
                     <button type="button" className="mg-small" disabled={refunding} onClick={() => { setRefundId(o.id); setRefundError(null); }}>Refund</button>
                   )}
                   {refundId === o.id && (
@@ -311,11 +326,11 @@ export default function ManageClient({ eventId }: { eventId: string }) {
         <div className="mg-actions">
           {live && (
             <div className="mg-quick">
-              <Link href={`/events/${event.id}/team`} className="ed-outline">Door team</Link>
+              <Link href={`/events/${event.id}/team`} className="ed-outline">Event team</Link>
               {scannable && <Link href={`/events/${event.id}/scan`} className="ed-primary" style={{ minHeight: 48 }}>Scan tickets</Link>}
             </div>
           )}
-          {canCancel(event) && !confirmCancel && (
+          {access.as === "host" && canCancel(event) && !confirmCancel && (
             <button type="button" className="mg-cancel-link" onClick={() => { setConfirmCancel(true); setCancelError(null); }}>{isDraft ? "Discard draft" : "Cancel event"}</button>
           )}
           {confirmCancel && (

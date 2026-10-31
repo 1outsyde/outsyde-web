@@ -1,5 +1,6 @@
 /**
  * Pure helpers shared by the door pages: /events/door, /events/[id]/team and the scanner (roles, scan window, times).
+ * p4-team step 8 (call 51): "Event team" everywhere on the website, never "door team".
  * No React, no network. Shapes follow outsyde-backend server/events/doorRouter.ts and doorAccess.ts.
  * Unit tests: tests/events-door-logic.test.ts.
  */
@@ -54,14 +55,14 @@ export function canLeave(e: DoorEvent): boolean {
 
 export function leaveConfirmCopy(e: DoorEvent): string {
   return e.role === "standing"
-    ? "Leave this host's door team? You won't be able to scan any of their events."
-    : `Leave the door team for ${e.title}? You won't be able to scan it anymore.`;
+    ? "Leave this host's Event team? You won't be on the team for any of their events."
+    : `Leave the Event team for ${e.title}? You won't be on the team for it anymore.`;
 }
 
 export function roleLabel(role: DoorRole): string {
   if (role === "host") return "Your event";
-  if (role === "standing") return "Door team";
-  return "Door team, this event";
+  if (role === "standing") return "Event team";
+  return "Event team, this event";
 }
 
 /* ---------- door team ---------- */
@@ -139,7 +140,7 @@ export function isDoorInvite(x: unknown): x is DoorInvite {
 }
 
 export function inviteHeadline(i: DoorInvite): string {
-  return `${i.host.name} invited you to their door team`;
+  return `${i.host.name} invited you to their Event team`;
 }
 
 /** Canvas 40: what the invite covers, the event day in the event's own zone. */
@@ -153,13 +154,13 @@ export function inviteScopeLine(i: DoorInvite): string {
 export function inviteAnsweredCopy(answer: "accepted" | "declined", i: DoorInvite): string {
   if (answer === "declined") return `Invite declined. ${i.host.name} can see you said no.`;
   return i.scope === "event"
-    ? "You're on the door team. The event is in your list below."
-    : "You're on the door team. Their events are in your list below.";
+    ? "You're on the Event team. The event is in your list below."
+    : "You're on the Event team. Their events are in your list below.";
 }
 
 export function removeConfirmCopy(m: TeamMember, scope: Scope): string {
   const who = guestName(m);
   return scope === "standing"
-    ? `Remove ${who} from your door team? They stop being able to scan all your events.`
-    : `Remove ${who} from this event's door team? They stop being able to scan this event.`;
+    ? `Remove ${who} from your Event team? They stop being on the team for all your events.`
+    : `Remove ${who} from this event's team? They stop being on the team for this event.`;
 }

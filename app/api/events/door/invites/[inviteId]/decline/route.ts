@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
-import { forward, isUuid, notFound } from "../../../../_lib/bff";
+import { forward, isUuid, notFound, rolesAll } from "../../../../_lib/bff";
 
 /** Decline a door team invite (backend doorRouter.ts POST /door/invites/:inviteId/decline). No body. */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ inviteId: string }> }) {
   const { inviteId } = await params;
   if (!isUuid(inviteId)) return notFound();
-  return forward(req, "POST", `/api/events/door/invites/${inviteId}/decline`, {});
+  return forward(req, "POST", `/api/events/door/invites/${inviteId}/decline`, {}, rolesAll(req));
 }

@@ -25,15 +25,15 @@ eq(scanWindowNote(ev, new Date("2026-10-25T06:00:00.001Z")), "Check in has close
 // door/mine
 eq(isDoorEvent({ id: "e", slug: "s", title: "T", startsAt: "a", endsAt: "b", timezone: tz, role: "standing" }), true, "door event guard");
 eq(isDoorEvent({ id: "e", title: "T", startsAt: "a", endsAt: "b", timezone: tz, role: "admin" }), false, "unknown role rejected");
-eq([roleLabel("host"), roleLabel("standing"), roleLabel("event")], ["Your event", "Door team", "Door team, this event"], "role labels");
+eq([roleLabel("host"), roleLabel("standing"), roleLabel("event")], ["Your event", "Event team", "Event team, this event"], "role labels");
 
 // door team
 eq(cleanUsername("  @marcus "), "marcus", "username: trims and drops the @");
 eq(cleanUsername("marcus"), "marcus", "username unchanged");
 eq(removeConfirmCopy({ userId: "u", firstName: "Marcus", username: "marcus", addedAt: null }, "standing"),
-  "Remove Marcus from your door team? They stop being able to scan all your events.", "remove standing copy");
+  "Remove Marcus from your Event team? They stop being on the team for all your events.", "remove standing copy");
 eq(removeConfirmCopy({ userId: "u", firstName: null, username: "marcus", addedAt: null }, "event"),
-  "Remove @marcus from this event's door team? They stop being able to scan this event.", "remove event copy");
+  "Remove @marcus from this event's team? They stop being on the team for this event.", "remove event copy");
 
 eq(scanWindowNote({ ...ev, status: "published" }, new Date("2026-10-24T20:00:00.000Z")), null, "published inside the window");
 eq(scanWindowNote({ ...ev, status: "cancelled" }, new Date("2026-10-24T20:00:00.000Z")), "Check in is closed for this event.", "cancelled is closed");
@@ -62,11 +62,11 @@ eq(isDoorInvite(inv({})), true, "invite guard");
 eq(isDoorInvite({ ...inv({}), status: "maybe" }), false, "unknown status rejected");
 eq(isDoorInvite({ ...inv({}), host: null }), false, "invite needs a host");
 eq(isDoorInvite(inv({ scope: "standing", event: null, upcoming: [{ id: "e2", title: "T", startsAt: "2026-11-01T01:00:00.000Z", timezone: tz }] })), true, "standing invite guard");
-eq(inviteHeadline(inv({})), "Club Nine invited you to their door team", "headline");
+eq(inviteHeadline(inv({})), "Club Nine invited you to their Event team", "headline");
 eq(inviteScopeLine(inv({})), "Only this event: Late Night, Sat, Oct 31. You can scan tickets and see the guest list.", "event scope line in the event's zone");
 eq(inviteScopeLine(inv({ scope: "standing", event: null })), "All of Club Nine's events. You can scan tickets and see the guest list.", "standing scope line");
-eq(inviteAnsweredCopy("accepted", inv({})), "You're on the door team. The event is in your list below.", "accepted copy, event");
-eq(inviteAnsweredCopy("accepted", inv({ scope: "standing", event: null })), "You're on the door team. Their events are in your list below.", "accepted copy, standing");
+eq(inviteAnsweredCopy("accepted", inv({})), "You're on the Event team. The event is in your list below.", "accepted copy, event");
+eq(inviteAnsweredCopy("accepted", inv({ scope: "standing", event: null })), "You're on the Event team. Their events are in your list below.", "accepted copy, standing");
 eq(inviteAnsweredCopy("declined", inv({})), "Invite declined. Club Nine can see you said no.", "declined copy");
 for (const s of [inviteScopeLine(inv({})), inviteAnsweredCopy("declined", inv({})), memberStatusLine(mem({ status: "declined" }), "event")]) {
   eq(/[–—]| - /.test(s), false, `no dashes: ${s.slice(0, 30)}`);
@@ -76,8 +76,8 @@ for (const s of [inviteScopeLine(inv({})), inviteAnsweredCopy("declined", inv({}
 const dev = (o: object) => ({ id: "e", slug: "s", title: "Late Night", startsAt: "a", endsAt: "b", timezone: tz, role: "event", inviteId: "i9", ...o }) as any;
 eq([canLeave(dev({})), canLeave(dev({ role: "standing" })), canLeave(dev({ role: "host", inviteId: null })), canLeave(dev({ inviteId: null })), canLeave(dev({ inviteId: undefined }))],
   [true, true, false, false, false], "Leave only for a member row that has its invite id");
-eq(leaveConfirmCopy(dev({})), "Leave the door team for Late Night? You won't be able to scan it anymore.", "leave copy, one event");
-eq(leaveConfirmCopy(dev({ role: "standing" })), "Leave this host's door team? You won't be able to scan any of their events.", "leave copy, all events");
+eq(leaveConfirmCopy(dev({})), "Leave the Event team for Late Night? You won't be on the team for it anymore.", "leave copy, one event");
+eq(leaveConfirmCopy(dev({ role: "standing" })), "Leave this host's Event team? You won't be on the team for any of their events.", "leave copy, all events");
 eq(isDoorEvent(dev({})), true, "door event guard accepts inviteId");
 
 console.log(`\n${passed} passed, ${failed} failed`);

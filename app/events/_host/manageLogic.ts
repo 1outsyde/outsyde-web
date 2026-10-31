@@ -79,6 +79,8 @@ export interface Summary {
   ticketTypes: SummaryType[];
   totals: { sold: number; grossCents: number; hostEarningsCents: number; refundedTickets: number; refundedCents: number; refundPendingTickets: number };
   payout: { expectedAt: string | null; status: string; amountCents: number | null; deductedCents: number | null; paidAt: string | null };
+  /** p4-team step 4a (backend ticketRefunds.ts summary): team pay and what the host takes home. Older backends: absent. */
+  teamPay?: unknown;
 }
 
 export interface HostOrder {

@@ -374,7 +374,7 @@ export default function Scanner({ eventId }: { eventId: string }) {
     return page(
       <div className="ed-card-msg" role="alert" data-testid="not-found">
         <h1 className="ed-h1">EVENT NOT FOUND</h1>
-        <p className="ed-text">Event not found. Only the host and their door team can scan tickets for an event.</p>
+        <p className="ed-text">Event not found. Only the host, co-hosts and Admissions on their Event team can scan tickets for an event.</p>
         <Link href="/events/door" className="ed-primary ed-auto">Events you can scan</Link>
       </div>,
     );

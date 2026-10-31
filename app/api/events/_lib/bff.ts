@@ -28,7 +28,7 @@ export function badRequest(code: string, message: string): NextResponse {
   return NextResponse.json({ success: false, error: message, code }, { status: 400 });
 }
 
-export type ForwardMethod = "GET" | "POST" | "PATCH" | "DELETE";
+export type ForwardMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
 /**
  * Forward with the caller's Bearer token and Cookie. An optional query (a string such as "scope=event" or
@@ -46,6 +46,20 @@ export function forward(
   const qs = query === undefined ? "" : query.toString();
   const headers = { ...(extraHeaders ?? {}), ...(backendAuthHeaders(req) as Record<string, string>) };
   return proxyToBackend(qs ? `${path}?${qs}` : path, { method, headers, body });
+}
+
+/** p4-team step 8: the Event team roles the backend accepts (doorRouter roleSchema). */
+export const TEAM_ROLES = new Set(["door", "security", "host", "entertainment", "media", "cohost", "other"]);
+
+/** ?roles=all passes through when the caller sent exactly that; anything else is dropped (the backend default). */
+export function rolesAll(req: NextRequest): URLSearchParams | undefined {
+  return req.nextUrl.searchParams.get("roles") === "all" ? new URLSearchParams({ roles: "all" }) : undefined;
+}
+
+/** ?role= for a per role route: a known role, else null (answer 400). */
+export function roleParam(req: NextRequest): string | null {
+  const r = req.nextUrl.searchParams.get("role") ?? "";
+  return TEAM_ROLES.has(r) ? r : null;
 }
 
 /** Parse the client's JSON object body; null when it is missing, invalid or not an object. */
