@@ -176,6 +176,23 @@ with sync_playwright() as p:
         sql(f"INSERT INTO event_door_members (event_id, member_user_id, added_by_user_id, role, invited_at, accepted_at) VALUES ('{ev}', '{late}', '{host}', 'media', now(), now())")
         sql(f"INSERT INTO event_team_pay (event_id, member_user_id, role, pay_type, fixed_cents, updated_by_user_id) VALUES ('{ev}', '{late}', 'media', 'fixed', 9000, '{host}')")
         sql(f"INSERT INTO user_payout_accounts (user_id, stripe_account_id, onboarding_complete) VALUES ('{late}', 'acct_{P}late', true)")
+        print("a slow note never holds up the page")
+        for who, path, main_id in ((free, "/events/door", "door-invite"), (late, f"/events/{ev}/my-team", "my-team")):
+            ctx, pg, errs = new_ctx(b, tok(who))
+            held = []
+            pg.route("**/api/events/team-note", lambda r: held.append(r))
+            pg.goto(f"{WEB}{path}")
+            shown = True
+            try: pg.get_by_test_id(main_id).first.wait_for(timeout=8000)
+            except Exception: shown = False
+            check(shown and len(held) == 1, f"{path}: the page draws while the note is still loading", (shown, len(held)))
+            for r in held: r.continue_()
+            if who == late:
+                pg.get_by_test_id("my-note").wait_for()
+                check(True, f"{path}: the note card appears once it arrives")
+            check(real(errs) == [], "no page errors", real(errs))
+            ctx.close()
+
         ctx, pg, errs = new_ctx(b, tok(late))
         pg.goto(f"{WEB}/events/{ev}/my-team")
         pg.get_by_test_id("my-team").wait_for()

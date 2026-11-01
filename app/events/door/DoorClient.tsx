@@ -50,10 +50,9 @@ export default function DoorClient() {
 
   const load = useCallback(async () => {
     setError(null);
-    const [r, i, n] = await Promise.all([
-      call("GET", "/api/events/door/mine?roles=all"), call("GET", "/api/events/door/invites?roles=all"), call("GET", "/api/events/team-note"),
-    ]);
-    setNote(n && n.status === 200 && isTeamNote(n.body?.note) ? n.body.note : null);
+    // The note loads on its own: a slow answer never holds up the list (its card just appears when it arrives).
+    call("GET", "/api/events/team-note").then((n) => setNote(n && n.status === 200 && isTeamNote(n.body?.note) ? n.body.note : null));
+    const [r, i] = await Promise.all([call("GET", "/api/events/door/mine?roles=all"), call("GET", "/api/events/door/invites?roles=all")]);
     if (!r) return;
     if (r.status !== 200 || !r.body?.success || !Array.isArray(r.body.events)) { setError(errorCopy(r.status, r.body)); return; }
     setEvents((r.body.events as unknown[]).filter(isTeamEvent));

@@ -51,10 +51,9 @@ export default function MyTeamClient({ eventId }: { eventId: string }) {
   const [note, setNote] = useState<TeamNote | null>(null);
 
   const load = useCallback(async () => {
-    const [r, mine, n] = await Promise.all([
-      call("GET", `/api/events/${eventId}/team/me`), call("GET", "/api/events/door/mine?roles=all"), call("GET", "/api/events/team-note"),
-    ]);
-    setNote(n && n.status === 200 && isTeamNote(n.body?.note) ? n.body.note : null);
+    // The note loads on its own: a slow answer never holds up the page (its card just appears when it arrives).
+    call("GET", "/api/events/team-note").then((n) => setNote(n && n.status === 200 && isTeamNote(n.body?.note) ? n.body.note : null));
+    const [r, mine] = await Promise.all([call("GET", `/api/events/${eventId}/team/me`), call("GET", "/api/events/door/mine?roles=all")]);
     if (!r) return;
     if (r.status === 404) { setState("notfound"); return; }
     if (r.status !== 200 || !r.body?.success || !r.body.event) { setLoadError(errorCopy(r.status, r.body)); setState("error"); return; }
