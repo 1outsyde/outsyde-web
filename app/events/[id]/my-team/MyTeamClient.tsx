@@ -5,6 +5,8 @@
  * times, where to go and the host's notes, notes from the host, a request to stay longer (Accept / Decline), my
  * promoter link, what I'll get (exactly what's paid: the backend works out every amount), payout setup, and after the
  * payout, Got it / Not yet. Only my own things (GET /team/me answers 404 for anyone not on the team).
+ * Step 9d-2: the Event Team note with I accept while they have pay and haven't accepted (shown even while the backend's
+ * TEAM_NOTE_REQUIRED switch is off, call 85), and "Set up payouts" only when payout setup is what's missing.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -19,13 +21,16 @@ import {
   timeFields, timeOf, type RolePay, type Schedule, type StayRequest, type TeamEvent, type TeamPayout,
 } from "../../_host/teamLogic";
 import { TEAM_CSS } from "../../_host/teamStyles";
+import TeamNoteCard from "../../_host/TeamNoteCard";
+import { isTeamNote, noteOnMyPage, setupLinkShown, type TeamNote } from "../../_host/teamNoteLogic";
 
 type Role = { role: string; roleLabel: string | null; roleInfo?: { name: string; description: string }; scope: "standing" | "event"; schedule: Schedule | null; pay: RolePay | null };
 type Me = {
   event: { id: string; slug: string; title: string; startsAt: string; endsAt: string; timezone: string };
   host: { name: string }; roles: Role[];
   promoter: { code: string; url: string; rsvps: number; ticketsSold: number; salesCents: number } | null;
-  payTotalCents: number | null; payout: TeamPayout | null; payoutSetup: { needed: boolean; deadline: string | null } | null;
+  payTotalCents: number | null; payout: TeamPayout | null;
+  payoutSetup: { needed: boolean; deadline: string | null; stripeNeeded?: boolean; noteNeeded?: boolean } | null;
   fromHost: { id: string; at: string; text: string; from: { name?: string } }[]; stayLonger: StayRequest[];
 };
 
@@ -36,16 +41,20 @@ export default function MyTeamClient({ eventId }: { eventId: string }) {
   const [state, setState] = useState<"loading" | "ready" | "notfound" | "error">("loading");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [note, setNote] = useState<{ where: string; ok: boolean; text: string } | null>(null);
+  const [said, setSay] = useState<{ where: string; ok: boolean; text: string } | null>(null);
   const [leaving, setLeaving] = useState<string | null>(null);
   // Leaving the last spot makes /team/me answer 404: keep the confirmation on that screen.
   const [left, setLeft] = useState(false);
   // Read when the data loads, never during render.
   const [now, setNow] = useState(0);
   const busyRef = useRef(false);
+  const [note, setNote] = useState<TeamNote | null>(null);
 
   const load = useCallback(async () => {
-    const [r, mine] = await Promise.all([call("GET", `/api/events/${eventId}/team/me`), call("GET", "/api/events/door/mine?roles=all")]);
+    const [r, mine, n] = await Promise.all([
+      call("GET", `/api/events/${eventId}/team/me`), call("GET", "/api/events/door/mine?roles=all"), call("GET", "/api/events/team-note"),
+    ]);
+    setNote(n && n.status === 200 && isTeamNote(n.body?.note) ? n.body.note : null);
     if (!r) return;
     if (r.status === 404) { setState("notfound"); return; }
     if (r.status !== 200 || !r.body?.success || !r.body.event) { setLoadError(errorCopy(r.status, r.body)); setState("error"); return; }
@@ -65,21 +74,21 @@ export default function MyTeamClient({ eventId }: { eventId: string }) {
 
   useEffect(() => { load(); }, [load]);
 
-  async function act(where: string, path: string, ok: string) {
+  async function act(where: string, path: string, ok: string, body?: unknown) {
     if (busyRef.current) return;
     busyRef.current = true;
     setBusy(where);
-    setNote(null);
-    const r = await call("POST", path);
+    setSay(null);
+    const r = await call("POST", path, body);
     busyRef.current = false;
     setBusy(null);
     if (!r) return;
-    if (r.status === 200 && r.body?.success) { if (where.startsWith("leave:")) setLeft(true); setNote({ where, ok: true, text: ok }); setLeaving(null); await load(); return; }
-    setNote({ where, ok: false, text: backendMessage(r.status, r.body) });
+    if (r.status === 200 && r.body?.success) { if (where.startsWith("leave:")) setLeft(true); setSay({ where, ok: true, text: ok }); setLeaving(null); await load(); return; }
+    setSay({ where, ok: false, text: backendMessage(r.status, r.body) });
     if (r.status === 409 || r.status === 404) await load();
   }
 
-  const say = (where: string) => note?.where === where ? <p className={note.ok ? "ed-ok" : "ed-err"} role={note.ok ? "status" : "alert"}>{note.text}</p> : null;
+  const say = (where: string) => said?.where === where ? <p className={said.ok ? "ed-ok" : "ed-err"} role={said.ok ? "status" : "alert"}>{said.text}</p> : null;
   const page = (inner: React.ReactNode) => <HostShell css={MANAGE_CSS + TEAM_CSS}>{inner}</HostShell>;
   const back = (
     <Link href="/events/door" className="ed-icon-btn" aria-label="Back to Event team">
@@ -129,7 +138,7 @@ export default function MyTeamClient({ eventId }: { eventId: string }) {
             {say(`stay:${r.id}`)}
           </section>
         ))}
-        {open.length === 0 && note?.where.startsWith("stay:") && say(note.where)}
+        {open.length === 0 && said?.where.startsWith("stay:") && say(said.where)}
 
         {me.roles.map((r) => {
           const s = r.schedule;
@@ -153,7 +162,7 @@ export default function MyTeamClient({ eventId }: { eventId: string }) {
           <section className="tm-tot" aria-label="Your link" data-testid="my-link">
             <h2 className="mg-section">YOUR LINK</h2>
             <div className="tm-msg-text" style={{ wordBreak: "break-all" }}>{me.promoter.url}</div>
-            <button type="button" className="mg-small" style={{ alignSelf: "flex-start" }} onClick={() => { try { navigator.clipboard?.writeText(me.promoter!.url); setNote({ where: "link", ok: true, text: "Link copied." }); } catch { /* ignore */ } }}>Copy link</button>
+            <button type="button" className="mg-small" style={{ alignSelf: "flex-start" }} onClick={() => { try { navigator.clipboard?.writeText(me.promoter!.url); setSay({ where: "link", ok: true, text: "Link copied." }); } catch { /* ignore */ } }}>Copy link</button>
             {say("link")}
             <div className="mg-trow"><span>Tickets sold through your link</span><b>{me.promoter.ticketsSold}</b></div>
             {me.promoter.rsvps > 0 && <div className="mg-trow"><span>RSVPs through your link</span><b>{me.promoter.rsvps}</b></div>}
@@ -188,7 +197,7 @@ export default function MyTeamClient({ eventId }: { eventId: string }) {
               </div>
             )}
             {say("paid")}
-            {me.payoutSetup?.needed && (
+            {me.payoutSetup && setupLinkShown(me.payoutSetup) && (
               <p className="ed-err" style={{ margin: 0 }} data-testid="setup-needed">
                 Set up payouts{me.payoutSetup.deadline ? ` by ${fmt(me.payoutSetup.deadline, tz, { weekday: "short", month: "short", day: "numeric" })}` : ""} to get paid. <Link href="/events/payouts" className="ed-link">Set up</Link>
               </p>
@@ -196,12 +205,18 @@ export default function MyTeamClient({ eventId }: { eventId: string }) {
           </section>
         )}
 
+        {noteOnMyPage({ hasPay: lines.length > 0, paidOut: !!me.payout }, note) && note && (
+          <TeamNoteCard note={note} busy={busy === "note"} testId="my-note"
+            onAccept={() => act("note", "/api/events/team-note/accept", "Thanks. You've accepted the Event Team note.", { version: note.version })} />
+        )}
+        {say("note")}
+
         {spots.length > 0 && !ended && (
           <section className="ed-stack-sm" aria-label="Leave">
             {spots.map((sp) => (
               <div key={sp.inviteId} className="ed-stack-sm" style={{ gap: 6 }}>
                 {leaving !== sp.inviteId && (
-                  <button type="button" className="ed-textbtn" style={{ alignSelf: "flex-end", minHeight: 36 }} disabled={busy !== null} onClick={() => { setLeaving(sp.inviteId); setNote(null); }}>
+                  <button type="button" className="ed-textbtn" style={{ alignSelf: "flex-end", minHeight: 36 }} disabled={busy !== null} onClick={() => { setLeaving(sp.inviteId); setSay(null); }}>
                     Leave as {roleName(sp.role, sp.roleLabel)}{sp.scope === "standing" ? " (all their events)" : ""}
                   </button>
                 )}
