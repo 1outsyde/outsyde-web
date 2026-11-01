@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * Event team (p4-team step 8, mockup D). The invite email's "Accept or decline" button opens this page
+ * Event team (p4-team step 8, mockup D). Step 9d-2: an invite that offers pay shows the Event Team note above one
+ * "Accept and join" (join first, then the note: calls 79, 84); a failed note save leaves them on the team. The invite email's "Accept or decline" button opens this page
  * (goutsyde.com/events/door, kept so emails already sent still work).
  *   INVITES FOR YOU   GET /door/invites?roles=all: open invites for every role, with the pay offered.
  *   YOUR EVENTS       GET /door/mine?roles=all: events I host or am on the team for (upcoming, or ended in the last
@@ -19,6 +20,8 @@ import { errorCopy } from "../../e/_shared/format";
 import { isDoorInvite, scanWindowNote, type DoorInvite } from "../_host/doorLogic";
 import { hasMemberPage, isCohosting, isTeamEvent, teamInviteHeadline, teamInviteLine, teamRolesLine, type TeamEvent } from "../_host/teamLogic";
 import { TEAM_CSS } from "../_host/teamStyles";
+import TeamNoteCard from "../_host/TeamNoteCard";
+import { acceptLabel, isTeamNote, noteOnAccept, NOTE_SAVE_FAILED, type TeamNote } from "../_host/teamNoteLogic";
 
 const INVITE_CSS = `
 .dr-invite { background: #1C1C1E; border: 1px solid #E8B930; border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
@@ -40,11 +43,15 @@ export default function DoorClient() {
   const [busy, setBusy] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<{ id: string; text: string } | null>(null);
   const [answered, setAnswered] = useState<string | null>(null);
+  // The Event Team note (null until loaded or when it fails: joining still works, just without the card).
+  const [note, setNote] = useState<TeamNote | null>(null);
   // Set before any await, so a double tap sends one request (state alone updates a render too late).
   const busyRef = useRef(false);
 
   const load = useCallback(async () => {
     setError(null);
+    // The note loads on its own: a slow answer never holds up the list (its card just appears when it arrives).
+    call("GET", "/api/events/team-note").then((n) => setNote(n && n.status === 200 && isTeamNote(n.body?.note) ? n.body.note : null));
     const [r, i] = await Promise.all([call("GET", "/api/events/door/mine?roles=all"), call("GET", "/api/events/door/invites?roles=all")]);
     if (!r) return;
     if (r.status !== 200 || !r.body?.success || !Array.isArray(r.body.events)) { setError(errorCopy(r.status, r.body)); return; }
@@ -63,16 +70,23 @@ export default function DoorClient() {
     setBusy(inv.id);
     setInviteError(null);
     setAnswered(null);
+    const withNote = a === "accept" && noteOnAccept(inv.pay, note);
     const r = await call("POST", `/api/events/door/invites/${inv.id}/${a}?roles=all`);
-    busyRef.current = false;
-    setBusy(null);
-    if (!r) return;
+    if (!r) { busyRef.current = false; setBusy(null); return; }
     if (r.status !== 200 || !r.body?.success) {
+      busyRef.current = false;
+      setBusy(null);
       setInviteError({ id: inv.id, text: backendMessage(r.status, r.body) });
       if (r.status === 409 || r.status === 404) load();
       return;
     }
+    // Call 84: joined first; now the note. A failure here never undoes joining.
+    const n = withNote && note ? await call("POST", "/api/events/team-note/accept", { version: note.version }) : null;
+    busyRef.current = false;
+    setBusy(null);
+    const noteFailed = withNote && !(n && n.status === 200 && n.body?.success);
     setAnswered(a === "decline" ? `Invite declined. ${inv.host.name} can see you said no.`
+      : noteFailed ? NOTE_SAVE_FAILED
       : inv.scope === "event" ? "You're on the Event team. The event is in your list below." : "You're on the Event team. Their events are in your list below.");
     await load();
   }
@@ -118,17 +132,21 @@ export default function DoorClient() {
         {(invites.length > 0 || answered) && (
           <section className="mg-group" aria-label="Event team invites" data-testid="door-invites">
             <h2 className="mg-section">INVITES FOR YOU</h2>
-            {invites.map((inv) => (
+            {invites.map((inv) => {
+              const withNote = noteOnAccept(inv.pay, note);
+              return (
               <div key={inv.id} className="dr-invite" data-testid="door-invite">
                 <p className="dr-invite-h">{teamInviteHeadline(inv)}</p>
                 <p className="dr-invite-p">{teamInviteLine(inv)}</p>
+                {withNote && note && <TeamNoteCard note={note} testId="invite-note" />}
                 {inviteError?.id === inv.id && <p className="ed-err" role="alert">{inviteError.text}</p>}
                 <div className="dr-invite-actions">
-                  <button type="button" className="ed-primary" disabled={busy !== null} onClick={() => answer(inv, "accept")}>{busy === inv.id ? "Saving…" : "Accept"}</button>
+                  <button type="button" className="ed-primary" disabled={busy !== null} onClick={() => answer(inv, "accept")} data-testid="invite-accept">{busy === inv.id ? "Saving…" : acceptLabel(withNote)}</button>
                   <button type="button" className="mg-small" disabled={busy !== null} onClick={() => answer(inv, "decline")}>Decline</button>
                 </div>
               </div>
-            ))}
+              );
+            })}
             {answered && <p className="ed-ok" role="status">{answered}</p>}
           </section>
         )}
