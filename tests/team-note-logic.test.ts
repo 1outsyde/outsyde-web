@@ -10,7 +10,7 @@
  *    backend doesn't ask yet (call 85)" fails.
  */
 import {
-  acceptLabel, isTeamNote, noteOnAccept, noteOnMyPage, payOffered, setupLinkShown, NOTE_SAVE_FAILED, type TeamNote,
+  acceptLabel, isTeamNote, noteDueLine, noteOnAccept, noteOnMyPage, payNotWorkedOut, payOffered, setupLinkShown, NOTE_SAVE_FAILED, NOTE_SAVE_FAILED_HERE, type TeamNote,
 } from "../app/events/_host/teamNoteLogic";
 
 let passed = 0, failed = 0;
@@ -60,6 +60,18 @@ eq(noteOnMyPage({ hasPay: true, paidOut: true }, note()), false, "pay already wo
 eq(noteOnMyPage({ hasPay: true, paidOut: false }, note(true)), false, "accepted: not shown");
 eq(noteOnMyPage({ hasPay: true, paidOut: false }, null), false, "note didn't load: not shown");
 
+console.log("pay not worked out yet (the backend's rule)");
+eq(payNotWorkedOut({ payoutSetup: { needed: false, deadline: null }, payout: null }), true, "payoutSetup sent: pay waiting");
+eq(payNotWorkedOut({ payoutSetup: null, payout: null }), false, "no payoutSetup (no pay, or fixed): no card");
+eq(payNotWorkedOut({ payoutSetup: { needed: true, deadline: null }, payout: { amountCents: 1 } }), false, "a payout exists: no card");
+
+console.log("the note couldn't load while it's due");
+const when = () => "Tue, Nov 10";
+eq(noteDueLine({ noteNeeded: true, deadline: "2026-11-10T00:00:00Z" }, false, when), "Accept the Event Team note by Tue, Nov 10 to get paid.", "says what is due and by when");
+eq(noteDueLine({ noteNeeded: true, deadline: "2026-11-10T00:00:00Z" }, true, when), null, "the card is there: no extra line");
+eq(noteDueLine({ noteNeeded: false, deadline: null }, false, when), null, "not due: nothing");
+eq(noteDueLine(null, false, when), null, "no info: nothing");
+
 console.log("the Set up payouts link");
 eq(setupLinkShown({ needed: true, deadline: null }), true, "older backend (no detail): as before");
 eq(setupLinkShown({ needed: true, deadline: null, stripeNeeded: true, noteNeeded: false }), true, "payouts missing: shown");
@@ -68,7 +80,8 @@ eq(setupLinkShown({ needed: false, deadline: null, stripeNeeded: false, noteNeed
 eq(setupLinkShown(null), false, "no setup info");
 
 console.log("copy");
-eq(DASH.test(NOTE_SAVE_FAILED), false, "no dashes");
+eq(DASH.test(NOTE_SAVE_FAILED) || DASH.test(NOTE_SAVE_FAILED_HERE), false, "no dashes");
+eq(/below/.test(NOTE_SAVE_FAILED_HERE) && !/event page/.test(NOTE_SAVE_FAILED_HERE), true, "on the link page it points below, where the card is");
 eq(/event page/i.test(NOTE_SAVE_FAILED) && /on the team/i.test(NOTE_SAVE_FAILED), true, "says they joined and where the note waits");
 
 console.log(`\n${passed} passed, ${failed} failed`);

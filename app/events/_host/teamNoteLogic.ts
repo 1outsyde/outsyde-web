@@ -43,5 +43,19 @@ export function setupLinkShown(s: { needed: boolean; deadline: string | null; st
   return typeof s.stripeNeeded === "boolean" ? s.stripeNeeded : true;
 }
 
-/** Joined, but saving the note failed (call 84). */
+/** Joined, but saving the note failed (call 84). On the invite list it waits on their event page. */
 export const NOTE_SAVE_FAILED = "You're on the team. Your acceptance of the Event Team note didn't save, so it's waiting on your event page.";
+/** The same on the link page, where the note card shows again right below. */
+export const NOTE_SAVE_FAILED_HERE = "You're on the team. Your acceptance of the Event Team note didn't save. Accept it below.";
+
+/**
+ * Their event page: pay that isn't worked out yet, the backend's own rule (GET /team/me sends payoutSetup only then:
+ * paid, team pay not fixed, no payout). Null payoutSetup (no pay, worked out, or it failed): no note card.
+ */
+export const payNotWorkedOut = (me: { payoutSetup: unknown; payout: unknown }) => me.payoutSetup !== null && me.payoutSetup !== undefined && !me.payout;
+
+/** When the switch is on and the note couldn't load: still tell them what's due, so the page is never silent. */
+export function noteDueLine(s: { noteNeeded?: boolean; deadline: string | null } | null, noteLoaded: boolean, when: (iso: string) => string): string | null {
+  if (!s?.noteNeeded || noteLoaded) return null;
+  return s.deadline ? `Accept the Event Team note by ${when(s.deadline)} to get paid.` : "Accept the Event Team note to get paid.";
+}

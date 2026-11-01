@@ -19,7 +19,7 @@ import { GENERIC_ERROR } from "../../e/_shared/format";
 import { cleanCode, isLinkPage, linkPageView, type LinkPage } from "../../events/_host/teamLinksLogic";
 import QuickAuthSheet from "../../e/[slug]/QuickAuthSheet";
 import TeamNoteCard from "../../events/_host/TeamNoteCard";
-import { acceptLabel, isTeamNote, noteOnAccept, NOTE_SAVE_FAILED, payOffered, type TeamNote } from "../../events/_host/teamNoteLogic";
+import { acceptLabel, isTeamNote, noteOnAccept, NOTE_SAVE_FAILED_HERE, payOffered, type TeamNote } from "../../events/_host/teamNoteLogic";
 
 type Res = { status: number; body: any } | null; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -79,13 +79,17 @@ export default function TeamLinkClient({ code: raw }: { code: string }) {
     if (r && r.status === 200 && isTeamNote(r.body?.note)) { setNote(r.body.note); return true; }
     return false;
   }
+  const noteBusyRef = useRef(false);
   async function acceptNoteNow() {
-    if (!note || noteBusy) return;
+    if (!note || noteBusyRef.current) return;
+    noteBusyRef.current = true;
     setNoteBusy(true);
     setNoteErr(null);
     const ok = await acceptNote(note);
+    noteBusyRef.current = false;
     setNoteBusy(false);
-    if (!ok) setNoteErr(GENERIC_ERROR);
+    if (ok) setErr(null); // the earlier "didn't save" message no longer applies
+    else setNoteErr(GENERIC_ERROR);
   }
 
   async function accept() {
@@ -98,7 +102,7 @@ export default function TeamLinkClient({ code: raw }: { code: string }) {
     const r = await req("POST", `/api/events/team-links/${code}/accept`);
     if (r && r.status === 200 && r.body?.success && shown && note) {
       // Call 84: joined first; a failed note save never undoes it.
-      if (!(await acceptNote(note))) setErr(NOTE_SAVE_FAILED);
+      if (!(await acceptNote(note))) setErr(NOTE_SAVE_FAILED_HERE);
     }
     busyRef.current = false;
     setBusy(false);

@@ -22,7 +22,7 @@ import {
 } from "../../_host/teamLogic";
 import { TEAM_CSS } from "../../_host/teamStyles";
 import TeamNoteCard from "../../_host/TeamNoteCard";
-import { isTeamNote, noteOnMyPage, setupLinkShown, type TeamNote } from "../../_host/teamNoteLogic";
+import { isTeamNote, noteDueLine, noteOnMyPage, payNotWorkedOut, setupLinkShown, type TeamNote } from "../../_host/teamNoteLogic";
 
 type Role = { role: string; roleLabel: string | null; roleInfo?: { name: string; description: string }; scope: "standing" | "event"; schedule: Schedule | null; pay: RolePay | null };
 type Me = {
@@ -197,6 +197,11 @@ export default function MyTeamClient({ eventId }: { eventId: string }) {
               </div>
             )}
             {say("paid")}
+            {noteDueLine(me.payoutSetup, !!note, (d) => fmt(d, tz, { weekday: "short", month: "short", day: "numeric" })) && (
+              <p className="ed-err" style={{ margin: 0 }} data-testid="note-due">
+                {noteDueLine(me.payoutSetup, !!note, (d) => fmt(d, tz, { weekday: "short", month: "short", day: "numeric" }))}
+              </p>
+            )}
             {me.payoutSetup && setupLinkShown(me.payoutSetup) && (
               <p className="ed-err" style={{ margin: 0 }} data-testid="setup-needed">
                 Set up payouts{me.payoutSetup.deadline ? ` by ${fmt(me.payoutSetup.deadline, tz, { weekday: "short", month: "short", day: "numeric" })}` : ""} to get paid. <Link href="/events/payouts" className="ed-link">Set up</Link>
@@ -205,7 +210,7 @@ export default function MyTeamClient({ eventId }: { eventId: string }) {
           </section>
         )}
 
-        {noteOnMyPage({ hasPay: lines.length > 0, paidOut: !!me.payout }, note) && note && (
+        {noteOnMyPage({ hasPay: payNotWorkedOut(me), paidOut: !!me.payout }, note) && note && (
           <TeamNoteCard note={note} busy={busy === "note"} testId="my-note"
             onAccept={() => act("note", "/api/events/team-note/accept", "Thanks. You've accepted the Event Team note.", { version: note.version })} />
         )}
