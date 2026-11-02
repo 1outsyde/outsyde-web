@@ -75,6 +75,8 @@ export default function ReportsClient({ onChanged, top }: { onChanged?: () => vo
   const [posts, setPosts] = useState<PostReport[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
+  /** The card whose action is being sent: its other buttons wait (one action at a time per event or post). */
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   const seq = useRef(0);
 
   /** Apply one pair of results. Only the newest request may write state. */
@@ -159,6 +161,8 @@ export default function ReportsClient({ onChanged, top }: { onChanged?: () => vo
                         tone={EVENT_TONE[a]}
                         confirm={EVENT_ACTION_CONFIRM[a]}
                         testId={`aem-act-${a}`}
+                        disabled={busyKey !== null && busyKey !== `e:${r.eventId}:${a}`}
+                        onBusy={(b) => setBusyKey(b ? `e:${r.eventId}:${a}` : null)}
                         onSend={(reason) => send(eventActionPath(a, r.eventId), { reason }, EVENT_ACTION_DONE[a])}
                       />
                     ))}
@@ -196,6 +200,8 @@ export default function ReportsClient({ onChanged, top }: { onChanged?: () => vo
                     tone={a === "remove" ? "red" : "ghost"}
                     confirm={POST_ACTION_CONFIRM[a]}
                     testId={`aem-post-${a}`}
+                    disabled={busyKey !== null && busyKey !== `p:${p.postId}:${a}`}
+                    onBusy={(b) => setBusyKey(b ? `p:${p.postId}:${a}` : null)}
                     onSend={(reason) => send(postActionPath(p.postId), { action: a, reason }, POST_ACTION_DONE[a])}
                   />
                 ))}

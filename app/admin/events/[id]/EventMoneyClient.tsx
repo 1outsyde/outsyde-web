@@ -145,6 +145,8 @@ export default function EventMoneyClient({ id }: { id: string }) {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** The moderation action being sent: the other moderation buttons wait (one at a time). */
+  const [modBusy, setModBusy] = useState<string | null>(null);
   const reqSeq = useRef(0);
 
   /** Apply one fetch result. Only the newest request may write state. */
@@ -296,9 +298,11 @@ export default function EventMoneyClient({ id }: { id: string }) {
                   reasonRequired={false}
                   fieldLabel="Note"
                   confirm={trust.trusted
-                    ? "Remove trusted host? The new host limits apply again until this host has a paid out event with at least 5 guests."
+                    ? "Remove trusted host? The new host limits apply again until this host has a paid out event with at least 5 paying guests and no lost disputes."
                     : "Mark this host as trusted? The new host limits (100 paid tickets per event, $100 per ticket) stop applying to every event they host."}
                   testId="aem-trust-switch"
+                  disabled={modBusy !== null && modBusy !== "trust"}
+                  onBusy={(b) => setModBusy(b ? "trust" : null)}
                   onSend={(note) => sendModeration(trustPath(host.id), note ? { trusted: !trust.trusted, note } : { trusted: !trust.trusted },
                     trust.trusted ? "Host is no longer trusted." : "Host marked as trusted.")}
                 />
@@ -443,6 +447,8 @@ export default function EventMoneyClient({ id }: { id: string }) {
                         tone={EVENT_TONE[a]}
                         confirm={EVENT_ACTION_CONFIRM[a]}
                         testId={`aem-act-${a}`}
+                        disabled={modBusy !== null && modBusy !== a}
+                        onBusy={(b) => setModBusy(b ? a : null)}
                         onSend={(reason) => sendModeration(eventActionPath(a, e.id), { reason }, EVENT_ACTION_DONE[a])}
                       />
                     ))}

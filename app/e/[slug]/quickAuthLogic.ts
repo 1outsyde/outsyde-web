@@ -111,5 +111,7 @@ export function pendingReturnPath(slug: string, pending: Pending): string {
   const base = `/e/${slug}`;
   if (pending.kind === "checkout") return `${base}?checkout=${encodeURIComponent(pending.typeId)}&qty=${pending.qty}`;
   if (pending.kind === "rsvp") return `${base}?rsvp=${encodeURIComponent(pending.typeId)}&qty=${pending.qty}`;
+  // Back from the full log in page (Apple, Google, a passwordless account): reopen the report sheet.
+  if (pending.kind === "report") return `${base}?report=1`;
   return base;
 }

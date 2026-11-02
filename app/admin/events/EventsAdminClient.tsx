@@ -21,7 +21,8 @@ async function countReports(): Promise<number | null> {
 }
 
 export default function EventsAdminClient() {
-  const [tab, setTab] = useState<AdminEventsTab>("money");
+  // null until the address hash is read, so a #reports link never starts the Money page first.
+  const [tab, setTab] = useState<AdminEventsTab | null>(null);
   const [count, setCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -50,12 +51,13 @@ export default function EventsAdminClient() {
   }
 
   const tabs = (
-    <div className="aem-tabs" role="tablist" aria-label="Events admin">
-      <button type="button" role="tab" className="aem-tab" aria-selected={tab === "money"} onClick={() => pick("money")} data-testid="aem-tab-money">Money</button>
-      <button type="button" role="tab" className="aem-tab" aria-selected={tab === "reports"} onClick={() => pick("reports")} data-testid="aem-tab-reports">
+    <div className="aem-tabs" role="group" aria-label="Events admin">
+      <button type="button" className="aem-tab" aria-pressed={tab === "money"} onClick={() => pick("money")} data-testid="aem-tab-money">Money</button>
+      <button type="button" className="aem-tab" aria-pressed={tab === "reports"} onClick={() => pick("reports")} data-testid="aem-tab-reports">
         Reports{count ? <span className="aem-badge" aria-label={`${count} waiting`}>{count}</span> : null}
       </button>
     </div>
   );
+  if (tab === null) return null;
   return tab === "money" ? <EventsMoneyClient top={tabs} /> : <ReportsClient top={tabs} onChanged={refreshCount} />;
 }

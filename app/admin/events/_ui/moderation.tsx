@@ -32,8 +32,10 @@ export function ModerationButton(props: {
   disabled?: boolean;
   onSend: (reason: string) => Promise<SendResult | null>;
   testId?: string;
+  /** Told when a request starts and ends, so the card can hold its other buttons (one action at a time). */
+  onBusy?: (busy: boolean) => void;
 }) {
-  const { label, tone, confirm, reasonRequired = true, fieldLabel = "Reason", disabled, onSend, testId } = props;
+  const { label, tone, confirm, reasonRequired = true, fieldLabel = "Reason", disabled, onSend, testId, onBusy } = props;
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -44,9 +46,15 @@ export function ModerationButton(props: {
     const problem = reasonRequired ? reasonError(reason) : reason.trim().length > REASON_MAX ? `Keep it under ${REASON_MAX} characters.` : null;
     if (problem) { setErr(problem); return; }
     setBusy(true);
+    onBusy?.(true);
     setErr(null);
-    const r = await onSend(reason.trim());
-    setBusy(false);
+    let r: SendResult | null;
+    try {
+      r = await onSend(reason.trim());
+    } finally {
+      setBusy(false);
+      onBusy?.(false);
+    }
     // null: the page took over (signed out, or it reloaded with a notice). ok: close and clear.
     if (!r) return;
     if (r.ok) { setOpen(false); setReason(""); return; }
@@ -77,7 +85,7 @@ export function ModerationButton(props: {
       <div className="aem-mod-foot">
         <span className="aem-mod-count">{reason.trim().length} / {REASON_MAX}</span>
         <div className="aem-actions">
-          <button type="button" className={`aem-btn aem-btn-${tone}`} disabled={busy} onClick={send}>{busy ? "Working…" : `Confirm: ${label}`}</button>
+          <button type="button" className={`aem-btn aem-btn-${tone}`} disabled={busy || disabled} onClick={send}>{busy ? "Working…" : `Confirm: ${label}`}</button>
           <button type="button" className="aem-btn aem-btn-ghost" disabled={busy} onClick={() => { setOpen(false); setErr(null); }}>Cancel</button>
         </div>
       </div>

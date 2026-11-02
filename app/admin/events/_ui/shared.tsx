@@ -408,7 +408,7 @@ export const AEM_CSS = `
 /* p5-safety: tabs, Reports tab, moderation boxes */
 .aem-tabs { display: flex; gap: 6px; border-bottom: 1px solid rgba(245,240,230,0.1); flex-wrap: wrap; }
 .aem-tab { height: 44px; padding: 0 16px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: rgba(245,240,230,0.6); font: 600 14px 'Hanken Grotesk', sans-serif; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; margin-bottom: -1px; }
-.aem-tab[aria-selected="true"] { color: #F5F0E6; border-bottom-color: #E8B930; }
+.aem-tab[aria-pressed="true"] { color: #F5F0E6; border-bottom-color: #E8B930; }
 .aem-tab:focus-visible, .aem-btn:focus-visible, .aem-chip:focus-visible { outline: 2px solid #E8B930; outline-offset: 2px; }
 .aem-badge { background: rgba(255,107,107,0.15); color: #ff6b6b; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
 .aem-reps { display: flex; flex-direction: column; gap: 14px; }

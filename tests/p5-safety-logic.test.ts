@@ -105,7 +105,7 @@ eq(onHoldBanner({ status: "paused", viewerIsHost: false, viewerIsCohost: true })
 console.log("\nsign in sheet for a report");
 eq(existsCopy("report"), QUICK_COPY.existsReport, "report: its own exists note");
 eq(existsCopy("checkout"), QUICK_COPY.exists, "checkout unchanged");
-eq(pendingReturnPath("my-party", { kind: "report" }), "/e/my-party", "back to the event");
+eq(pendingReturnPath("my-party", { kind: "report" }), "/e/my-party?report=1", "back to the event, report sheet reopens");
 
 console.log("\npublish refused by the new host limit");
 const lim = "New hosts can sell up to 100 paid tickets per event, at up to $100 each, until a paid event with at least 5 guests has been paid out. Free RSVPs have no limit.";

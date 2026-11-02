@@ -179,7 +179,7 @@ export default function TicketsPage() {
                     </article>
 
                     <div style={{ display: "flex", justifyContent: "center" }}>
-                      {t.event.status !== "cancelled" && <button type="button" className="tk-link" onClick={() => openPanel(t)} aria-expanded={!!panel}>Can't make it?</button>}
+                      {t.event.status !== "cancelled" && t.event.status !== "paused" && <button type="button" className="tk-link" onClick={() => openPanel(t)} aria-expanded={!!panel}>Can't make it?</button>}
                     </div>
 
                     {panel && (

@@ -108,7 +108,7 @@ export function trustState(m: ModerationSummary | null): { text: string; tone: "
   if (!m || m.hostType !== "user") return null;
   if (m.hostTrusted) return { text: "Trusted host, new host limits lifted", tone: "ok", trusted: true };
   if (m.hostLimited) return { text: "Under new host limits: 100 paid tickets per event, $100 per ticket", tone: "warn", trusted: false };
-  return { text: "New host limits lifted after a paid out event", tone: "ok", trusted: false };
+  return { text: "New host limits lifted: a paid out event with at least 5 paying guests", tone: "ok", trusted: false };
 }
 
 /* ---------- Reports list ---------- */

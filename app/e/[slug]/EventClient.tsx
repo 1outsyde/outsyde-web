@@ -80,6 +80,9 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
   const probingRef = useRef(false);
   const [newAccountEmail, setNewAccountEmail] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
+  const reportBtnRef = useRef<HTMLButtonElement | null>(null);
+  const reportStarting = useRef(false);
+  const reportResumed = useRef(false);
 
   const load = useCallback(async (): Promise<EventPayload | null> => {
     try {
@@ -211,18 +214,42 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
 
   /** p5-safety W8: Report this event. Signed out (or not known yet and the probe says so): sign in first. */
   async function startReport() {
-    if (reportOpen) return;
-    let known = signedIn;
-    if (known === null) {
-      known = await probeSignedIn();
-      if (known !== null) setSignedIn(known);
+    // One at a time: taps while the sign in check runs are ignored.
+    if (reportOpen || reportStarting.current) return;
+    reportStarting.current = true;
+    try {
+      let known = signedIn;
+      if (known === null) {
+        known = await probeSignedIn();
+        if (known !== null) setSignedIn(known);
+      }
+      if (known === false) {
+        openAuth({ kind: "report" });
+        return;
+      }
+      setReportOpen(true);
+    } finally {
+      reportStarting.current = false;
     }
-    if (known === false) {
-      openAuth({ kind: "report" });
-      return;
-    }
-    setReportOpen(true);
   }
+
+  function closeReport() {
+    setReportOpen(false);
+    // Focus goes back to the link that opened the sheet.
+    setTimeout(() => reportBtnRef.current?.focus(), 0);
+  }
+
+  // Back from the full log in page with ?report=1: open the report sheet once (never for the host or co-hosts).
+  useEffect(() => {
+    if (reportResumed.current || !data) return;
+    let sp: URLSearchParams;
+    try { sp = new URLSearchParams(window.location.search); } catch { return; }
+    if (sp.get("report") !== "1") return;
+    reportResumed.current = true;
+    if (!canShowReport(data.event)) return;
+    void startReport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per page load, after the event loads
+  }, [data]);
 
   function openAuth(pending: Pending, mode: QuickMode = "signup") {
     setSheetKey((k) => k + 1);
@@ -612,7 +639,7 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
           {started && !ended && !cancelled && !draft && !onHold && <div className="ev-muted">This event has started.</div>}
           <div className="ev-muted">{refundLine}</div>
           {canShowReport(e) && (
-            <button type="button" className="ev-report" onClick={() => void startReport()} data-testid="report-event">{REPORT_COPY.link}</button>
+            <button type="button" className="ev-report" ref={reportBtnRef} onClick={() => void startReport()} data-testid="report-event">{REPORT_COPY.link}</button>
           )}
 
           {!going && <div className="ev-card ev-app" data-testid="get-the-app">
@@ -668,8 +695,8 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
         {reportOpen && (
           <ReportSheet
             eventId={e.id}
-            onClose={() => setReportOpen(false)}
-            onSent={(m) => { setReportOpen(false); showToast(m); }}
+            onClose={closeReport}
+            onSent={(m) => { closeReport(); showToast(m); }}
             onSignedOut={() => { setReportOpen(false); setSignedIn(false); openAuth({ kind: "report" }); }}
           />
         )}
