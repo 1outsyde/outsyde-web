@@ -45,6 +45,36 @@ if (existsSync("app/shipping-policy/page.tsx")) {
   assert(t.includes("required to provide a tracking number for every shipment"), "shipping: tracking required");
 }
 
+// Event tickets (Nov 2): the text says what the platform does. Buyer and host refunds return the ticket price (fee kept);
+// a cancelled event refunds everything, fee included; tickets stay valid while an event is on hold.
+{
+  const block = (src: string, start: string, end: string) => { const i = src.indexOf(start); return i < 0 ? "" : src.slice(i, src.indexOf(end, i + start.length)); };
+  const terms = readFileSync("app/terms/page.tsx", "utf8");
+  const privacy = readFileSync("app/privacy/page.tsx", "utf8");
+  const refund = readFileSync("app/refund-policy/page.tsx", "utf8");
+  const tt = visibleText(block(terms, '<SubSection title="Event Tickets and RSVPs">', "</SubSection>"));
+  assert(tt.includes("you get the ticket price back. The service fee is not refunded."), "terms: buyer or host refund is the ticket price");
+  assert(tt.includes("refunded in full, including the service fee, and every free RSVP is cancelled"), "terms: cancelled event refunds everything");
+  assert(tt.includes("tickets already issued stay valid"), "terms: on hold keeps tickets");
+  assert(!terms.includes("Event tickets are non-refundable unless the event is cancelled by the organizer"), "terms: old ticket line gone");
+  const pv = visibleText(block(privacy, '<Section title="8. Events and Tickets"', "</Section>"));
+  assert(pv.includes("They don't see your email address, phone number or payment details."), "privacy: what hosts see");
+  assert(pv.includes("the Host is not told who reported it"), "privacy: reports");
+  const nums = [...privacy.matchAll(/<Section title="(\d+)\. /g)].map((m) => Number(m[1]));
+  assert(JSON.stringify(nums) === JSON.stringify(Array.from({ length: 18 }, (_, i) => i + 1)), "privacy: sections 1 to 18 in order", nums);
+  const labels = [...privacy.matchAll(/"label": "(\d+)\. /g)].map((m) => Number(m[1]));
+  assert(JSON.stringify(labels) === JSON.stringify(nums), "privacy: side menu matches the sections", labels);
+  const rf = visibleText(block(refund, '<Section id="events"', "</Section>"));
+  assert(rf.includes("If the organizer or Outsyde cancels the event, you receive a full refund, including the service fee"), "refund: cancelled event refunds everything");
+  assert(!refund.includes("less the service fee.</p>\n      </Section>\n\n      <Section id=\"rewards\""), "refund: old cancel line gone");
+  for (const [name, t] of [["terms tickets", tt], ["privacy events", pv], ["refund events", rf]] as const) {
+    const d = t.match(/.{0,30}(—|–| - ).{0,30}/);
+    assert(!d, `${name}: no dashes`, d?.[0]);
+    const pc = t.match(/.{0,30}%.{0,30}/);
+    assert(!pc, `${name}: no percentage`, pc?.[0]);
+  }
+}
+
 for (const [f, path] of [["app/terms/page.tsx", "/terms"], ["app/privacy/page.tsx", "/privacy"]]) {
   const src = readFileSync(f, "utf8");
   assert(src.includes(`canonical: 'https://www.goutsyde.com${path}'`), `${path}: own canonical on www`);

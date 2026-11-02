@@ -13,6 +13,7 @@ import AppGetBlock from "./AppGetBlock";
 import { pendingReturnPath, type Pending, type QuickMode } from "./quickAuthLogic";
 import { browserStorage, readRef, rememberRefFromUrl, withLinkCode } from "./promoterRef";
 import ReportSheet from "./ReportSheet";
+import TicketTerms from "./TicketTerms";
 import { ON_HOLD_COPY, REPORT_COPY, canShowReport, onHoldBanner } from "./reportLogic";
 
 const whenLine = rangeLine;
@@ -638,6 +639,7 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
           {ended && !cancelled && !onHold && <div className="ev-muted">This event has ended.</div>}
           {started && !ended && !cancelled && !draft && !onHold && <div className="ev-muted">This event has started.</div>}
           <div className="ev-muted">{refundLine}</div>
+          {canBuy && !e.viewerIsHost && <TicketTerms kind="event" />}
           {canShowReport(e) && (
             <button type="button" className="ev-report" ref={reportBtnRef} onClick={() => void startReport()} data-testid="report-event">{REPORT_COPY.link}</button>
           )}

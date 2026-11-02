@@ -52,6 +52,12 @@ export function stripeUrl(value: unknown): string | null {
   }
 }
 
+/** The agreement line on the event page and in checkout: lead, then links to the Terms and the Refund Policy. */
+export const TICKET_TERMS_LEAD = {
+  event: "By getting tickets or RSVPing, you agree to the ",
+  checkout: "By paying, you agree to the ",
+} as const;
+
 /** Cents as "$20.00". Always two decimals. */
 export function money(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
