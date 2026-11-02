@@ -12,10 +12,14 @@ import QuickAuthSheet, { type QuickPurpose } from "./QuickAuthSheet";
 import AppGetBlock from "./AppGetBlock";
 import { pendingReturnPath, type Pending, type QuickMode } from "./quickAuthLogic";
 import { browserStorage, readRef, rememberRefFromUrl, withLinkCode } from "./promoterRef";
+import ReportSheet from "./ReportSheet";
+import { ON_HOLD_COPY, REPORT_COPY, canShowReport, onHoldBanner } from "./reportLogic";
 
 const whenLine = rangeLine;
 
-function statusText(t: TicketType, tz: string): string {
+function statusText(t: TicketType, tz: string, onHold = false): string {
+  // p5-safety: on hold, the backend sends every type as ended; say why instead.
+  if (onHold) return ON_HOLD_COPY.ticketRow;
   switch (t.salesStatus) {
     case "on_sale": {
       const left = typeof t.remaining === "number" && t.remaining <= 10 ? `${t.remaining} left` : "";
@@ -75,6 +79,7 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
   const [authVersion, setAuthVersion] = useState(0);
   const probingRef = useRef(false);
   const [newAccountEmail, setNewAccountEmail] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const load = useCallback(async (): Promise<EventPayload | null> => {
     try {
@@ -204,6 +209,21 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
     }
   }
 
+  /** p5-safety W8: Report this event. Signed out (or not known yet and the probe says so): sign in first. */
+  async function startReport() {
+    if (reportOpen) return;
+    let known = signedIn;
+    if (known === null) {
+      known = await probeSignedIn();
+      if (known !== null) setSignedIn(known);
+    }
+    if (known === false) {
+      openAuth({ kind: "report" });
+      return;
+    }
+    setReportOpen(true);
+  }
+
   function openAuth(pending: Pending, mode: QuickMode = "signup") {
     setSheetKey((k) => k + 1);
     setAuthSheet({ pending, mode });
@@ -316,6 +336,10 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
     if (!pending) return;
     if (pending.kind === "checkout") {
       router.push(checkoutPathFor(pending.typeId, pending.qty));
+    } else if (pending.kind === "report") {
+      // The host or a co-host who just signed in can't report their own event.
+      const ev = refreshed?.event;
+      if (ev && canShowReport(ev)) setReportOpen(true);
     } else if (pending.kind === "rsvp") {
       const t = (refreshed?.ticketTypes ?? types).find((x) => x.id === pending.typeId);
       if (t) void rsvp(t, pending.qty, true);
@@ -355,8 +379,9 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
   const ended = e ? new Date(e.endsAt).getTime() < Date.now() : false;
   const started = e ? hasStarted(e, Date.now()) : false;
   const cancelled = e?.status === "cancelled";
+  const onHold = !!e && (e.onHold === true || e.status === "paused");
   const draft = e?.status === "draft";
-  const canBuy = !!e && !cancelled && !draft && !started && onSale.length > 0;
+  const canBuy = !!e && !cancelled && !draft && !onHold && !started && onSale.length > 0;
   const paidOnSale = onSale.filter((t) => t.priceCents > 0 && t.buyerTotalCents != null);
   const lowest = paidOnSale.length ? Math.min(...paidOnSale.map((t) => t.buyerTotalCents as number)) : null;
   const hasFreeOnSale = onSale.some((t) => t.priceCents === 0);
@@ -411,6 +436,9 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
     .ev-step:disabled { opacity: 0.35; cursor: default; }
     .ev-err { font-size: 13px; color: #ff8a80; }
     .ev-toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 110px; background: #F5F0E6; color: #0B0B0B; padding: 10px 18px; border-radius: 20px; font-size: 14px; font-weight: 600; z-index: 300; }
+    .ev-report { align-self: flex-start; min-height: 44px; padding: 0; border: 0; background: transparent; color: #B8B0A0; font: 600 13px 'Hanken Grotesk', sans-serif; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+    .ev-report:hover { color: #F5F0E6; }
+    .ev-report:focus-visible { outline: 2px solid #E8B930; outline-offset: 2px; }
     .ev-center { max-width: 680px; margin: 0 auto; padding: 96px 20px; text-align: center; color: #B8B0A0; }
   `;
   const fonts = <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />;
@@ -460,6 +488,7 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
       <div className="ev-wrap">
         {draft && <div className="ev-banner" style={{ background: "#3A2F0B", color: "#E8B930" }}>Draft preview. Only you can see this page.</div>}
         {cancelled && <div className="ev-banner" style={{ background: "#3B1414", color: "#ff8a80" }}>This event was cancelled.</div>}
+        {onHold && <div className="ev-banner" role="status" data-testid="on-hold-banner" style={{ background: "#3A2F0B", color: "#F5D26B" }}>{onHoldBanner(e)}</div>}
 
         <div className="ev-cover">
           {e.coverImageUrl ? (
@@ -553,7 +582,7 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
                       </span>
                     </span>
                     <span style={{ fontSize: 14, fontWeight: t.salesStatus === "on_sale" ? 600 : 400, color: t.salesStatus === "on_sale" ? "#F5F0E6" : "#8F887B", textAlign: "right", flexShrink: 0 }}>
-                      {statusText(t, e.timezone)}
+                      {statusText(t, e.timezone, onHold)}
                     </span>
                   </button>
                   {isSel && can && !going && (
@@ -579,9 +608,12 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
           </div>
 
           {e.description && <div className="ev-desc">{e.description}</div>}
-          {ended && !cancelled && <div className="ev-muted">This event has ended.</div>}
-          {started && !ended && !cancelled && !draft && <div className="ev-muted">This event has started.</div>}
+          {ended && !cancelled && !onHold && <div className="ev-muted">This event has ended.</div>}
+          {started && !ended && !cancelled && !draft && !onHold && <div className="ev-muted">This event has started.</div>}
           <div className="ev-muted">{refundLine}</div>
+          {canShowReport(e) && (
+            <button type="button" className="ev-report" onClick={() => void startReport()} data-testid="report-event">{REPORT_COPY.link}</button>
+          )}
 
           {!going && <div className="ev-card ev-app" data-testid="get-the-app">
             <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
@@ -631,6 +663,14 @@ export default function EventClient({ slug, initial }: { slug: string; initial: 
             returnPath={pendingReturnPath(slug, authSheet.pending)}
             onClose={() => setAuthSheet(null)}
             onDone={onAuthDone}
+          />
+        )}
+        {reportOpen && (
+          <ReportSheet
+            eventId={e.id}
+            onClose={() => setReportOpen(false)}
+            onSent={(m) => { setReportOpen(false); showToast(m); }}
+            onSignedOut={() => { setReportOpen(false); setSignedIn(false); openAuth({ kind: "report" }); }}
           />
         )}
         {toast && <div className="ev-toast" role="status">{toast}</div>}

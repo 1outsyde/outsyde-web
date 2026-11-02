@@ -5,7 +5,7 @@
  * BFF GET /api/admin/events; the grouping, filters, pills and totals come from _lib/money.ts.
  */
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   FILTERS,
   RANGE_PRESETS,
@@ -147,7 +147,8 @@ async function fetchList(p: RangePreset): Promise<ListResult> {
 
 const sum = (events: AdminEventRow[], f: (e: AdminEventRow) => number) => events.reduce((a, e) => a + f(e), 0);
 
-export default function EventsMoneyClient() {
+/** `top`: the Money / Reports tabs, drawn first inside the page (p5-safety W1). */
+export default function EventsMoneyClient({ top }: { top?: ReactNode } = {}) {
   const [auth, setAuth] = useState<Auth>("loading");
   const [data, setData] = useState<ListData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -207,16 +208,16 @@ export default function EventsMoneyClient() {
   const shown = useMemo(() => (now ? filterEvents(events, filter, now, search) : []), [events, filter, now, search]);
   const counts = useMemo(() => (now ? filterCounts(events, now, search) : null), [events, now, search]);
 
-  if (auth === "unauthorized" || auth === "forbidden") return <AuthScreen state={auth} returnTo="/admin/events" />;
+  if (auth === "unauthorized" || auth === "forbidden") return <AuthScreen state={auth} returnTo="/admin/events" top={top} />;
   if (loadError && !data) {
     return (
-      <StateScreen title="Couldn't load events money">
+      <StateScreen title="Couldn't load events money" top={top}>
         <div style={{ marginBottom: 12 }}>{loadError}</div>
         <button type="button" className="aem-btn aem-btn-gold aem-btn-md" onClick={() => { setLoadError(null); load(preset); }}>Retry</button>
       </StateScreen>
     );
   }
-  if (!data || !now || !counts) return <StateScreen title="Loading…" />;
+  if (!data || !now || !counts) return <StateScreen title="Loading…" top={top} />;
 
   const totals = totalsOf(events);
   // Attention is platform wide, so an item's event may sit outside the range; then the backend still guards.
@@ -278,7 +279,7 @@ export default function EventsMoneyClient() {
   })();
 
   return (
-    <Shell>
+    <Shell top={top}>
       <div className="aem-head">
         <div>
           <h1 className="aem-h1">Events money</h1>

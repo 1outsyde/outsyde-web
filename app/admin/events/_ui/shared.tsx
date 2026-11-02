@@ -262,19 +262,20 @@ export function NoticeBanner({ notice, onClose }: { notice: Notice | null; onClo
 export const FONTS_HREF =
   "https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Hanken+Grotesk:wght@400;500;600;700&display=swap";
 
-export function Shell({ children }: { children: ReactNode }) {
+/** `top` (optional) is drawn first inside the page, e.g. the Money / Reports tabs on /admin/events. */
+export function Shell({ children, top }: { children: ReactNode; top?: ReactNode }) {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: AEM_CSS }} />
       <link href={FONTS_HREF} rel="stylesheet" />
-      <div className="aem-page">{children}</div>
+      <div className="aem-page">{top}{children}</div>
     </>
   );
 }
 
-export function StateScreen({ title, children }: { title: string; children?: ReactNode }) {
+export function StateScreen({ title, children, top }: { title: string; children?: ReactNode; top?: ReactNode }) {
   return (
-    <Shell>
+    <Shell top={top}>
       <div className="aem-state">
         <div className="aem-state-title">{title}</div>
         {children ? <div className="aem-state-sub">{children}</div> : null}
@@ -283,16 +284,16 @@ export function StateScreen({ title, children }: { title: string; children?: Rea
   );
 }
 
-export function AuthScreen({ state, returnTo }: { state: "unauthorized" | "forbidden"; returnTo: string }) {
+export function AuthScreen({ state, returnTo, top }: { state: "unauthorized" | "forbidden"; returnTo: string; top?: ReactNode }) {
   if (state === "unauthorized") {
     return (
-      <StateScreen title="Not signed in">
+      <StateScreen title="Not signed in" top={top}>
         <Link href={`/login?return=${encodeURIComponent(returnTo)}`} className="aem-link">Log in</Link> to access the admin dashboard.
       </StateScreen>
     );
   }
   return (
-    <StateScreen title="Not authorized">
+    <StateScreen title="Not authorized" top={top}>
       Your account doesn&apos;t have admin access. Contact the platform owner if you believe this is a mistake.
     </StateScreen>
   );
@@ -400,6 +401,40 @@ export const AEM_CSS = `
 .aem-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 40vh; text-align: center; gap: 8px; }
 .aem-state-title { font-family: 'Bebas Neue', sans-serif; font-size: 22px; color: #F5F0E6; }
 .aem-state-sub { color: rgba(245,240,230,0.5); font-size: 14px; max-width: 420px; }
+
+.aem-btn-red { background: rgba(255,107,107,0.15); color: #ff6b6b; border-color: rgba(255,107,107,0.35); }
+.aem-btn-red:hover:not(:disabled) { border-color: #ff6b6b; }
+
+/* p5-safety: tabs, Reports tab, moderation boxes */
+.aem-tabs { display: flex; gap: 6px; border-bottom: 1px solid rgba(245,240,230,0.1); flex-wrap: wrap; }
+.aem-tab { height: 44px; padding: 0 16px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: rgba(245,240,230,0.6); font: 600 14px 'Hanken Grotesk', sans-serif; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; margin-bottom: -1px; }
+.aem-tab[aria-selected="true"] { color: #F5F0E6; border-bottom-color: #E8B930; }
+.aem-tab:focus-visible, .aem-btn:focus-visible, .aem-chip:focus-visible { outline: 2px solid #E8B930; outline-offset: 2px; }
+.aem-badge { background: rgba(255,107,107,0.15); color: #ff6b6b; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.aem-reps { display: flex; flex-direction: column; gap: 14px; }
+.aem-rep { background: rgba(245,240,230,0.03); border: 1px solid rgba(245,240,230,0.1); border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.aem-rep-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.aem-rep-title { font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
+.aem-rep-meta { font-size: 12.5px; color: rgba(245,240,230,0.55); margin-top: 4px; }
+.aem-rep-count { font-size: 13px; font-weight: 700; color: #ff6b6b; white-space: nowrap; }
+.aem-reasons { display: flex; flex-direction: column; gap: 8px; border-left: 2px solid rgba(245,240,230,0.1); padding-left: 12px; }
+.aem-reason { font-size: 13px; min-width: 0; }
+.aem-reason-label { font-weight: 600; }
+.aem-reason-note { color: rgba(245,240,230,0.75); margin-top: 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.aem-reason-who { font-size: 11.5px; color: rgba(245,240,230,0.45); margin-top: 2px; }
+.aem-post-body { display: flex; gap: 12px; align-items: flex-start; min-width: 0; }
+.aem-thumb { width: 64px; height: 80px; border-radius: 8px; object-fit: cover; background: #1A3C34; flex: none; }
+.aem-post-text { font-size: 13.5px; color: rgba(245,240,230,0.85); white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
+.aem-mod { flex: 1 1 100%; display: flex; flex-direction: column; gap: 8px; background: rgba(0,0,0,0.35); border: 1px solid rgba(245,240,230,0.12); border-radius: 8px; padding: 12px; }
+.aem-mod-what { font-size: 13px; line-height: 1.5; color: #F5F0E6; }
+.aem-mod-label { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: rgba(245,240,230,0.55); }
+.aem-textarea { width: 100%; min-height: 72px; resize: vertical; border-radius: 6px; border: 1px solid rgba(245,240,230,0.2); background: #000; color: #F5F0E6; font: 13.5px/1.45 'Hanken Grotesk', sans-serif; padding: 8px 10px; }
+.aem-textarea:focus { outline: none; border-color: rgba(232,185,48,0.6); }
+.aem-mod-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.aem-mod-count { font-size: 11.5px; color: rgba(245,240,230,0.45); font-variant-numeric: tabular-nums; }
+.aem-mod-err { font-size: 12.5px; color: #ff6b6b; }
+.aem-safety { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+.aem-trust { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid rgba(245,240,230,0.08); padding-top: 10px; margin-top: 4px; }
 
 /* Event page */
 .aem-back { font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }

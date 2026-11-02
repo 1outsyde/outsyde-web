@@ -230,7 +230,7 @@ try:
         body = list_res.json()
         check(list_res.status == 200 and "from=" in list_res.url, "list fetched through the BFF with a from date (Last 90 days)", list_res.url)
         pg.locator("[data-tile='Ticket sales']").wait_for(timeout=30000)
-        check(pg.title() == "Events money | Outsyde Admin", "tab title", pg.title())
+        check(pg.title() == "Events | Outsyde Admin", "tab title", pg.title())
         events = body["events"]
         ids = {e["id"] for e in events}
         check(all(x in ids for x in (ev_biz, ev_user, ev_up, ev_old, ev_due, ev_pause, ev_dup, ev_can)), "every seeded event is listed")
