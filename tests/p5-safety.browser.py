@@ -168,6 +168,7 @@ try:
         ctx, pg, errs = new_ctx(b, T_HOST, 390)
         pg.goto(f"{WEB}/e/{slug}"); pg.wait_for_selector("[data-testid=on-hold-banner]")
         check("Check your email" in pg.locator("[data-testid=on-hold-banner]").inner_text() and pg.locator("[data-testid=report-event]").count() == 0, "host banner, no Report link")
+        check(pg.locator("[data-testid=ticket-terms-event]").count() == 0, "host: no ticket terms line")
         ctx.close()
         ctx, pg, errs = new_ctx(b, T_GUEST, 390)
         pg.goto(f"{WEB}/e/{slug}"); pg.wait_for_selector("text=Event not found", timeout=10000)
@@ -186,6 +187,10 @@ try:
         ctx, pg, errs = new_ctx(b, T_GUEST, 390)
         pg.goto(f"{WEB}/e/{slug}"); pg.wait_for_selector("[data-testid=report-event]")
         check(pg.locator("[data-testid=on-hold-banner]").count() == 0, "live again: no banner")
+        tt = pg.locator("[data-testid=ticket-terms-event]")
+        check(tt.count() == 1 and "By getting tickets or RSVPing, you agree to the Terms of Service and the Refund Policy." in tt.inner_text()
+              and tt.get_by_role("link", name="Terms of Service").get_attribute("href") == "/terms"
+              and tt.get_by_role("link", name="Refund Policy").get_attribute("href") == "/refund-policy", "ticket terms line with both links", tt.inner_text() if tt.count() else "")
         pg.click("[data-testid=report-event]"); pg.wait_for_selector("[data-testid=report-sheet]")
         pg.get_by_role("button", name="Send report").click()
         check(pg.locator(".rp-err").inner_text() == "Choose a reason.", "no reason: Choose a reason.")

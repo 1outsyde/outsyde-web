@@ -36,50 +36,54 @@ const SECTIONS = [
     "label": "7. Influencer Referral Tracking"
   },
   {
+    "id": "events-and-tickets",
+    "label": "8. Events and Tickets"
+  },
+  {
     "id": "data-security",
-    "label": "8. Data Security"
+    "label": "9. Data Security"
   },
   {
     "id": "data-retention",
-    "label": "9. Data Retention"
+    "label": "10. Data Retention"
   },
   {
     "id": "account-deletion",
-    "label": "10. Account Deletion"
+    "label": "11. Account Deletion"
   },
   {
     "id": "your-rights",
-    "label": "11. Your Rights"
+    "label": "12. Your Rights"
   },
   {
     "id": "children-s-privacy",
-    "label": "12. Children's Privacy"
+    "label": "13. Children's Privacy"
   },
   {
     "id": "sensitive-personal-information",
-    "label": "13. Sensitive Personal Information"
+    "label": "14. Sensitive Personal Information"
   },
   {
     "id": "cookies-and-tracking-technologies",
-    "label": "14. Cookies and Tracking Technologies"
+    "label": "15. Cookies and Tracking Technologies"
   },
   {
     "id": "new-york-shield-act",
-    "label": "15. New York SHIELD Act"
+    "label": "16. New York SHIELD Act"
   },
   {
     "id": "changes-to-this-privacy-policy",
-    "label": "16. Changes to This Privacy Policy"
+    "label": "17. Changes to This Privacy Policy"
   },
   {
     "id": "contact-information",
-    "label": "17. Contact Information"
+    "label": "18. Contact Information"
   }
 ]
 
 export default function PrivacyPage() {
   return (
-    <LegalLayout title={["Privacy", "Policy"]} current="/privacy" updated="July 25, 2026" sections={SECTIONS}>
+    <LegalLayout title={["Privacy", "Policy"]} current="/privacy" updated="November 2, 2026" sections={SECTIONS}>
 
           <p>Welcome to Outsyde LLC ("Outsyde," "we," "our," or "us"). Outsyde values your privacy and is committed to protecting your personal information. This Privacy Policy explains how we collect, use, disclose, store, and protect information when you use the Outsyde mobile application, website, and related services (collectively, the "Platform").</p>
           <p>By creating an account or using the Platform, you agree to this Privacy Policy.</p>
@@ -255,23 +259,36 @@ export default function PrivacyPage() {
             <p>If you use an influencer referral or promo code, Outsyde records the referral event including the associated click, purchase, and revenue attributed to that code. This data is used to calculate influencer commissions.</p>
           </Section>
 
-          <Section title="8. Data Security" id="data-security">
+          <Section title="8. Events and Tickets" id="events-and-tickets">
+            <p>{"When you get tickets, RSVP, host an event or report one:"}</p>
+            <ul>
+              <li>{"The Host and the people they add to their Event team (for example door staff and co-hosts) see your first name or username, your ticket type and whether you have checked in. They don't see your email address, phone number or payment details."}</li>
+              <li>{"If you buy through a promoter's link, the promoter sees how many tickets their link sold, not who bought them."}</li>
+              <li>{"We record when your ticket is scanned at the door."}</li>
+              <li>{"We send ticket confirmations, reminders, the event address (when the Host shares it on the day) and changes to the event by email and push notification."}</li>
+              <li>{"If you add a ticket to Apple Wallet, the pass holds the event name, time, place and your ticket's QR code."}</li>
+              <li>{"If you report an event, the Host is not told who reported it. Outsyde staff see your username, the reason and any note you add."}</li>
+              <li>{"If you host, we keep a record of which version of the Event Host Agreement you accepted and when, and of your event's sales and payouts."}</li>
+            </ul>
+          </Section>
+
+          <Section title="9. Data Security" id="data-security">
             <p>We implement administrative, technical, and physical safeguards to protect your information, including encrypted credential storage and PCI-compliant payment processing via Stripe.</p>
             <p>No internet transmission or electronic storage system can be guaranteed completely secure. We encourage you to use a strong, unique password and contact us immediately if you suspect unauthorized access.</p>
           </Section>
 
-          <Section title="9. Data Retention" id="data-retention">
+          <Section title="10. Data Retention" id="data-retention">
             <p>We retain your information only as long as necessary to provide our services, resolve disputes, detect fraud, meet legal and tax obligations, and enforce our agreements.</p>
             <p>Some financial and transaction records may be retained as required by law even after account deletion.</p>
           </Section>
 
-          <Section title="10. Account Deletion" id="account-deletion">
+          <Section title="11. Account Deletion" id="account-deletion">
             <p>You may request deletion of your account directly through the app under Settings → Account → Delete Account, or by contacting us at <a href="mailto:info@goutsyde.com">info@goutsyde.com</a>.</p>
             <p>Following a deletion request, your account is scheduled for permanent removal after a 30-day grace period, during which you may cancel the request. After the grace period, personal information will be deleted or anonymized where reasonably possible.</p>
             <p>Certain records may be retained for tax compliance, fraud prevention, legal obligations, or dispute resolution. Active orders, bookings, or outstanding Stripe balances may delay deletion.</p>
           </Section>
 
-          <Section title="11. Your Rights" id="your-rights">
+          <Section title="12. Your Rights" id="your-rights">
             <p>Depending on your jurisdiction, you may have the right to:</p>
             <ul>
               <li>Access your personal information</li>
@@ -284,27 +301,27 @@ export default function PrivacyPage() {
             <p>To exercise any of these rights, contact us at <a href="mailto:info@goutsyde.com">info@goutsyde.com</a>.</p>
           </Section>
 
-          <Section title="12. Children's Privacy" id="children-s-privacy">
+          <Section title="13. Children's Privacy" id="children-s-privacy">
             <p>Outsyde is not intended for individuals under 18 years of age. We do not knowingly collect personal information from minors. If we become aware that such information has been collected, we will take appropriate steps to delete it promptly.</p>
           </Section>
 
-          <Section title="13. Sensitive Personal Information" id="sensitive-personal-information">
+          <Section title="14. Sensitive Personal Information" id="sensitive-personal-information">
             <p>During signup, consumers may optionally provide gender, ethnicity, and demographic information. This information is used solely to personalize your experience and generate aggregate, anonymized platform insights. We do not sell this information or use it for targeted advertising.</p>
           </Section>
 
-          <Section title="14. Cookies and Tracking Technologies" id="cookies-and-tracking-technologies">
+          <Section title="15. Cookies and Tracking Technologies" id="cookies-and-tracking-technologies">
             <p>Our website may use cookies and similar technologies to remember preferences, maintain sessions, analyze traffic, and improve performance. Users may manage cookie preferences through their browser settings.</p>
           </Section>
 
-          <Section title="15. New York SHIELD Act" id="new-york-shield-act">
+          <Section title="16. New York SHIELD Act" id="new-york-shield-act">
             <p>For users located in New York, Outsyde maintains reasonable administrative, technical, and physical safeguards designed to protect private information in compliance with the New York SHIELD Act.</p>
           </Section>
 
-          <Section title="16. Changes to This Privacy Policy" id="changes-to-this-privacy-policy">
+          <Section title="17. Changes to This Privacy Policy" id="changes-to-this-privacy-policy">
             <p>We may update this Privacy Policy periodically. When material changes occur, we will update the "Last Updated" date and, where appropriate, notify users through the Platform. Continued use of Outsyde after changes become effective constitutes acceptance of the updated Privacy Policy.</p>
           </Section>
 
-          <Section title="17. Contact Information" id="contact-information">
+          <Section title="18. Contact Information" id="contact-information">
             <p>
               Outsyde LLC<br />
               Email: <a href="mailto:info@goutsyde.com">info@goutsyde.com</a><br />

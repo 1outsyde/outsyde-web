@@ -18,6 +18,7 @@ import { loadStripe, type Stripe, type PaymentIntentResult } from "@stripe/strip
 import { Elements, CardElement, ExpressCheckoutElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import type { EventInfo, TicketType } from "./types";
 import AppGetBlock from "./AppGetBlock";
+import TicketTerms from "./TicketTerms";
 import { browserStorage, readRef, withLinkCode } from "./promoterRef";
 import { GENERIC_ERROR, failureCopy, money, newKey, startLine } from "../_shared/format";
 import {
@@ -711,6 +712,10 @@ function PayForm({ hold, type, qty, remaining, paying, stripe: stripeInstance, o
         <button type="button" className="co-pay" onClick={pay} disabled={!stripe || !elements || paying}>
           {paying ? "Processing" : `Pay ${money(hold.totalCents)}`}
         </button>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 10 }}>
+          <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: "#B8B0A0" }} data-testid="checkout-fee-note">The service fee isn&apos;t refunded unless the event is cancelled.</p>
+          <TicketTerms kind="checkout" />
+        </div>
       </div>
     </>
   );
