@@ -9,6 +9,8 @@ import {
 } from "./ticketsLogic";
 
 const LOGIN = "/login?return=/tickets";
+// Apple's badge, used as supplied (Apple's rules: do not alter it).
+const WALLET_BADGE = "/badges/US-UK_Add_to_Apple_Wallet_RGB_101421.svg";
 
 type Panel =
   | { step: "loading" }
@@ -170,7 +172,13 @@ export default function TicketsPage() {
                           {t.ticketTypeName}{g.tickets.length > 1 ? ` · Ticket ${i + 1} of ${g.tickets.length}` : ""}
                         </div>
                         {t.checkedInAt && <span className="tk-badge">Checked in</span>}
-                        {wallet && <a href={wallet} className="tk-wallet">Add to Apple Wallet</a>}
+                        {wallet && (
+                          <a href={wallet} className="tk-wallet" data-testid="wallet-badge">
+                            {/* A small fixed SVG badge: next/image would add nothing here. */}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={WALLET_BADGE} alt="Add to Apple Wallet" width={139} height={44} />
+                          </a>
+                        )}
                       </div>
                       <div className="tk-actions" style={{ gridTemplateColumns: dir ? "1fr 1fr" : "1fr" }}>
                         {dir && <a href={dir} target="_blank" rel="noopener noreferrer" className="tk-act tk-act-l">Directions</a>}
@@ -273,8 +281,9 @@ body{background:#0B0B0B;margin:0}
 .tk-code{font-size:13px;font-weight:700;letter-spacing:2px;overflow-wrap:anywhere;text-align:center}
 .tk-small{font-size:12px;color:#4A453C;text-align:center}
 .tk-badge{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#1A3C34;border:1px solid #1A3C34;border-radius:999px;padding:4px 12px}
-.tk-wallet{height:44px;padding:0 18px;border-radius:10px;background:#000;display:flex;align-items:center;font:600 14px 'Hanken Grotesk',sans-serif}
-.tk-page .tk-wallet{color:#fff}
+.tk-wallet{display:inline-flex;line-height:0;border-radius:6px}
+.tk-wallet img{height:44px;width:auto;display:block}
+.tk-wallet:focus-visible{outline:2px solid #E8B930;outline-offset:3px}
 .tk-actions{display:grid;border-top:1px dashed #B8B0A0}
 .tk-act{height:50px;border:0;background:transparent;font:600 14px 'Hanken Grotesk',sans-serif;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .tk-page .tk-act,.tk-act{color:#0B0B0B}

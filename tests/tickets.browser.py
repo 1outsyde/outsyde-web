@@ -91,8 +91,10 @@ def real(errs):
     # analytics script, which only exists on Vercel. Anything else, including any other 404, counts.
     return [e for e in errs if not e.startswith("Failed to load resource") and "/_vercel/insights/" not in e]
 
-def new_ctx(browser, token, width):
-    ctx = browser.new_context(viewport={"width": width, "height": 900}, accept_downloads=True)
+def new_ctx(browser, token, width, ua=None, touch=False):
+    opts = {"viewport": {"width": width, "height": 900}, "accept_downloads": True, "has_touch": touch}
+    if ua: opts["user_agent"] = ua
+    ctx = browser.new_context(**opts)
     if token:
         ctx.add_cookies([{"name": "outsyde_access_token", "value": token, "url": WEB}])
     ctx.route(re.compile(r"^https?://(?!localhost)"), lambda r: r.abort())
@@ -176,6 +178,51 @@ try:
         if SHOTS: pg.screenshot(path=f"{SHOTS}/tickets-1280.png", full_page=True)
         check(real(errs) == [], "no page errors", errs)
         ctx.close()
+
+        # p4-store S3: Apple's badge. The local backend has no Apple pass settings, so the real tickets response gets a
+        # walletUrl added on the way to the page (everything else is the backend's own answer).
+        WALLET = "https://api.goutsyde.com/api/events/tickets/x/wallet.pkpass"
+        def with_wallet(route):
+            r = route.fetch()
+            data = r.json()
+            for t in data.get("tickets", []):
+                t["walletUrl"] = WALLET
+            route.fulfill(response=r, json=data)
+        IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1"
+        MAC = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15"
+        ANDROID = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"
+
+        print("Apple Wallet badge, iPhone (390px)")
+        ctx, pg, errs = new_ctx(browser, t2, 390, IPHONE, True)
+        pg.route("**/api/events/me/tickets", with_wallet)
+        pg.goto(WEB + "/tickets")
+        pg.wait_for_selector("[data-testid=wallet-badge]", timeout=15000)
+        badge = pg.locator("[data-testid=wallet-badge]").first
+        check(badge.get_attribute("href") == WALLET, "badge links to the pass", badge.get_attribute("href"))
+        im = badge.locator("img")
+        check(im.get_attribute("alt") == "Add to Apple Wallet", "badge alt text", im.get_attribute("alt"))
+        check(im.get_attribute("src") == "/badges/US-UK_Add_to_Apple_Wallet_RGB_101421.svg", "Apple's badge file", im.get_attribute("src"))
+        pg.wait_for_function("() => { const i = document.querySelector('[data-testid=wallet-badge] img'); return i && i.complete }", timeout=15000)
+        check(im.evaluate("i => i.naturalWidth") > 0, "badge image loads")
+        box = badge.bounding_box()
+        check(box and round(box["height"]) == 44 and 135 <= box["width"] <= 142, "badge is 44px tall, about 139px wide", box)
+        check(pg.get_by_role("link", name="Add to Apple Wallet").count() >= 1, "screen readers get a link named Add to Apple Wallet")
+        check(pg.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), "390px: no horizontal overflow")
+        if SHOTS: pg.screenshot(path=f"{SHOTS}/tickets-wallet-390.png", full_page=True)
+        check(real(errs) == [], "no page errors", errs)
+        ctx.close()
+
+        for label, ua, touch, want in (("Mac Safari", MAC, False, True), ("iPad", MAC, True, False), ("Android", ANDROID, True, False)):
+            ctx, pg, errs = new_ctx(browser, t2, 1024, ua, touch)
+            # Chromium's touch emulation reports 1 touch point; a real iPad reports 5.
+            if touch: pg.add_init_script("Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: () => 5 })")
+            pg.route("**/api/events/me/tickets", with_wallet)
+            pg.goto(WEB + "/tickets")
+            pg.wait_for_selector("img[alt='Ticket QR code']", timeout=15000)
+            pg.wait_for_timeout(300)
+            n = pg.locator("[data-testid=wallet-badge]").count()
+            check((n > 0) == want, f"{label}: badge {'shows' if want else 'hidden'}", n)
+            ctx.close()
         browser.close()
 finally:
     ev_ids = f"SELECT id FROM events WHERE host_user_id='{host}'"
