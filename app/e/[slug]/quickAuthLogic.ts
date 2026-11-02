@@ -2,14 +2,15 @@
 import { GENERIC_ERROR } from "../_shared/format";
 
 export type QuickMode = "signup" | "login";
-/** team: an Event team invite link (p4-team step 9-0, goutsyde.com/team/CODE). */
-export type QuickPurpose = "checkout" | "rsvp" | "follow" | "team";
+/** team: an Event team invite link (p4-team step 9-0, goutsyde.com/team/CODE). report: Report this event (p5-safety). */
+export type QuickPurpose = "checkout" | "rsvp" | "follow" | "team" | "report";
 
 /** What to do once the person is signed in. */
 export type Pending =
   | { kind: "checkout"; typeId: string; qty: number }
   | { kind: "rsvp"; typeId: string; qty: number }
-  | { kind: "follow" };
+  | { kind: "follow" }
+  | { kind: "report" };
 
 export const QUICK_COPY = {
   firstName: "Add your first name.",
@@ -20,6 +21,7 @@ export const QUICK_COPY = {
   exists: "That email already has an Outsyde account. Log in to get your tickets.",
   existsFollow: "That email already has an Outsyde account. Log in to follow.",
   existsTeam: "That email already has an Outsyde account. Log in to join the team.",
+  existsReport: "That email already has an Outsyde account. Log in to send your report.",
   oauth: "This account uses Apple or Google sign in. Continue on the log in page.",
   limit: "Too many sign ups from this network. Please try again in a few minutes.",
   loginLimit: "Too many tries. Please wait a few minutes and try again.",
@@ -81,6 +83,7 @@ export function quickErrorCopy(status: number, body: unknown, mode: QuickMode = 
 
 /** The mockup 43 note, worded for what the sheet was opened for. */
 export function existsCopy(purpose: QuickPurpose): string {
+  if (purpose === "report") return QUICK_COPY.existsReport;
   return purpose === "follow" ? QUICK_COPY.existsFollow : purpose === "team" ? QUICK_COPY.existsTeam : QUICK_COPY.exists;
 }
 
@@ -108,5 +111,7 @@ export function pendingReturnPath(slug: string, pending: Pending): string {
   const base = `/e/${slug}`;
   if (pending.kind === "checkout") return `${base}?checkout=${encodeURIComponent(pending.typeId)}&qty=${pending.qty}`;
   if (pending.kind === "rsvp") return `${base}?rsvp=${encodeURIComponent(pending.typeId)}&qty=${pending.qty}`;
+  // Back from the full log in page (Apple, Google, a passwordless account): reopen the report sheet.
+  if (pending.kind === "report") return `${base}?report=1`;
   return base;
 }

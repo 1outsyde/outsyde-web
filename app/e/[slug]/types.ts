@@ -10,7 +10,8 @@ export interface EventHost {
 export interface EventInfo {
   id: string;
   slug: string;
-  status: "draft" | "published" | "cancelled";
+  /** paused: Outsyde put it on hold (p5-safety); only the host, co-hosts and ticket holders get it, with onHold true. */
+  status: "draft" | "published" | "cancelled" | "paused";
   title: string;
   description: string | null;
   coverImageUrl: string | null;
@@ -33,7 +34,11 @@ export interface EventInfo {
   soldOut: boolean;
   host: EventHost;
   viewerIsHost: boolean;
+  /** Sent by the backend since p4-team step 2b; optional for older answers. */
+  viewerIsCohost?: boolean;
   viewerHasTicket: boolean;
+  /** p5-safety T10 (additive): Outsyde paused the event while it reviews it. Nothing is on sale. */
+  onHold?: boolean;
 }
 
 export interface TicketType {

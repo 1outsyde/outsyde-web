@@ -538,6 +538,8 @@ const PUBLISH_COPY: Record<string, { message: string; next: PublishNext }> = {
   HOST_AGREEMENT_REQUIRED: { message: "Read and accept the Event Host Agreement to publish.", next: "agreement" },
   AGREEMENT_VERSION_CHANGED: { message: "The Event Host Agreement was updated. Read the new version to continue.", next: "agreement" },
   EVENT_CHANGED: { message: "This event just changed. Reload and try again.", next: "reload" },
+  // p5-safety W12: new personal hosts' limits (backend message says what the limits are); fix it on the tickets step.
+  NEW_HOST_LIMIT: { message: "New hosts can sell up to 100 paid tickets per event, at up to $100 each. Free RSVPs have no limit.", next: "tickets" },
 };
 
 /** Publish refusal to copy and the next step the page offers. The backend's own message wins when it sent one. */

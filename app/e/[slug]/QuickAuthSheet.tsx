@@ -82,6 +82,7 @@ const COPY: Record<QuickPurpose, { title: string; sub: string; loginTitle: strin
   rsvp: { title: "Get your tickets", sub: "Create your free Outsyde account to RSVP. It takes a few seconds.", loginTitle: "Log in to get your tickets", cta: "Create account and continue", loginCta: "Log in and continue" },
   follow: { title: "Join Outsyde", sub: "Create your free Outsyde account to follow this host. It takes a few seconds.", loginTitle: "Log in to follow", cta: "Create account and follow", loginCta: "Log in and follow" },
   team: { title: "Join the Event team", sub: "Create your free Outsyde account to accept. It takes a few seconds.", loginTitle: "Log in to accept", cta: "Create account and accept", loginCta: "Log in and accept" },
+  report: { title: "Report this event", sub: "Create your free Outsyde account to send a report. It takes a few seconds.", loginTitle: "Log in to report", cta: "Create account and continue", loginCta: "Log in and continue" },
 };
 
 export default function QuickAuthSheet({ open, initialMode, purpose = "checkout", returnPath, onClose, onDone }: Props) {

@@ -151,6 +151,7 @@ export default function TicketsPage() {
                       <div className="tk-info">
                         <h2 className="tk-title"><Link href={`/e/${t.event.slug}`}>{t.event.title}</Link></h2>
                         {t.event.status === "cancelled" && <div className="tk-cancelled">Event cancelled</div>}
+                        {t.event.status === "paused" && <div className="tk-onhold" data-testid="ticket-on-hold">On hold, your ticket is safe</div>}
                         <div style={{ fontSize: 13, fontWeight: 600 }}>{whenLine(t.event)}</div>
                         <div className="tk-place">
                           {place.lines.length > 0 && <div>{place.lines.join(", ")}</div>}
@@ -178,7 +179,7 @@ export default function TicketsPage() {
                     </article>
 
                     <div style={{ display: "flex", justifyContent: "center" }}>
-                      {t.event.status !== "cancelled" && <button type="button" className="tk-link" onClick={() => openPanel(t)} aria-expanded={!!panel}>Can't make it?</button>}
+                      {t.event.status !== "cancelled" && t.event.status !== "paused" && <button type="button" className="tk-link" onClick={() => openPanel(t)} aria-expanded={!!panel}>Can't make it?</button>}
                     </div>
 
                     {panel && (
@@ -264,6 +265,7 @@ body{background:#0B0B0B;margin:0}
 .tk-title{font-family:'Bebas Neue',sans-serif;font-size:28px;line-height:1;margin:0;font-weight:400;overflow-wrap:anywhere}
 .tk-card .tk-title a{color:#0B0B0B}
 .tk-cancelled{font-size:12px;font-weight:700;color:#9B2C2C}
+.tk-onhold{font-size:12px;font-weight:700;color:#E8B930}
 .tk-place{font-size:13px;color:#4A453C;display:flex;flex-direction:column;gap:2px}
 .tk-qrbox{padding:14px 18px 12px;display:flex;flex-direction:column;align-items:center;gap:10px}
 .tk-qr{width:200px;height:200px;max-width:100%;background:#F5F0E6;display:block}

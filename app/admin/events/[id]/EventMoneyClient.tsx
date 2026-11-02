@@ -3,6 +3,8 @@
  * One event's money for admins: header, host card, tiles, ticket types, orders, refunds after
  * payout (with Mark collected and Write off on owed rows), the payout card (Try again and Email the
  * host by payout status) and activity, newest first. Data comes from GET /api/admin/events/:id.
+ * p5-safety (W3, W4, W7): a Safety box (pending reports, Pause, Release, Cancel and refund everyone, Dismiss) and,
+ * for a personal host, the Trusted host switch in the host card.
  */
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -30,6 +32,21 @@ import {
   type ActionKind,
   type Notice,
 } from "../_ui/shared";
+import {
+  EVENT_ACTION_CONFIRM,
+  EVENT_ACTION_DONE,
+  EVENT_ACTION_LABEL,
+  eventActionPath,
+  eventActionsFor,
+  moderationErrorText,
+  readModeration,
+  trustPath,
+  trustState,
+  type EventAction,
+} from "../_lib/moderation";
+import { ModerationButton, postModeration, type ModTone, type SendResult } from "../_ui/moderation";
+
+const EVENT_TONE: Record<EventAction, ModTone> = { pause: "gold", release: "green", cancel: "red", dismiss: "ghost" };
 
 interface TicketTypeRow {
   ticketTypeId: string;
@@ -86,6 +103,8 @@ interface Detail {
   teamPayouts?: AdminTeamPayout[];
   host: AdminEventHost & { connectedAccount?: string | null };
   activity: Activity[];
+  /** p5-safety (additive): pending reports and the host's new host limit state; older backends send none. */
+  moderation?: unknown;
 }
 
 type Auth = "loading" | "ok" | "unauthorized" | "forbidden" | "notfound";
@@ -126,6 +145,8 @@ export default function EventMoneyClient({ id }: { id: string }) {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** The moderation action being sent: the other moderation buttons wait (one at a time). */
+  const [modBusy, setModBusy] = useState<string | null>(null);
   const reqSeq = useRef(0);
 
   /** Apply one fetch result. Only the newest request may write state. */
@@ -211,6 +232,22 @@ export default function EventMoneyClient({ id }: { id: string }) {
     { sold: 0, sales: 0, refunded: 0, host: 0 },
   );
 
+  const moderation = readModeration(data.moderation);
+  const trust = trustState(moderation);
+  const pendingReports = moderation?.pendingReports ?? 0;
+  const modActions = moderation ? eventActionsFor(e.status, pendingReports) : [];
+
+  /** One moderation request, then reload with a notice. null when the page took over (signed out). */
+  async function sendModeration(url: string, body: unknown, done: string): Promise<SendResult | null> {
+    setNotice(null);
+    const r = await postModeration(url, body);
+    if (r.ok === false && r.auth) { setAuth(r.auth); return null; }
+    if (r.ok === false) return { ok: false, text: moderationErrorText(r.body, r.status) };
+    await load();
+    setNotice({ kind: "ok", text: done });
+    return { ok: true };
+  }
+
   const ask = (k: string) => { setNotice(null); setConfirmKey(k); };
   const cancel = () => setConfirmKey(null);
   const payoutBad = e.status !== "cancelled" && (payout?.status === "review" || payout?.status === "held");
@@ -234,7 +271,9 @@ export default function EventMoneyClient({ id }: { id: string }) {
             <div className="aem-pills">
               <span className="aem-pill aem-pill-grey">{ended}</span>
               <span className={`aem-pill aem-pill-${pill.tone}`} data-testid="aem-payout-pill">{pill.text}</span>
-              {e.status !== "draft" && e.slug ? <Link href={`/e/${encodeURIComponent(e.slug)}`} className="aem-link" style={{ fontSize: 13 }}>View public page</Link> : null}
+              {e.status === "paused"
+                ? <span className="aem-muted" style={{ fontSize: 13 }} data-testid="aem-public-hidden">Public page hidden while on hold</span>
+                : e.status !== "draft" && e.slug ? <Link href={`/e/${encodeURIComponent(e.slug)}`} className="aem-link" style={{ fontSize: 13 }}>View public page</Link> : null}
             </div>
           </div>
         </div>
@@ -249,6 +288,27 @@ export default function EventMoneyClient({ id }: { id: string }) {
             {[host.ownerUsername ? `Owner @${host.ownerUsername}` : null, account ? `Stripe account ${account}` : "No Stripe account yet"].filter(Boolean).join(" · ")}
           </div>
           <div className={setup.ok ? "aem-ok-text" : "aem-bad-text"} style={{ fontSize: 12.5, fontWeight: 600 }}>{setup.text}</div>
+          {trust && host.type === "user" ? (
+            <div className="aem-trust" data-testid="aem-trust">
+              <div className={trust.tone === "ok" ? "aem-ok-text" : "aem-bad-text"} style={{ fontSize: 12.5, fontWeight: 600 }}>{trust.text}</div>
+              <div className="aem-actions">
+                <ModerationButton
+                  label={trust.trusted ? "Remove trust" : "Mark as trusted host"}
+                  tone={trust.trusted ? "ghost" : "green"}
+                  reasonRequired={false}
+                  fieldLabel="Note"
+                  confirm={trust.trusted
+                    ? "Remove trusted host? The new host limits apply again until this host has a paid out event with at least 5 paying guests and no lost disputes."
+                    : "Mark this host as trusted? The new host limits (100 paid tickets per event, $100 per ticket) stop applying to every event they host."}
+                  testId="aem-trust-switch"
+                  disabled={modBusy !== null && modBusy !== "trust"}
+                  onBusy={(b) => setModBusy(b ? "trust" : null)}
+                  onSend={(note) => sendModeration(trustPath(host.id), note ? { trusted: !trust.trusted, note } : { trusted: !trust.trusted },
+                    trust.trusted ? "Host is no longer trusted." : "Host marked as trusted.")}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -368,6 +428,36 @@ export default function EventMoneyClient({ id }: { id: string }) {
         </div>
 
         <div className="aem-col-side">
+          {moderation ? (
+            <div className="aem-box" data-testid="aem-safety">
+              <div className="aem-box-title">Safety</div>
+              <div className="aem-safety">
+                <div style={{ fontSize: 13.5 }}>
+                  {pendingReports === 0
+                    ? "No reports waiting."
+                    : <><span className="aem-bad-text" style={{ fontSize: 13.5, fontWeight: 700 }}>{pendingReports === 1 ? "1 person reported this event." : `${pendingReports} people reported this event.`}</span>{" "}<Link href="/admin/events#reports" className="aem-link">Open Reports</Link></>}
+                </div>
+                {e.status === "paused" ? <div className="aem-attn-why">On hold. Only ticket holders and the host can see the public page, and nothing is on sale.</div> : null}
+                {modActions.length > 0 ? (
+                  <div className="aem-actions">
+                    {modActions.map((a) => (
+                      <ModerationButton
+                        key={a}
+                        label={EVENT_ACTION_LABEL[a]}
+                        tone={EVENT_TONE[a]}
+                        confirm={EVENT_ACTION_CONFIRM[a]}
+                        testId={`aem-act-${a}`}
+                        disabled={modBusy !== null && modBusy !== a}
+                        onBusy={(b) => setModBusy(b ? a : null)}
+                        onSend={(reason) => sendModeration(eventActionPath(a, e.id), { reason }, EVENT_ACTION_DONE[a])}
+                      />
+                    ))}
+                  </div>
+                ) : <div className="aem-none">Nothing to do here for a {e.status === "cancelled" ? "cancelled" : e.status === "draft" ? "draft" : "finished"} event.</div>}
+              </div>
+            </div>
+          ) : null}
+
           <div className={`aem-payout${payoutBad ? " aem-payout-bad" : ""}`} data-testid="aem-payout-card">
             <div className="aem-payout-top">
               <div className="aem-h2">Payout</div>
