@@ -1,9 +1,6 @@
 // app/about/page.tsx
-// Go OutsYde — About page (matches home page design system)
+// Go Outsyde — About page (matches home page design system)
 // Paste this whole file into: outsyde-web/app/about/page.tsx
-//
-// Uses the same fonts/colors/nav/footer pattern as app/page.tsx so it feels
-// like one continuous site. Swap image URLs for real photography when ready.
 
 "use client";
 
@@ -84,7 +81,7 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
 .about-hero-inner h1 .gold{color:var(--gold);}
 .about-hero-inner p{font-size:clamp(14px,1.6vw,17px);font-weight:300;color:rgba(245,240,230,.72);line-height:1.75;max-width:640px;margin:0 auto;}
 
-/* ── AUDIENCE SPLIT (matches tri-panel pattern) ── */
+/* ── AUDIENCE SPLIT ── */
 #audience-split{display:grid;grid-template-columns:repeat(2,1fr);}
 .aud-panel{position:relative;overflow:hidden;padding:64px 52px;min-height:480px;display:flex;flex-direction:column;justify-content:center;}
 .aud-panel.emerald-bg{background:linear-gradient(150deg,var(--emerald) 0%,var(--off-black) 100%);}
@@ -121,7 +118,7 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
 .why-card h3{font-family:var(--serif);font-size:24px;font-weight:400;letter-spacing:.02em;text-transform:uppercase;color:var(--cream);margin-bottom:12px;line-height:1.1;}
 .why-card p{font-size:13px;font-weight:300;line-height:1.75;color:rgba(245,240,230,.55);}
 
-/* ── CTA BAND (matches business-band) ── */
+/* ── CTA BAND ── */
 #about-cta{background:var(--emerald);padding:88px 52px;display:flex;align-items:center;justify-content:space-between;gap:44px;flex-wrap:wrap;}
 .about-cta-text h2{font-family:var(--serif);font-size:clamp(34px,4.5vw,56px);font-weight:400;color:var(--cream);line-height:1.0;letter-spacing:.02em;text-transform:uppercase;margin-bottom:12px;}
 .about-cta-text h2 em{font-style:normal;color:var(--gold);}
@@ -134,7 +131,7 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
 .btn-about-ghost{background:transparent;color:var(--cream);border:1px solid rgba(245,240,230,.35);}
 .btn-about-ghost:hover{border-color:var(--gold);color:var(--gold);}
 
-/* ── FOOTER (shared with home) ── */
+/* ── FOOTER ── */
 footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 52px 36px;}
 .footer-grid{display:grid;grid-template-columns:2.2fr 1fr 1fr 1fr;gap:52px;margin-bottom:56px;}
 .footer-brand-col .ft-logo{display:flex;align-items:center;gap:10px;margin-bottom:18px;}
@@ -167,12 +164,12 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
         }}
       />
 
-      {/* ══ NAV ══ */}
+      {/* NAV */}
       <nav id="nav" className={scrolled ? "scrolled" : ""} aria-label="Main navigation">
-        <a href="/" className="nav-logo" aria-label="Go OutsYde home">
-          <img src="/outsyde-y-transparent.png" className="nav-y-mark" alt="OutsYde" />
+        <a href="/" className="nav-logo" aria-label="Go Outsyde home">
+          <img src="/outsyde-y-transparent.png" className="nav-y-mark" alt="Outsyde" />
           <div className="nav-wordmark">
-            <strong>Go OutsYde</strong>
+            <strong>Go Outsyde</strong>
             <span>Like a Lavished Local</span>
           </div>
         </a>
@@ -196,146 +193,141 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
         </div>
       </nav>
 
-      {/* ══ ABOUT HERO ══ */}
-      <section id="about-hero" aria-label="About Go OutsYde">
+      {/* ABOUT HERO */}
+      <section id="about-hero" aria-label="About Outsyde">
         <div className="about-hero-inner">
           <p className="about-eyebrow">Our Story</p>
           <h1>
             Culture Meets <span className="gold">Commerce</span>
           </h1>
           <p>
-            At OutsYde, we believe in the power of authentic storytelling and the strength of
-            community. We&apos;re more than a platform — we&apos;re a marketplace and creative
-            hub built to spotlight the local gems overshadowed by big corporations and
-            oversaturated tourist spots, while giving photographers, creators, and small
-            businesses the tools to thrive.
+            The best businesses are the ones you have to know about. The stylist your
+            neighbor drives 45 minutes for. The vendor whose table is always sold out first.
+            They exist in every city, every neighborhood — they just don&apos;t have the
+            marketing budget to prove it. Outsyde was built to change that.
           </p>
         </div>
       </section>
 
-      {/* ══ AUDIENCE SPLIT ══ */}
-      <div id="audience-split" aria-label="Who OutsYde is for">
+      {/* AUDIENCE SPLIT */}
+      <div id="audience-split" aria-label="Who Outsyde is for">
         <div className="aud-panel emerald-bg">
           <span className="aud-tag">For Locals &amp; Travelers</span>
           <h2>Like a Lavished Local</h2>
           <p>
-            Every neighborhood has an identity shaped by the people who live there — not by
-            the chains lining the main strip. OutsYde helps you skip the tourist traps and
-            find what locals actually love, so you learn a community instead of just passing
-            through it.
+            You shouldn&apos;t need a local to show you around — but it should feel like you
+            have one. Whether you&apos;re two blocks from home or two states away, Outsyde
+            connects you to the people and places worth finding.
           </p>
           <ul>
-            <li>Discover local brands, vendors, and creators near you</li>
-            <li>Book a neighborhood photographer for your next shoot</li>
-            <li>Shop a curated collection you won&apos;t find anywhere else</li>
+            <li>Shop independent vendors you won&apos;t find on Amazon</li>
+            <li>Book local services, photographers, and experiences</li>
+            <li>Discover events happening in communities near you</li>
           </ul>
         </div>
         <div className="aud-panel dark-bg">
           <span className="aud-tag">For Businesses &amp; Creators</span>
-          <h2>Get Discovered, Get Booked</h2>
+          <h2>Get Found. Get Booked. Get Paid.</h2>
           <p>
-            Being great shouldn&apos;t mean staying invisible. OutsYde puts local businesses,
-            photographers, and independent vendors in front of an audience that&apos;s
-            specifically looking for the real thing — not just whoever has the biggest sign.
+            If you&apos;re great at what you do, staying invisible isn&apos;t an option —
+            it&apos;s a loss. Outsyde gives independent businesses and creators a platform
+            built around how they actually work.
           </p>
           <ul>
-            <li>List your business or products with no upfront cost</li>
-            <li>Join our photographer collective and start receiving bookings</li>
-            <li>Reach customers who value authenticity over popularity</li>
+            <li>List services and take bookings without the back-and-forth</li>
+            <li>Sell products to customers who are actively shopping local</li>
+            <li>Join a network of creators who show up for each other</li>
           </ul>
         </div>
       </div>
 
-      {/* ══ MARQUEE ══ */}
+      {/* MARQUEE */}
       <div id="about-marquee" aria-hidden="true">
         <div className="marquee-track">
           <span className="marquee-item">Culture Meets Commerce <span className="marquee-sep">•</span></span>
           <span className="marquee-item">Like a Lavished Local <span className="marquee-sep">•</span></span>
           <span className="marquee-item">Shop Local <span className="marquee-sep">•</span></span>
           <span className="marquee-item">Discover Your Community <span className="marquee-sep">•</span></span>
-          <span className="marquee-item">Go OutsYde <span className="marquee-sep">•</span></span>
+          <span className="marquee-item">Go Outsyde <span className="marquee-sep">•</span></span>
           <span className="marquee-item">Culture Meets Commerce <span className="marquee-sep">•</span></span>
           <span className="marquee-item">Like a Lavished Local <span className="marquee-sep">•</span></span>
           <span className="marquee-item">Shop Local <span className="marquee-sep">•</span></span>
           <span className="marquee-item">Discover Your Community <span className="marquee-sep">•</span></span>
-          <span className="marquee-item">Go OutsYde <span className="marquee-sep">•</span></span>
+          <span className="marquee-item">Go Outsyde <span className="marquee-sep">•</span></span>
         </div>
       </div>
 
-      {/* ══ MISSION ══ */}
+      {/* MISSION */}
       <section id="mission-band" aria-label="Our mission">
         <div className="mission-inner">
           <p className="about-eyebrow">Our Mission</p>
           <h2>
-            To help people find the businesses that make a community
-            <span className="gold"> special</span> — and help those businesses get the
-            spotlight, tools, and support they deserve.
+            To put the businesses that make a community worth visiting — in front of the
+            people who are <span className="gold">ready to support them.</span>
           </h2>
         </div>
       </section>
 
-      {/* ══ WHY ══ */}
-      <section id="why" aria-label="Why choose OutsYde">
+      {/* WHY */}
+      <section id="why" aria-label="Why choose Outsyde">
         <div className="why-head">
-          <h2>Why OutsYde</h2>
+          <h2>Why Outsyde</h2>
         </div>
         <div className="why-grid">
           <div className="why-card">
             <span className="why-num">01</span>
-            <h3>Real Local Discovery</h3>
-            <p>Find the businesses locals love, not just what has the biggest tourist crowd.</p>
+            <h3>Shop local, actually</h3>
+            <p>Browse and buy from independent vendors. Not resellers, not chains. Real people, real products.</p>
           </div>
           <div className="why-card">
             <span className="why-num">02</span>
-            <h3>One-Stop Creative Hub</h3>
-            <p>Book photographers, influencers, and marketing experts all in one place.</p>
+            <h3>Book without the DMs</h3>
+            <p>Services, appointments, and photographers — request, confirm, and pay in one place.</p>
           </div>
           <div className="why-card">
             <span className="why-num">03</span>
-            <h3>Curated Marketplace</h3>
-            <p>Discover unique products from independent vendors you won&apos;t find anywhere else.</p>
+            <h3>Find what&apos;s happening</h3>
+            <p>Local events and pop-ups posted by the businesses and creators behind them.</p>
           </div>
           <div className="why-card">
             <span className="why-num">04</span>
-            <h3>Built for Small Business</h3>
-            <p>Tailored plans designed to fit real budgets and real growth goals.</p>
+            <h3>Built for the solo operator</h3>
+            <p>No big team required. Outsyde is designed around how one-person businesses actually run.</p>
           </div>
           <div className="why-card">
             <span className="why-num">05</span>
-            <h3>A Spotlight for the Overshadowed</h3>
-            <p>We elevate the local gems that get lost next to big corporations.</p>
+            <h3>Your community, expanded</h3>
+            <p>Hole-in-the-wall over chain store aesthetics. Local favorites over conglomerate giants.</p>
           </div>
           <div className="why-card">
             <span className="why-num">06</span>
-            <h3>Community Focus</h3>
-            <p>Collaboration, growth, and authentic connections — that&apos;s the whole point.</p>
+            <h3>Creators at the center</h3>
+            <p>Photographers, influencers, and content creators are part of the platform — not an afterthought.</p>
           </div>
         </div>
       </section>
 
-      {/* ══ CTA BAND ══ */}
-      <div id="about-cta" aria-label="Join OutsYde">
+      {/* CTA BAND */}
+      <div id="about-cta" aria-label="Join Outsyde">
         <div className="about-cta-text">
-          <h2>Come Experience It <em>OutsYde</em></h2>
+          <h2>Come Experience It <em>Outsyde.</em></h2>
           <p>
-            Whether you&apos;re a startup looking for creative services, a vendor ready to
-            showcase your products, or a traveler looking to learn a community instead of
-            just passing through — OutsYde is here to help you succeed.
+            Your community is waiting. So are the businesses that make it worth exploring.
           </p>
         </div>
         <div className="about-cta-ctas">
-          <a href="/shop" className="btn-about-cta btn-about-gold">Shop Now →</a>
+          <a href="/shop" className="btn-about-cta btn-about-gold">Explore Now</a>
           <a href="/for-business" className="btn-about-cta btn-about-ghost">Partner With Us</a>
         </div>
       </div>
 
-      {/* ══ FOOTER ══ */}
+      {/* FOOTER */}
       <footer>
         <div className="footer-grid">
           <div className="footer-brand-col">
             <div className="ft-logo">
               <div className="ft-y" aria-hidden="true">Y</div>
-              <span className="ft-name">Go OutsYde</span>
+              <span className="ft-name">Go Outsyde</span>
             </div>
             <p>Culture meets commerce. Linking local businesses with artists and consumers — one place to shop, book, and experience it all.</p>
             <div className="ft-social" aria-label="Social media links">
@@ -376,7 +368,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
         </div>
 
         <div className="footer-bottom">
-          <span>© {new Date().getFullYear()} Go OutsYde. All rights reserved.</span>
+          <span>© {new Date().getFullYear()} Go Outsyde. All rights reserved.</span>
           <span>Like a Lavished Local</span>
         </div>
       </footer>
