@@ -22,7 +22,7 @@ const SECTIONS = [
 
 export default function RefundPolicyPage() {
   return (
-    <LegalLayout title={["Refund", "Policy"]} current="/refund-policy" updated="November 2, 2026" sections={SECTIONS}>
+    <LegalLayout title={["Refund", "Policy"]} current="/refund-policy" updated="November 4, 2026" sections={SECTIONS}>
       <p>
         This Refund Policy explains how refunds work for purchases made through Outsyde LLC (&quot;Outsyde,&quot; &quot;we,&quot; &quot;our,&quot; or &quot;us&quot;), including the Outsyde mobile application, goutsyde.com and every Outsyde powered vendor website (together, the &quot;Platform&quot;). This policy is part of our <a href="/terms">Terms of Service</a>. By booking, buying or purchasing tickets on the Platform, you agree to it. Where this Refund Policy and the Terms of Service differ on refunds, this Refund Policy controls.
       </p>
@@ -73,7 +73,7 @@ export default function RefundPolicyPage() {
 
       <Section id="events" title="5. Event Tickets">
         <p>Each event organizer sets the refund policy for their event, which is shown on the event page before you buy: no refunds, or refunds until a set time before the event starts. Once an event is published, its refund policy may only be changed to become more flexible for ticket holders.</p>
-        <p>When a refund is allowed under that policy, or the organizer refunds your order, you receive the ticket price back. The service fee is not refunded. Refunds are not available after the event starts or after a ticket on your order has been checked in.</p>
+        <p>When a refund is allowed under that policy, or the organizer refunds your order, you receive the ticket price back. The service fee is not refunded. You can&apos;t request a refund after the event starts or after a ticket on your order has been checked in, but the organizer may still refund your order until their payout for the event is worked out, 3 days after the event ends.</p>
         <p><strong>If the organizer or Outsyde cancels the event, you receive a full refund, including the service fee</strong>, and free RSVPs are cancelled.</p>
         <p>If Outsyde puts an event on hold while it reviews it, your tickets stay valid and refunds wait until the review ends.</p>
       </Section>

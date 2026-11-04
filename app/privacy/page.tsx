@@ -83,7 +83,7 @@ const SECTIONS = [
 
 export default function PrivacyPage() {
   return (
-    <LegalLayout title={["Privacy", "Policy"]} current="/privacy" updated="November 2, 2026" sections={SECTIONS}>
+    <LegalLayout title={["Privacy", "Policy"]} current="/privacy" updated="November 4, 2026" sections={SECTIONS}>
 
           <p>Welcome to Outsyde LLC ("Outsyde," "we," "our," or "us"). Outsyde values your privacy and is committed to protecting your personal information. This Privacy Policy explains how we collect, use, disclose, store, and protect information when you use the Outsyde mobile application, website, and related services (collectively, the "Platform").</p>
           <p>By creating an account or using the Platform, you agree to this Privacy Policy.</p>
@@ -267,7 +267,7 @@ export default function PrivacyPage() {
               <li>{"We record when your ticket is scanned at the door."}</li>
               <li>{"We send ticket confirmations, reminders, the event address (when the Host shares it on the day) and changes to the event by email and push notification."}</li>
               <li>{"If you add a ticket to Apple Wallet, the pass holds the event name, time, place and your ticket's QR code."}</li>
-              <li>{"If you report an event, the Host is not told who reported it. Outsyde staff see your username, the reason and any note you add."}</li>
+              <li>{"If you report an event, we don't share your identity with the Host. Outsyde staff see your username, the reason and any note you add. We may disclose it if required by valid legal process, such as a subpoena or court order."}</li>
               <li>{"If you host, we keep a record of which version of the Event Host Agreement you accepted and when, and of your event's sales and payouts."}</li>
             </ul>
           </Section>
