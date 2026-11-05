@@ -487,6 +487,7 @@ export default function AccountPage() {
           <Link href="/account" className="tab-link active">Posts</Link>
           <Link href="/account/bookings" className="tab-link">Bookings</Link>
           <Link href="/account/orders" className="tab-link">Orders</Link>
+          <Link href="/account/quotes" className="tab-link">Requests and quotes</Link>
           <Link href="/tickets" className="tab-link">Tickets</Link>
           <Link href="/account/points" className="tab-link">Points</Link>
           <Link href="/account/settings" className="tab-link">Settings</Link>
