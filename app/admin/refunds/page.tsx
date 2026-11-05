@@ -17,7 +17,20 @@ interface RefundRequest {
   createdAt: string;
   requesterName: string | null;
   requesterEmail: string | null;
+  // Quotes step 4b-1 (backend, additive): set only when the request is a customer's
+  // report on a quote booking. Those take one of three outcomes instead of approve or reject.
+  quoteReport?: {
+    reportId: string;
+    quoteId: string;
+    appointmentId: string;
+    status: string;
+    photos: string[];
+    maxRefundCents: number;
+    outcomes: string[];
+  };
 }
+
+type QuoteOutcome = "pay_full" | "partial_refund" | "full_refund";
 
 type AuthState = "loading" | "ok" | "unauthorized" | "forbidden";
 type Notice = { kind: "error" | "warn" | "info"; text: string };
@@ -59,6 +72,10 @@ export default function AdminRefundsPage() {
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectNotes, setRejectNotes] = useState("");
+  // Quote reports: which outcome form is open, the partial amount (dollars, as typed) and the note.
+  const [reportForm, setReportForm] = useState<{ id: string; outcome: QuoteOutcome } | null>(null);
+  const [partialDollars, setPartialDollars] = useState("");
+  const [reportNotes, setReportNotes] = useState("");
 
   const loadData = useCallback(async () => {
     try {
@@ -94,9 +111,41 @@ export default function AdminRefundsPage() {
   function closeRejectForm() {
     setRejectingId(null);
     setRejectNotes("");
+    setReportForm(null);
+    setPartialDollars("");
+    setReportNotes("");
   }
 
-  async function decide(id: string, status: "approved" | "rejected", adminNotes?: string) {
+  // Quote reports: pay in full is sent as rejected, both refunds as approved, with the outcome.
+  function decideReport(request: RefundRequest, outcome: QuoteOutcome) {
+    const notes = reportNotes.trim() || undefined;
+    if (outcome === "partial_refund") {
+      const max = request.quoteReport?.maxRefundCents ?? 0;
+      // Dollars with at most 2 decimals ("50", "50.5", "50.25"); anything else is refused, never rounded.
+      if (!/^\d+(\.\d{1,2})?$/.test(partialDollars.trim())) {
+        setNotice({ kind: "error", text: "Enter the amount in dollars and cents, like 50.25." });
+        return;
+      }
+      const cents = Math.round(Number(partialDollars.trim()) * 100);
+      if (!Number.isFinite(cents) || cents <= 0) {
+        setNotice({ kind: "error", text: "Enter the amount to refund, more than $0." });
+        return;
+      }
+      if (cents >= max) {
+        setNotice({ kind: "error", text: `That is everything the customer paid (${formatAmount(max)}). Choose Full refund instead.` });
+        return;
+      }
+      return decide(request.id, "approved", notes, { outcome, amountCents: cents });
+    }
+    return decide(request.id, outcome === "pay_full" ? "rejected" : "approved", notes, { outcome });
+  }
+
+  async function decide(
+    id: string,
+    status: "approved" | "rejected",
+    adminNotes?: string,
+    report?: { outcome: QuoteOutcome; amountCents?: number }
+  ) {
     setActioningId(id);
     setNotice(null);
 
@@ -104,11 +153,12 @@ export default function AdminRefundsPage() {
       const res = await fetch(`/api/admin/refunds/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          status === "rejected" && adminNotes?.trim()
-            ? { status, adminNotes: adminNotes.trim() }
-            : { status }
-        ),
+        body: JSON.stringify({
+          status,
+          ...((report || status === "rejected") && adminNotes?.trim() ? { adminNotes: adminNotes.trim() } : {}),
+          ...(report ? { outcome: report.outcome } : {}),
+          ...(report?.amountCents !== undefined ? { amountCents: report.amountCents } : {}),
+        }),
       });
 
       if (res.ok) {
@@ -419,6 +469,97 @@ export default function AdminRefundsPage() {
           requests.map((request) => {
             const busy = actioningId === request.id;
             const isRejecting = rejectingId === request.id;
+            const report = request.quoteReport;
+            if (report) {
+              const open = reportForm?.id === request.id ? reportForm.outcome : null;
+              const confirmText: Record<QuoteOutcome, string> = {
+                pay_full: "The vendor is paid their share in full. Nothing is refunded.",
+                partial_refund: "The customer gets this amount back, from the balance first, then the deposit. The service fee is not refunded. The vendor is paid the rest of their share.",
+                full_refund: `The customer gets back everything the business was paid, ${formatAmount(report.maxRefundCents)}. The service fee is not refunded. The vendor is not paid the balance.`,
+              };
+              const buttonText: Record<QuoteOutcome, string> = {
+                pay_full: "Pay vendor in full",
+                partial_refund: "Partial refund",
+                full_refund: "Full refund",
+              };
+              return (
+                <div key={request.id}>
+                  <div className="issue-row">
+                    <div style={{ minWidth: 0 }}>
+                      <div className="issue-title">
+                        Quote report · {formatAmount(report.maxRefundCents)} held
+                      </div>
+                      <div className="issue-meta">{buildMeta(request)}</div>
+                      {report.photos.length > 0 && (
+                        <div className="issue-meta" style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                          {report.photos.map((url, i) => (
+                            <a key={url} href={url} target="_blank" rel="noreferrer" style={{ color: "#E8B930" }}>
+                              Photo {i + 1}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                      <span className="status-pill st-pending">payout paused</span>
+                      {(["pay_full", "partial_refund", "full_refund"] as QuoteOutcome[]).map((o) => (
+                        <button
+                          key={o}
+                          className={o === "full_refund" ? "btn btn-gold" : "btn btn-ghost"}
+                          onClick={() => {
+                            setNotice(null);
+                            setPartialDollars("");
+                            setReportForm(open === o ? null : { id: request.id, outcome: o });
+                          }}
+                          disabled={busy}
+                        >
+                          {open === o ? "Cancel" : buttonText[o]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {open && (
+                    <div className="add-form">
+                      <div className="reject-warning">{confirmText[open]} This decision is final.</div>
+                      {open === "partial_refund" && (
+                        <>
+                          <label className="field-label" htmlFor={`partial-${request.id}`}>
+                            Amount to refund (up to {formatAmount(report.maxRefundCents - 1)})
+                          </label>
+                          <input
+                            id={`partial-${request.id}`}
+                            className="field-input"
+                            inputMode="decimal"
+                            value={partialDollars}
+                            onChange={(e) => setPartialDollars(e.target.value.replace(/[^0-9.]/g, ""))}
+                            placeholder="50.00"
+                          />
+                        </>
+                      )}
+                      <label className="field-label" htmlFor={`report-notes-${request.id}`}>
+                        Internal note (optional)
+                      </label>
+                      <textarea
+                        id={`report-notes-${request.id}`}
+                        className="field-textarea"
+                        value={reportNotes}
+                        onChange={(e) => setReportNotes(e.target.value)}
+                        placeholder="Optional note for the record. Not sent to the customer or the vendor."
+                      />
+                      <div className="form-actions">
+                        <button className="btn btn-ghost" onClick={closeRejectForm} disabled={busy}>
+                          Cancel
+                        </button>
+                        <button className="btn btn-gold" onClick={() => decideReport(request, open)} disabled={busy}>
+                          {busy ? "Saving…" : `Confirm: ${buttonText[open]}`}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            }
 
             return (
               <div key={request.id}>
