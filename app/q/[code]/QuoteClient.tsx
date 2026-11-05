@@ -87,12 +87,21 @@ export default function QuoteClient({ code }: { code: string }) {
   const [view, setView] = useState<View>({ kind: "loading" });
   const [meId, setMeId] = useState<string>("");
 
-  const loadQuote = useCallback(async (quoteId: string, access: Access) => {
+  const current = useRef<{ id: string; access: Access } | null>(null);
+  const loadQuote = useCallback(async (quoteId: string, access: Access, first = false) => {
     const r = await get(`/api/quotes/${quoteId}`);
-    if (r.status === 200 && r.body?.quote) setView({ kind: "quote", access, quote: r.body.quote as Quote });
-    else setView({ kind: "error", message: msgOf(r.body) });
-    return r.status === 200 ? (r.body.quote as Quote) : null;
+    if (r.status === 200 && r.body?.quote) {
+      current.current = { id: quoteId, access };
+      setView({ kind: "quote", access, quote: r.body.quote as Quote });
+      return r.body.quote as Quote;
+    }
+    // Review I5: a refresh that fails (a blip, too many requests) keeps the quote on screen; only the first load
+    // shows the error page.
+    if (first) setView({ kind: "error", message: msgOf(r.body) });
+    return null;
   }, []);
+  // Review C1: one refresh function for the life of the page, so nothing restarts on every render.
+  const refresh = useCallback(async () => (current.current ? loadQuote(current.current.id, current.current.access) : null), [loadQuote]);
 
   const load = useCallback(async () => {
     if (!code) { setView({ kind: "invalid" }); return; }
@@ -102,8 +111,10 @@ export default function QuoteClient({ code }: { code: string }) {
     if (r.status !== 200) { setView({ kind: "error", message: msgOf(r.body) }); return; }
     if (r.body.access === "preview" || !r.body.quoteId) { setView({ kind: "preview", preview: r.body.preview as Preview }); return; }
     const me = await get("/api/auth/me");
-    if (typeof me.body?.id === "string") setMeId(me.body.id);
-    await loadQuote(r.body.quoteId, r.body.access as Access);
+    // /api/auth/me answers { authenticated, user: { id } } (review I2).
+    const myId = me.body?.user?.id ?? me.body?.id;
+    if (typeof myId === "string") setMeId(myId);
+    await loadQuote(r.body.quoteId, r.body.access as Access, true);
   }, [code, loadQuote]);
 
   useEffect(() => { const t = setTimeout(() => void load(), 0); return () => clearTimeout(t); }, [load]);
@@ -128,7 +139,7 @@ export default function QuoteClient({ code }: { code: string }) {
         {view.kind === "error" && <Message title="We couldn't load this quote" text={view.message}><button className="qp-btn" onClick={() => void load()}>Try again</button></Message>}
         {view.kind === "preview" && <PreviewView preview={view.preview} code={code} />}
         {view.kind === "quote" && (
-          <QuoteView quote={view.quote} access={view.access} meId={meId} refresh={() => loadQuote(view.quote.id, view.access)} />
+          <QuoteView quote={view.quote} access={view.access} meId={meId} refresh={refresh} />
         )}
       </div>
     </div>
@@ -153,7 +164,7 @@ function Header({ business }: { business: Business }) {
   const initials = name.split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
   return (
     <header className="qp-head">
-      {cover && <div className="qp-cover" style={{ backgroundImage: `url("${cover.replace(/"/g, "%22")}")` }} aria-hidden="true" />}
+      {cover && <div className="qp-cover" style={{ backgroundImage: `url("${cover.replace(/["\\\n]/g, encodeURIComponent)}")` }} aria-hidden="true" />}
       <div className="qp-brand">
         {logo ? <img className="qp-logo" src={logo} alt="" /> : <div className="qp-logo qp-initials" aria-hidden="true">{initials}</div>}
         <div className="qp-bname">{name}</div>
@@ -221,40 +232,42 @@ function PreviewView({ preview, code }: { preview: Preview; code: string }) {
 /* ---------- the quote ---------- */
 
 function QuoteView({ quote: q, access, meId, refresh }: { quote: Quote; access: Access; meId: string; refresh: () => Promise<Quote | null> }) {
-  const stage = stageOf(q);
   const isCustomer = access === "customer";
+  // Review I1: "paying" only means a payment was started (a lock, up to 15 minutes). The customer keeps the pay
+  // form (Continue returns the same payment); only this page's own confirm shows the waiting line.
+  const raw = stageOf(q);
+  const stage = isCustomer && raw === "paying" ? "pay" : raw;
   const businessName = q.business?.name || q.businessName || "The business";
 
   // While a payment or a bank step settles at Stripe, ask the backend again every few seconds for up to 2 minutes.
   const [waiting, setWaiting] = useState<string>("");
+  // Review C1: only one poll at a time; a new one (or leaving the page) ends the one before.
+  const pollId = useRef(0);
+  useEffect(() => () => { pollId.current++; }, []);
   const pollUntil = useCallback(async (done: (fresh: Quote) => boolean, label: string) => {
+    const mine = ++pollId.current;
     setWaiting(label);
     const until = Date.now() + 120_000;
-    while (Date.now() < until) {
+    while (Date.now() < until && pollId.current === mine) {
       const fresh = await refresh();
+      if (pollId.current !== mine) return false;
       if (fresh && done(fresh)) { setWaiting(""); return true; }
-      await new Promise((r) => setTimeout(r, 2500));
+      await new Promise((r) => setTimeout(r, 3000));
     }
-    setWaiting("");
+    if (pollId.current === mine) setWaiting("This is taking longer than usual. Refresh in a minute.");
     return false;
   }, [refresh]);
-
-  useEffect(() => {
-    if (stage !== "paying") return;
-    const t = setTimeout(() => void pollUntil((f) => stageOf(f) !== "paying", "Your payment is being confirmed."), 0);
-    return () => clearTimeout(t);
-  }, [stage, pollUntil]);
 
   return (
     <>
       <div className="qp-card">
-        <span className="qp-pill">{stage === "pay" ? "Quote" : stage === "closed" ? "Closed" : stage === "window" ? "Job complete" : stage === "reported" ? "Under review" : stage === "decided" ? "Reviewed" : stage === "complete" ? "Complete" : "Booked"}</span>
+        <span className="qp-pill">{stage === "pay" ? "Quote" : stage === "paying" ? "Paying" : stage === "closed" ? "Closed" : stage === "window" ? "Job complete" : stage === "reported" ? "Under review" : stage === "decided" ? "Reviewed" : stage === "complete" ? "Complete" : "Booked"}</span>
         <Summary q={q} details={true} />
         {(stage === "pay" || stage === "paying" || stage === "closed") && <Lines preview={q} />}
         {waiting && <p className="qp-note" role="status">{waiting}</p>}
         {stage === "closed" && <p className="qp-muted">{closedLine(q.status)}</p>}
         {stage === "pay" && isCustomer && <PayPanel q={q} onPaid={() => pollUntil((f) => f.status === "paid", "Your payment is being confirmed.")} onDeclined={refresh} />}
-        {stage === "pay" && !isCustomer && <p className="qp-muted">Waiting for the customer to pay. Manage this quote in the Outsyde app.</p>}
+        {(stage === "pay" || stage === "paying") && !isCustomer && <p className="qp-muted">{stage === "paying" ? "The customer started paying." : "Waiting for the customer to pay."} Manage this quote in the Outsyde app.</p>}
         {stage !== "pay" && stage !== "paying" && stage !== "closed" && <BookedLines q={q} isCustomer={isCustomer} pollUntil={pollUntil} />}
       </div>
       {q.status === "paid" && q.extras.length > 0 && <ExtrasPanel q={q} isCustomer={isCustomer} refresh={refresh} />}
@@ -277,7 +290,7 @@ function BookedLines({ q, isCustomer, pollUntil }: { q: Quote; isCustomer: boole
       {q.paymentMode === "full" && <div className="qp-line qp-muted"><span>Paid, with the service fee</span><span>{money(q.amounts.payNowCents)}</span></div>}
       {bal && <ActionLine text={bal.text} action={isCustomer ? bal.action : undefined} q={q} onDone={() => pollUntil((f) => !balanceLine(f)?.action, "Your card is being confirmed.")} />}
       {ex && <ActionLine text={ex.text} action={isCustomer ? ex.action : undefined} q={q} onDone={() => pollUntil((f) => !extrasPaymentLine(f.extrasPayment)?.action, "Your card is being confirmed.")} />}
-      {!isCustomer && ex?.action && <p className="qp-small">Extras unpaid. The customer has been asked to pay for them.</p>}
+      {!isCustomer && q.extrasPayment?.unpaid && <p className="qp-small">Extras unpaid. The customer has been asked to pay for them.</p>}
     </div>
   );
 }
@@ -287,6 +300,8 @@ function BookedLines({ q, isCustomer, pollUntil }: { q: Quote; isCustomer: boole
 function PayPanel({ q, onPaid, onDeclined }: { q: Quote; onPaid: () => void; onDeclined: () => Promise<Quote | null> }) {
   const [stripe, setStripe] = useState<Stripe | null | undefined>(undefined);
   const [secret, setSecret] = useState<string>("");
+  // The amount Stripe will charge comes from the pay answer (a points code started in the app lowers it).
+  const [chargeCents, setChargeCents] = useState<number>(q.amounts.payNowCents);
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
   const [declining, setDeclining] = useState(false);
@@ -299,7 +314,11 @@ function PayPanel({ q, onPaid, onDeclined }: { q: Quote; onPaid: () => void; onD
     setError(""); setStarting(true);
     const r = await post(`/api/quotes/${q.id}/pay`, { version: q.version });
     setStarting(false);
-    if (r.status === 200 && typeof r.body?.clientSecret === "string") { setSecret(r.body.clientSecret); return; }
+    if (r.status === 200 && typeof r.body?.clientSecret === "string") {
+      if (Number.isInteger(r.body.amountChargedNowCents) && r.body.amountChargedNowCents > 0) setChargeCents(r.body.amountChargedNowCents);
+      setSecret(r.body.clientSecret);
+      return;
+    }
     if (r.body?.code === "QUOTE_CLOSED" && r.body?.status === "paid") { onPaid(); return; }
     setError(msgOf(r.body));
     if (r.body?.code === "QUOTE_CHANGED") void onDeclined();
@@ -312,14 +331,16 @@ function PayPanel({ q, onPaid, onDeclined }: { q: Quote; onPaid: () => void; onD
     await onDeclined();
   }
 
-  if (stripe === null) return <p className="qp-err">Payments aren&apos;t available right now. Try again later.</p>;
+  // Quotes the backend can't take payment for yet: say so instead of a button that fails.
+  const cantPay = q.kind === "product" ? "Paying for custom products in Outsyde is coming soon. Message the business to arrange payment for now."
+    : !q.jobDate || !q.startTime ? "This quote doesn't have a date and time yet. Ask the business to add them, then pay." : "";
   return (
     <div className="qp-stack">
-      {!secret ? (
+      {cantPay ? <p className="qp-muted">{cantPay}</p> : stripe === null ? <p className="qp-err">Payments aren&apos;t available right now. Try again later.</p> : !secret ? (
         <button className="qp-btn" onClick={() => void start()} disabled={starting || stripe === undefined}>{starting ? "Getting your payment ready" : `Continue to pay ${money(q.amounts.payNowCents)}`}</button>
       ) : (
         <Elements stripe={stripe ?? null} options={{ appearance }}>
-          <CardPay secret={secret} amountCents={q.amounts.payNowCents} kind="pay" label={`Pay ${money(q.amounts.payNowCents)}`} onDone={onPaid} applePay />
+          <CardPay secret={secret} amountCents={chargeCents} kind="pay" label={`Pay ${money(chargeCents)}`} onDone={onPaid} applePay />
         </Elements>
       )}
       {error && <p className="qp-err" role="alert">{error}</p>}
@@ -347,6 +368,8 @@ function CardPay({ secret, kind, label, onDone, amountCents, applePay = false }:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [cardError, setCardError] = useState("");
+  const [finished, setFinished] = useState(false);
+  const finishedRef = useRef(false);
   const lock = useRef(false);
 
   async function settle(s: Stripe, r: { status?: string | null; errorCode?: string | null; errorMessage?: string | null; thrown?: boolean }) {
@@ -357,7 +380,7 @@ function CardPay({ secret, kind, label, onDone, amountCents, applePay = false }:
         o = intentOutcome(kind, { status: st ?? null });
       } catch { o = { next: "failed", message: GENERIC }; }
     }
-    if (o.next === "done") onDone();
+    if (o.next === "done") { lock.current = true; finishedRef.current = true; setFinished(true); onDone(); }
     else if (o.next === "failed") setError(o.message);
     else setError(GENERIC);
   }
@@ -376,20 +399,21 @@ function CardPay({ secret, kind, label, onDone, amountCents, applePay = false }:
         await settle(stripe, r ? { status: r.paymentIntent?.status ?? (r.error as { payment_intent?: { status?: string } } | undefined)?.payment_intent?.status, errorCode: r.error?.code, errorMessage: r.error?.message } : { thrown: true });
       }
     } finally {
-      lock.current = false; setBusy(false);
+      if (!finishedRef.current) lock.current = false;
+      setBusy(false);
     }
   }
 
   return (
     <div className="qp-stack">
       {applePay && kind === "pay" && amountCents && amountCents > 0 && (
-        <ApplePayBox secret={secret} amountCents={amountCents} busy={() => lock.current} onStart={() => { lock.current = true; setBusy(true); setError(""); }} onEnd={() => { lock.current = false; setBusy(false); }} onResult={settle} />
+        <ApplePayBox secret={secret} amountCents={amountCents} busy={() => lock.current} onStart={() => { lock.current = true; setBusy(true); setError(""); }} onEnd={() => { if (!finishedRef.current) lock.current = false; setBusy(false); }} onResult={settle} />
       )}
       <div className="qp-label" id="qp-card-label">Card</div>
       <div className="qp-cardbox" aria-labelledby="qp-card-label"><CardElement options={cardStyle} onChange={(e) => setCardError(e.error ? e.error.message : "")} /></div>
       {cardError && <p className="qp-err" role="alert">{cardError}</p>}
       {error && <p className="qp-err" role="alert">{error}</p>}
-      <button className="qp-btn" onClick={() => void submit()} disabled={!stripe || !elements || busy}>{busy ? "Processing" : label}</button>
+      <button className="qp-btn" onClick={() => void submit()} disabled={!stripe || !elements || busy || finished}>{finished ? "Done" : busy ? "Processing" : label}</button>
     </div>
   );
 }
@@ -400,7 +424,7 @@ function ApplePayBox(props: { secret: string; amountCents: number; busy: () => b
   const [shown, setShown] = useState(false);
   return (
     <div style={shown ? { display: "flex", flexDirection: "column", gap: 10 } : { visibility: "hidden", height: 0, overflow: "hidden" }} aria-hidden={!shown}>
-      <Elements stripe={parentStripe} options={{ mode: "payment", amount: props.amountCents, currency: "usd", appearance }}>
+      <Elements stripe={parentStripe} options={{ mode: "payment", amount: props.amountCents, currency: "usd", setupFutureUsage: "off_session", appearance }}>
         <ApplePayButton {...props} onShown={setShown} />
       </Elements>
       <div className="qp-or">or pay with card</div>
@@ -486,6 +510,9 @@ function ExtraRow({ q, x, isCustomer, refresh }: { q: Quote; x: Extra; isCustome
     const path = `/api/quotes/${q.id}/extras/${x.id}/approve`;
     let r = await post(path, newCard ? { newCard: true } : {});
     // A bank check (3D Secure) on the saved card: finish it here, then ask again.
+    if (r.status === 200 && r.body?.status === "needs_action" && !newCard && !stripe) {
+      setBusy(false); setError("Your bank needs to confirm this card. Open the Outsyde app to finish approving."); return;
+    }
     if (r.status === 200 && r.body?.status === "needs_action" && !newCard && stripe) {
       const s = stripe;
       const res = await s.handleNextAction({ clientSecret: r.body.clientSecret }).catch(() => null);
@@ -543,6 +570,8 @@ function WindowPanel({ q, refresh }: { q: Quote; refresh: () => Promise<Quote | 
   const [error, setError] = useState("");
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(t); }, []);
 
+  // The buttons go when the 6 hours end, even before the next refresh.
+  const open = !q.window?.endsAt || new Date(q.window.endsAt).getTime() > now;
   const charged = [q.balance?.status === "captured" ? `the balance, ${money(q.balance.capturedCents ?? q.balance.holdCents)}` : "", q.extrasPayment?.status === "captured" ? `extras, ${money(q.extrasPayment.capturedCents ?? q.extrasPayment.holdCents)}` : ""].filter(Boolean);
 
   async function confirm() {
@@ -588,16 +617,22 @@ function WindowPanel({ q, refresh }: { q: Quote; refresh: () => Promise<Quote | 
       <p className="qp-small">{windowLeft(q.window?.endsAt ?? null, now)}</p>
       {mode === "choose" ? (
         <div className="qp-stack">
-          {q.window?.canConfirm && <button className="qp-btn" onClick={() => void confirm()} disabled={busy}>Confirm the job</button>}
-          {q.window?.canReport && <button className="qp-btn2" onClick={() => setMode("report")} disabled={busy}>Report a problem</button>}
+          {open && q.window?.canConfirm && <button className="qp-btn" onClick={() => void confirm()} disabled={busy}>Confirm the job</button>}
+          {open && q.window?.canReport && <button className="qp-btn2" onClick={() => setMode("report")} disabled={busy}>Report a problem</button>}
         </div>
       ) : (
         <div className="qp-stack">
           <label className="qp-label" htmlFor="qp-reason">What went wrong?</label>
           <textarea id="qp-reason" className="qp-input" rows={4} maxLength={1000} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="At least 10 characters" />
           <label className="qp-label" htmlFor="qp-photos">Photos, up to {MAX_PHOTOS}</label>
-          <input id="qp-photos" type="file" accept="image/jpeg,image/png,image/webp,image/heic" multiple disabled={uploading || photos.length >= MAX_PHOTOS} onChange={(e) => void upload(e.target.files)} />
-          {photos.length > 0 && <div className="qp-thumbs">{photos.map((p) => <img key={p} src={p} alt="" />)}</div>}
+          <input id="qp-photos" type="file" accept="image/jpeg,image/png,image/webp,image/heic" multiple disabled={uploading || photos.length >= MAX_PHOTOS} onChange={(e) => { void upload(e.target.files); e.target.value = ""; }} />
+          {photos.length > 0 && (
+            <div className="qp-thumbs">
+              {photos.map((p, i) => (
+                <div key={p} className="qp-thumb"><img src={p} alt={`Photo ${i + 1}`} /><button className="qp-link" onClick={() => setPhotos((list) => list.filter((x) => x !== p))} aria-label={`Remove photo ${i + 1}`}>Remove</button></div>
+              ))}
+            </div>
+          )}
           <button className="qp-btn" onClick={() => void report()} disabled={busy || uploading}>{busy ? "Sending" : "Send the report"}</button>
           <button className="qp-link" onClick={() => setMode("choose")} disabled={busy}>Back</button>
         </div>
@@ -611,18 +646,31 @@ function WindowPanel({ q, refresh }: { q: Quote; refresh: () => Promise<Quote | 
 
 function NotesPanel({ q, meId, businessName }: { q: Quote; meId: string; businessName: string }) {
   const [notes, setNotes] = useState<Note[] | null>(null);
+  const [notesError, setNotesError] = useState("");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const load = useCallback(async () => {
     const r = await get(`/api/quotes/${q.id}/notes`);
-    if (r.status === 200 && Array.isArray(r.body?.messages)) setNotes((r.body.messages as Note[]).slice().sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
-  }, [q.id]);
-  useEffect(() => { const first = setTimeout(() => void load(), 0); const t = setInterval(() => void load(), 20_000); return () => { clearTimeout(first); clearInterval(t); }; }, [load]);
+    if (r.status === 200 && Array.isArray(r.body?.messages)) { setNotesError(""); setNotes((r.body.messages as Note[]).slice().sort((a, b) => a.createdAt.localeCompare(b.createdAt))); }
+    else if (r.status === 403 || r.status === 404) setNotesError("These notes are in the chat of the person who sent the quote. Open Messages in the Outsyde app.");
+    else if (notes === null) setNotesError("Notes couldn't load right now.");
+  }, [q.id, notes]);
+  // Reading the notes marks them read (and stops their emails), so only while the page is in view (review I6).
+  const loadRef = useRef(load);
+  useEffect(() => { loadRef.current = load; }, [load]);
+  useEffect(() => {
+    const tick = () => { if (typeof document === "undefined" || !document.hidden) void loadRef.current(); };
+    const first = setTimeout(tick, 0);
+    const t = setInterval(tick, 20_000);
+    const onVis = () => { if (!document.hidden) void loadRef.current(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { clearTimeout(first); clearInterval(t); document.removeEventListener("visibilitychange", onVis); };
+  }, []);
 
   async function send() {
     const content = text.trim();
-    if (!content) return;
+    if (!content || busy) return;
     setBusy(true); setError("");
     const r = await post(`/api/quotes/${q.id}/notes`, { content });
     setBusy(false);
@@ -636,7 +684,8 @@ function NotesPanel({ q, meId, businessName }: { q: Quote; meId: string; busines
       <h2 className="qp-h2">Notes with {meId === q.customerId ? businessName : "the customer"}</h2>
       <p className="qp-small">The same chat as Messages in the Outsyde app.</p>
       <div className="qp-notes" aria-live="polite">
-        {notes === null && <p className="qp-small">Loading notes.</p>}
+        {notesError && <p className="qp-small">{notesError}</p>}
+        {notes === null && !notesError && <p className="qp-small">Loading notes.</p>}
         {notes?.length === 0 && <p className="qp-small">No notes yet.</p>}
         {notes?.map((n) => n.kind === "text"
           ? <div key={n.id} className={`qp-bub${n.senderId === meId ? " qp-me" : ""}`}>{n.content || (n.mediaItems.length ? "Sent a photo. Open the app to see it." : "")}<span className="qp-time">{n.senderId === meId ? "You" : other}</span></div>
@@ -644,7 +693,7 @@ function NotesPanel({ q, meId, businessName }: { q: Quote; meId: string; busines
       </div>
       <div className="qp-row">
         <label htmlFor="qp-note" className="qp-sr">Write a note</label>
-        <input id="qp-note" className="qp-input" value={text} maxLength={2000} onChange={(e) => setText(e.target.value)} placeholder="Write a note" onKeyDown={(e) => { if (e.key === "Enter") void send(); }} />
+        <input id="qp-note" className="qp-input" value={text} maxLength={2000} onChange={(e) => setText(e.target.value)} placeholder="Write a note" onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing && !busy) { e.preventDefault(); void send(); } }} />
         <button className="qp-btn qp-send" onClick={() => void send()} disabled={busy || !text.trim()}>Send</button>
       </div>
       {error && <p className="qp-err" role="alert">{error}</p>}
@@ -696,6 +745,7 @@ const css = `
 .qp-input { flex: 1 1 200px; min-width: 0; background: #121116; color: #F2F0EA; border: 1px solid #3A3842; border-radius: 12px; padding: 12px; font: inherit; }
 .qp-thumbs { display: flex; flex-wrap: wrap; gap: 8px; }
 .qp-thumbs img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; }
+.qp-thumb { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 12px; }
 .qp-notes { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; }
 .qp-bub { align-self: flex-start; max-width: 85%; background: #24222B; border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; overflow-wrap: anywhere; white-space: pre-wrap; }
 .qp-me { align-self: flex-end; background: var(--brand); color: var(--brand-ink); }

@@ -129,7 +129,7 @@ export function extrasPaymentLine(p: Quote["extrasPayment"]): { text: string; ac
   const amt = money(p.holdCents);
   if (p.unpaid) return { text: `We couldn't charge your card for the extras, ${amt}. Pay for extras to finish your booking.`, action: { kind: "extras-card", label: "Pay for extras" } };
   if (p.needsNewCard) return { text: `We couldn't hold the extras, ${amt}, on your card. Update your card so the job can be marked complete.`, action: { kind: "extras-card", label: "Update your card" } };
-  if (p.status === "captured") return { text: `Extras charged: ${money(p.capturedCents ?? p.holdCents)}.` };
+  if (p.status === "captured") return { text: `Extras charged, ${money(p.capturedCents ?? p.holdCents)}.` };
   if (p.status === "scheduled") return { text: `Approved extras, ${amt}, are held on your card the day before the job.` };
   if (p.status === "held") return { text: `Approved extras, ${amt}, are on hold on your card. They are charged when the job is complete.` };
   return null;
@@ -190,7 +190,12 @@ export function decidedLine(r: NonNullable<Quote["report"]>, businessName: strin
   return `Outsyde reviewed your report. ${name} is paid in full.`;
 }
 
-/** The status chip in Requests and quotes. */
+/** The status chip in Requests and quotes. The list carries only the quote's status (no window or extras). */
+export function listChip(status: string): string {
+  return ({ sent: "Ready to pay", paid: "Paid", withdrawn: "Withdrawn", declined: "Declined", expired: "Expired" } as Record<string, string>)[status] ?? "Quote";
+}
+
+/** The status chip from a full quote (the quote page). */
 export function quoteChip(q: Pick<Quote, "status" | "paying" | "window" | "report">): string {
   const s = stageOf(q);
   return ({ pay: "Ready to pay", paying: "Paying", closed: q.status === "withdrawn" ? "Withdrawn" : q.status === "declined" ? "Declined" : "Expired",

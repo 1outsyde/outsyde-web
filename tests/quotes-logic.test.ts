@@ -2,7 +2,7 @@
 /** Unit tests for the quote page (Quotes step 5b). No server needed: npx tsx tests/quotes-logic.test.ts */
 import {
   money, whenLine, payLines, stageOf, closedLine, balanceLine, extrasPaymentLine, extraStatusLine, intentOutcome, loginHref, windowLeft,
-  reportProblem, decidedLine, quoteChip, requestChip, brandColor, inkOn, safeImage,
+  reportProblem, decidedLine, quoteChip, listChip, requestChip, brandColor, inkOn, safeImage,
 } from "../app/q/[code]/quoteLogic";
 
 let passed = 0, failed = 0;
@@ -75,6 +75,8 @@ eq(decidedLine({ status: "decided", outcome: "partial_refund", refundCents: 6000
 console.log("lists and look");
 eq(quoteChip({ status: "paid", paying: false, window: { state: "open" }, report: null } as any), "Confirm or report", "chip");
 eq(requestChip("new"), "Waiting for a quote", "request chip");
+eq([listChip("sent"), listChip("paid"), listChip("expired")], ["Ready to pay", "Paid", "Expired"], "list chips from the status alone (review I3)");
+eq(extrasPaymentLine({ status: "captured", approvedCents: 10000, holdCents: 10800, capturedCents: 10800, needsNewCard: false, unpaid: false })?.text, "Extras charged, $108.00.", "charged extras, commas and periods only");
 eq(brandColor({ brandColors: { primary: "#123456" } }), "#123456", "brand color");
 eq(brandColor({ brandColors: { primary: "red; background:url(x)" } }), "#E2BE4B", "anything but a hex is ignored");
 eq(inkOn("#E2BE4B"), "#141413", "dark text on gold");

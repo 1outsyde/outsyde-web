@@ -7,5 +7,5 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!isUuid(id)) return notFound();
   const body = await readBody(req);
   if (!body) return invalidBody();
-  return forward(req, "POST", `/api/quotes/${id}/report`, { reason: body.reason, photos: Array.isArray(body.photos) ? body.photos.slice(0, 6) : [] });
+  return forward(req, "POST", `/api/quotes/${id}/report`, { reason: typeof body.reason === "string" ? body.reason : "", photos: Array.isArray(body.photos) ? body.photos.filter((x) => typeof x === "string").slice(0, 5) : [] });
 }

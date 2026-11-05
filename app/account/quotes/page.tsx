@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { money, quoteChip, requestChip, whenLine, type Quote } from "@/app/q/[code]/quoteLogic";
+import { listChip, money, requestChip, whenLine, type Quote } from "@/app/q/[code]/quoteLogic";
 
 interface RequestRow { id: string; status: string; businessName: string | null; serviceName: string | null; createdAt: string; }
 
@@ -35,7 +35,6 @@ export default function QuotesPage() {
 
   // A request that already has a quote shows as the quote; the rest show as waiting.
   const waiting = requests.filter((r) => r.status === "new" || r.status === "called");
-  const unpaidExtras = quotes.filter((q) => q.extrasPayment?.unpaid).length;
 
   const css = `
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -137,7 +136,6 @@ export default function QuotesPage() {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {failed && <div className="empty-text">Some of your requests or quotes couldn&apos;t load. Refresh to try again.</div>}
-            {unpaidExtras > 0 && <div className="order-card" style={{ borderColor: "#5A3A1A" }}>Extras are unpaid on {unpaidExtras === 1 ? "1 booking" : `${unpaidExtras} bookings`}. Open it to pay for extras.</div>}
             {quotes.length === 0 && waiting.length === 0 && (
               <div className="empty-state">
                 <div className="empty-text">No requests or quotes yet. When a business sends you a quote, it shows here.</div>
@@ -147,10 +145,10 @@ export default function QuotesPage() {
               <Link key={q.id} href={`/q/${q.linkCode}`} className="order-card" style={{ display: "block", textDecoration: "none", color: "inherit" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
                   <div style={{ fontWeight: 700, minWidth: 0, overflowWrap: "anywhere" }}>{q.businessName || "Business"}</div>
-                  <span style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", border: "1px solid rgba(245,240,230,0.4)", borderRadius: 999, padding: "3px 10px", fontWeight: 600, whiteSpace: "nowrap" }}>{quoteChip(q)}</span>
+                  <span style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", border: "1px solid rgba(245,240,230,0.4)", borderRadius: 999, padding: "3px 10px", fontWeight: 600, whiteSpace: "nowrap" }}>{listChip(q.status)}</span>
                 </div>
                 <div style={{ opacity: 0.8, marginTop: 4 }}>{q.title}</div>
-                <div style={{ opacity: 0.6, marginTop: 2, fontSize: 13 }}>{[whenLine(q), money(q.totalCents)].filter(Boolean).join(" · ")}</div>
+                <div style={{ opacity: 0.6, marginTop: 2, fontSize: 13 }}>{[whenLine(q), money(q.totalCents)].filter(Boolean).join(", ")}</div>
               </Link>
             ))}
             {waiting.map((r) => (
