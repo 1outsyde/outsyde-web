@@ -474,8 +474,8 @@ export default function AdminRefundsPage() {
               const open = reportForm?.id === request.id ? reportForm.outcome : null;
               const confirmText: Record<QuoteOutcome, string> = {
                 pay_full: "The vendor is paid their share in full. Nothing is refunded.",
-                partial_refund: "The customer gets this amount back, from the balance first, then the deposit. The vendor is paid the rest of their share.",
-                full_refund: `The customer gets every dollar back, ${formatAmount(report.maxRefundCents)}, service fees included. The vendor is not paid the balance.`,
+                partial_refund: "The customer gets this amount back, from the balance first, then the deposit. The service fee is not refunded. The vendor is paid the rest of their share.",
+                full_refund: `The customer gets back everything the business was paid, ${formatAmount(report.maxRefundCents)}. The service fee is not refunded. The vendor is not paid the balance.`,
               };
               const buttonText: Record<QuoteOutcome, string> = {
                 pay_full: "Pay vendor in full",
