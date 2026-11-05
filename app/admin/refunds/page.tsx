@@ -120,8 +120,13 @@ export default function AdminRefundsPage() {
   function decideReport(request: RefundRequest, outcome: QuoteOutcome) {
     const notes = reportNotes.trim() || undefined;
     if (outcome === "partial_refund") {
-      const cents = Math.round(Number(partialDollars) * 100);
       const max = request.quoteReport?.maxRefundCents ?? 0;
+      // Dollars with at most 2 decimals ("50", "50.5", "50.25"); anything else is refused, never rounded.
+      if (!/^\d+(\.\d{1,2})?$/.test(partialDollars.trim())) {
+        setNotice({ kind: "error", text: "Enter the amount in dollars and cents, like 50.25." });
+        return;
+      }
+      const cents = Math.round(Number(partialDollars.trim()) * 100);
       if (!Number.isFinite(cents) || cents <= 0) {
         setNotice({ kind: "error", text: "Enter the amount to refund, more than $0." });
         return;
