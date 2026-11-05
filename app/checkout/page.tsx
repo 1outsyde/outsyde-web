@@ -163,14 +163,14 @@ function CheckoutForm() {
       .then((r) => r.json())
       .then((d) => {
         if (!d.authenticated) {
-          router.push("/login?redirect=/checkout");
+          router.push(`/login?return=${encodeURIComponent("/checkout")}`);
         } else {
           setAuthed(true);
           loadPoints();
         }
       })
       .catch(() => {
-        router.push("/login?redirect=/checkout");
+        router.push(`/login?return=${encodeURIComponent("/checkout")}`);
       });
 
     return unsub;

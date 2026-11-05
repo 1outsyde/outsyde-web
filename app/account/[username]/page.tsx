@@ -346,7 +346,7 @@ export default function PublicProfilePage() {
               Create an account or sign in to follow {displayName ?? `@${username}`}.
             </p>
             <button
-              onClick={() => router.push(`/login?redirect=/account/${username}`)}
+              onClick={() => router.push(`/login?return=${encodeURIComponent(`/account/${username}`)}`)}
               className="w-full bg-[#D4A017] text-black font-bold py-3 rounded-xl mb-3"
             >
               Sign In
