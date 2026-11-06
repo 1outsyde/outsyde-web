@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { orderDepositNote, orderFulfillmentLine } from "@/app/q/[code]/quoteLogic";
 
 // addonsLabel: only on lines bought with add-ons (backend #371); price already includes them.
 interface OrderItem { name: string; quantity: number; price: number; variantLabel?: string | null; addonsLabel?: string | null; }
@@ -15,6 +16,11 @@ interface Order {
   status?: string;
   createdAt?: string;
   shipment?: { trackingNumber?: string; carrier?: string };
+  /** Deliverables D3 (additive): an order paid from a deliverable quote. Its shippingAddress is plain text. */
+  quoteId?: string | null;
+  fulfillment?: "pickup" | "delivery" | null;
+  shippingAddress?: string | null;
+  paidDirectlyCents?: number | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -201,6 +207,16 @@ export default function OrdersPage() {
                       </li>
                     ))}
                   </ul>
+                  {orderFulfillmentLine(order) && (
+                    <div className="tracking-row">
+                      <span className="tracking-label">{orderFulfillmentLine(order)}</span>
+                    </div>
+                  )}
+                  {orderDepositNote(order) && (
+                    <div className="tracking-row">
+                      <span className="tracking-label">{orderDepositNote(order)}</span>
+                    </div>
+                  )}
                   {order.shipment?.trackingNumber && (
                     <div className="tracking-row">
                       <span className="tracking-label">

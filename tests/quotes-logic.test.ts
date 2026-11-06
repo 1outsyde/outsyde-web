@@ -3,6 +3,7 @@
 import {
   money, whenLine, payLines, stageOf, closedLine, balanceLine, extrasPaymentLine, extraStatusLine, intentOutcome, loginHref, windowLeft,
   reportProblem, decidedLine, quoteChip, listChip, requestChip, brandColor, inkOn, safeImage,
+  needsAddress, deliverablePill, deliverablePaidLine, orderFulfillmentLine, orderDepositNote,
 } from "../app/q/[code]/quoteLogic";
 
 let passed = 0, failed = 0;
@@ -89,6 +90,25 @@ const copy = [closedLine("withdrawn"), closedLine("declined"), closedLine("expir
   ...["proposed", "approving", "approved", "declined", "withdrawn", "lapsed", "canceled"].map((s) => extraStatusLine({ status: s })),
   decidedLine({ status: "decided", outcome: "full_refund", refundCents: 0 }, "X"), decidedLine({ status: "decided", outcome: "pay_full", refundCents: 0 }, "X")];
 for (const c of copy) eq(/[–—]|8%/.test(c), false, `no dash or fee rate: ${c.slice(0, 50)}`);
+
+console.log("deliverables (D3)");
+const clean = (t: string) => !/[\u2014\u2013]| - |%/.test(t);
+eq(whenLine({ kind: "product", jobDate: null, startTime: null, durationMinutes: null, dueDate: "2026-11-20", fulfillment: "delivery" } as any), "Due Fri, Nov 20 · Delivery", "due date and Delivery");
+eq(whenLine({ kind: "product", jobDate: null, startTime: null, durationMinutes: null, dueDate: null, fulfillment: "pickup" } as any), "Pickup", "Pickup with no due date");
+eq(needsAddress({ kind: "product", fulfillment: "delivery", deliveryAddress: null }), true, "Delivery needs the address first");
+eq(needsAddress({ kind: "product", fulfillment: "delivery", deliveryAddress: "14 Oak Ave" }), false, "address saved");
+eq(needsAddress({ kind: "product", fulfillment: "pickup", deliveryAddress: null }), false, "Pickup needs none");
+eq(needsAddress({ kind: "service", fulfillment: null, deliveryAddress: null }), false, "services need none");
+eq([deliverablePill({ orderStatus: "paid" }), deliverablePill({ orderStatus: "delivered" }), deliverablePill({ orderStatus: "cancelled" })], ["Paid", "Delivered", "Refunded"], "the pill on a paid deliverable");
+eq(deliverablePaidLine({ orderStatus: "paid" }, "customer"), "Paid. Your order is in your Outsyde orders.", "customer, paid");
+eq(deliverablePaidLine({ orderStatus: "cancelled" }, "business"), "Refunded. You cancelled this order.", "business, refunded, own words");
+eq(deliverablePaidLine({ orderStatus: "cancelled" }, "customer"), "Refunded. The business cancelled this order.", "customer, refunded");
+eq(orderFulfillmentLine({ fulfillment: "delivery", shippingAddress: "14 Oak Ave, Uniondale, NY" }), "Delivery to 14 Oak Ave, Uniondale, NY", "order: Delivery to");
+eq(orderFulfillmentLine({ fulfillment: "pickup", shippingAddress: null }), "Pickup", "order: Pickup");
+eq(orderFulfillmentLine({ fulfillment: null, shippingAddress: "{}" }), null, "cart orders keep their lines");
+eq(orderDepositNote({ paidDirectlyCents: 35000 }), "Deposit paid. $350.00 goes to the business directly.", "deposit note");
+eq(orderDepositNote({ paidDirectlyCents: 0 }), null, "no note on full payment");
+eq([deliverablePaidLine({ orderStatus: "paid" }, "business"), deliverablePaidLine({ orderStatus: "cancelled" }, "customer"), orderDepositNote({ paidDirectlyCents: 100 })!].every(clean), true, "copy: commas and periods, no dashes or fee rate");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
