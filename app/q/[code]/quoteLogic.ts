@@ -15,11 +15,15 @@ export type Preview = {
   status: string; kind: string; title: string; jobDate: string | null; startTime: string | null; durationMinutes: number | null; timeZone: string | null;
   dueDate: string | null; totalCents: number; paymentMode: "deposit" | "full"; depositCents: number | null; restPaid: string; amounts: Amounts;
   expiresAt: string; business: Business;
+  /** Deliverables D3 (backend D1a, additive; older backends send none). Never the address in a preview. */
+  fulfillment?: "pickup" | "delivery" | null; deliveryFeeCents?: number | null;
 };
 export type Extra = { id: string; description: string; amountCents: number; serviceFeeCents: number; totalCents: number; status: string; canApprove: boolean; canDecline: boolean; canWithdraw: boolean };
 export type Quote = Preview & {
   id: string; version: number; businessName: string | null; customerId: string; conversationId: string; details: string | null; extrasNote: string | null;
   paying: boolean; appointmentId: string | null; paidAt: string | null; linkCode: string;
+  /** Deliverables D3 (backend D1a/D1b, additive): the customer's address, and the product order a paid deliverable became. */
+  deliveryAddress?: string | null; orderId?: string | null; orderStatus?: string | null;
   balance: { status: string; holdCents: number; capturedCents: number | null; needsNewCard: boolean; completedAt: string | null } | null;
   window: { state: string; endsAt: string | null; canConfirm: boolean; canReport: boolean } | null;
   report: { status: "open" | "decided"; outcome: "pay_full" | "partial_refund" | "full_refund" | null; refundCents: number | null } | null;
@@ -38,7 +42,12 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 
 /** "Sat, Nov 8 at 9:00 AM, 3 hours". The job's own wall clock date and time, never shifted by the viewer's zone. */
 export function whenLine(p: Pick<Preview, "jobDate" | "startTime" | "durationMinutes" | "dueDate" | "kind">): string {
-  if (p.kind === "product") return p.dueDate ? `Due ${dateLabel(p.dueDate)}` : "";
+  if (p.kind === "product") {
+    // Deliverables D3: "Due Fri, Nov 20 · Pickup" once the backend says how; an older quote keeps "Due ...".
+    const f = (p as { fulfillment?: string | null }).fulfillment;
+    const how = f === "delivery" ? "Delivery" : f === "pickup" ? "Pickup" : "";
+    return [p.dueDate ? `Due ${dateLabel(p.dueDate)}` : "", how].filter(Boolean).join(" · ");
+  }
   if (!p.jobDate) return "";
   const parts = [dateLabel(p.jobDate) + (p.startTime ? ` at ${timeLabel(p.startTime)}` : "")];
   if (p.durationMinutes) parts.push(durationLabel(p.durationMinutes));
@@ -219,4 +228,36 @@ export function inkOn(hex: string): string {
 /** Only https images (our uploads) are shown. */
 export function safeImage(u: string | null | undefined): string | null {
   return typeof u === "string" && /^https:\/\//i.test(u) ? u : null;
+}
+
+/* ---------- deliverables (D3, Legend 2026-11-06) ---------- */
+
+/** A Delivery deliverable can't be paid until the customer adds the address (the backend answers ADDRESS_NEEDED). */
+export function needsAddress(q: { kind: string; fulfillment?: string | null; deliveryAddress?: string | null }): boolean {
+  return q.kind === "product" && q.fulfillment === "delivery" && !q.deliveryAddress;
+}
+
+/** The pill on a paid deliverable: it's an order, not a booking. */
+export function deliverablePill(q: { orderStatus?: string | null }): string {
+  return q.orderStatus === "delivered" ? "Delivered" : q.orderStatus === "cancelled" || q.orderStatus === "refunded" ? "Refunded" : "Paid";
+}
+
+/** The line under a paid deliverable, in the viewer's own words. */
+export function deliverablePaidLine(q: { orderStatus?: string | null }, viewer: "customer" | "business"): string {
+  if (q.orderStatus === "delivered") return "Delivered.";
+  if (q.orderStatus === "cancelled" || q.orderStatus === "refunded") return viewer === "business" ? "Refunded. You cancelled this order." : "Refunded. The business cancelled this order.";
+  return viewer === "business" ? "Paid. Mark it picked up or delivered in Orders in the Outsyde app." : "Paid. Your order is in your Outsyde orders.";
+}
+
+/** "Pickup" or "Delivery to ..." for an order from a deliverable; null for cart orders (they keep their shipping lines). */
+export function orderFulfillmentLine(o: { fulfillment?: string | null; shippingAddress?: string | null }): string | null {
+  if (o.fulfillment === "pickup") return "Pickup";
+  if (o.fulfillment === "delivery") return o.shippingAddress ? `Delivery to ${o.shippingAddress}` : "Delivery";
+  return null;
+}
+
+/** A deposit order: what goes to the business directly. */
+export function orderDepositNote(o: { paidDirectlyCents?: number | null }): string | null {
+  const c = Number(o.paidDirectlyCents ?? 0);
+  return c > 0 ? `Deposit paid. ${money(c)} goes to the business directly.` : null;
 }

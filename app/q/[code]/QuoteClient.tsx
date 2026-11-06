@@ -22,6 +22,7 @@ import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/app-stores";
 import {
   balanceLine, brandColor, closedLine, decidedLine, extraStatusLine, extrasPaymentLine, inkOn, intentOutcome, loginHref, money,
   payLines, reportProblem, safeImage, stageOf, whenLine, windowLeft, MAX_PHOTOS,
+  deliverablePaidLine, deliverablePill, needsAddress,
   type Action, type Business, type Extra, type IntentKind, type Preview, type Quote,
 } from "./quoteLogic";
 
@@ -201,6 +202,8 @@ function Summary({ q, details }: { q: Preview & { details?: string | null; extra
       {when && <div className="qp-muted">{when}</div>}
       {details && q.details && <p className="qp-text">{q.details}</p>}
       {details && q.extrasNote && <p className="qp-text qp-muted">{q.extrasNote}</p>}
+      {q.kind === "product" && q.fulfillment === "delivery" && q.deliveryFeeCents ? <div className="qp-muted">{`Delivery fee ${money(q.deliveryFeeCents)}, included in the total.`}</div> : null}
+      {details && (q as Quote).deliveryAddress ? <div className="qp-muted">{`Delivery to ${(q as Quote).deliveryAddress}`}</div> : null}
     </>
   );
 }
@@ -221,7 +224,7 @@ function PreviewView({ preview, code }: { preview: Preview; code: string }) {
         </>
       ) : (
         <>
-          <p className="qp-muted">{preview.status === "paid" ? "This quote is paid. Sign in to see your booking." : closedLine(preview.status)}</p>
+          <p className="qp-muted">{preview.status === "paid" ? (preview.kind === "product" ? "This quote is paid. Sign in to see your order." : "This quote is paid. Sign in to see your booking.") : closedLine(preview.status)}</p>
           <Link className="qp-btn2" href={loginHref(code)}>Sign in</Link>
         </>
       )}
@@ -238,6 +241,8 @@ function QuoteView({ quote: q, access, meId, refresh }: { quote: Quote; access: 
   const raw = stageOf(q);
   const stage = isCustomer && raw === "paying" ? "pay" : raw;
   const businessName = q.business?.name || q.businessName || "The business";
+  // Deliverables D3: a deliverable is paid as a product order (no booking lines, extras, window or report).
+  const product = q.kind === "product";
 
   // While a payment or a bank step settles at Stripe, ask the backend again every few seconds for up to 2 minutes.
   const [waiting, setWaiting] = useState<string>("");
@@ -261,21 +266,21 @@ function QuoteView({ quote: q, access, meId, refresh }: { quote: Quote; access: 
   return (
     <>
       <div className="qp-card">
-        <span className="qp-pill">{stage === "pay" ? "Quote" : stage === "paying" ? "Paying" : stage === "closed" ? "Closed" : stage === "window" ? "Job complete" : stage === "reported" ? "Under review" : stage === "decided" ? "Reviewed" : stage === "complete" ? "Complete" : "Booked"}</span>
+        <span className="qp-pill">{stage === "pay" ? "Quote" : stage === "paying" ? "Paying" : stage === "closed" ? "Closed" : product && q.status === "paid" ? deliverablePill(q) : stage === "window" ? "Job complete" : stage === "reported" ? "Under review" : stage === "decided" ? "Reviewed" : stage === "complete" ? "Complete" : "Booked"}</span>
         <Summary q={q} details={true} />
         {(stage === "pay" || stage === "paying" || stage === "closed") && <Lines preview={q} />}
         {waiting && <p className="qp-note" role="status">{waiting}</p>}
         {stage === "closed" && <p className="qp-muted">{closedLine(q.status)}</p>}
         {stage === "pay" && isCustomer && <PayPanel q={q} onPaid={() => pollUntil((f) => f.status === "paid", "Your payment is being confirmed.")} onDeclined={refresh} />}
         {(stage === "pay" || stage === "paying") && !isCustomer && <p className="qp-muted">{stage === "paying" ? "The customer started paying." : "Waiting for the customer to pay."} Manage this quote in the Outsyde app.</p>}
-        {stage !== "pay" && stage !== "paying" && stage !== "closed" && <BookedLines q={q} isCustomer={isCustomer} pollUntil={pollUntil} />}
+        {stage !== "pay" && stage !== "paying" && stage !== "closed" && (product ? <DeliverableLines q={q} isCustomer={isCustomer} /> : <BookedLines q={q} isCustomer={isCustomer} pollUntil={pollUntil} />)}
       </div>
-      {q.status === "paid" && q.extras.length > 0 && <ExtrasPanel q={q} isCustomer={isCustomer} refresh={refresh} />}
+      {!product && q.status === "paid" && q.extras.length > 0 && <ExtrasPanel q={q} isCustomer={isCustomer} refresh={refresh} />}
       {stage === "window" && isCustomer && <WindowPanel q={q} refresh={refresh} />}
       {stage === "reported" && <div className="qp-card"><h2 className="qp-h2">Outsyde is reviewing this job</h2><p className="qp-muted">{isCustomer ? "Thanks for telling us. We'll let you know what we decide." : "The customer reported a problem. Your payout for this job is paused while Outsyde reviews it."}</p></div>}
       {stage === "decided" && q.report && <div className="qp-card"><h2 className="qp-h2">Review done</h2><p className="qp-muted">{decidedLine(q.report, businessName)}</p></div>}
       {access !== "admin" && <NotesPanel q={q} meId={meId} businessName={businessName} />}
-      {!isCustomer && access === "vendor" && <p className="qp-small qp-center">You&apos;re viewing this as the business. Send extras and mark the job complete in the Outsyde app.</p>}
+      {!isCustomer && access === "vendor" && <p className="qp-small qp-center">{product ? "You're viewing this as the business. Manage the order in the Outsyde app." : <>You&apos;re viewing this as the business. Send extras and mark the job complete in the Outsyde app.</>}</p>}
     </>
   );
 }
@@ -291,6 +296,46 @@ function BookedLines({ q, isCustomer, pollUntil }: { q: Quote; isCustomer: boole
       {bal && <ActionLine text={bal.text} action={isCustomer ? bal.action : undefined} q={q} onDone={() => pollUntil((f) => !balanceLine(f)?.action, "Your card is being confirmed.")} />}
       {ex && <ActionLine text={ex.text} action={isCustomer ? ex.action : undefined} q={q} onDone={() => pollUntil((f) => !extrasPaymentLine(f.extrasPayment)?.action, "Your card is being confirmed.")} />}
       {!isCustomer && q.extrasPayment?.unpaid && <p className="qp-small">Extras unpaid. The customer has been asked to pay for them.</p>}
+    </div>
+  );
+}
+
+/** Deliverables D3: a paid deliverable is an order. What was paid, and where the order stands. */
+function DeliverableLines({ q, isCustomer }: { q: Quote; isCustomer: boolean }) {
+  return (
+    <div className="qp-stack">
+      <div className="qp-line"><span>Quote total</span><span>{money(q.totalCents)}</span></div>
+      {q.paymentMode === "deposit" && <div className="qp-line qp-muted"><span>Deposit paid, with its service fee</span><span>{money(q.amounts.payNowCents)}</span></div>}
+      {q.paymentMode === "deposit" && q.amounts.paidDirectlyCents > 0 && <div className="qp-line qp-muted"><span>{isCustomer ? "The rest, paid to the business directly" : "The rest, paid to you directly"}</span><span>{money(q.amounts.paidDirectlyCents)}</span></div>}
+      {q.paymentMode === "full" && <div className="qp-line qp-muted"><span>Paid, with the service fee</span><span>{money(q.amounts.payNowCents)}</span></div>}
+      <p className="qp-muted">{deliverablePaidLine(q, isCustomer ? "customer" : "business")}</p>
+    </div>
+  );
+}
+
+/* ---------- the delivery address (deliverables D3) ---------- */
+
+function AddressBox({ q, onSaved, onCancel }: { q: Quote; onSaved: () => Promise<unknown>; onCancel?: () => void }) {
+  const [text, setText] = useState(q.deliveryAddress ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  async function save() {
+    setError("");
+    if (!text.trim()) { setError("Enter the delivery address."); return; }
+    setSaving(true);
+    const r = await post(`/api/quotes/${q.id}/delivery-address`, { address: text });
+    setSaving(false);
+    if (r.status !== 200) { setError(msgOf(r.body)); return; }
+    await onSaved();
+  }
+  return (
+    <div className="qp-stack">
+      <label className="qp-label" htmlFor="qp-address">Delivery address</label>
+      <textarea id="qp-address" className="qp-input" rows={3} maxLength={300} value={text} onChange={(e) => setText(e.target.value)} placeholder="Street, town and ZIP code" />
+      <p className="qp-small">Add where it should be delivered. The business sees it before you pay.</p>
+      {error && <p className="qp-err">{error}</p>}
+      <button className="qp-btn" onClick={() => void save()} disabled={saving}>{saving ? "Saving" : "Save address"}</button>
+      {onCancel && <button className="qp-btn2" onClick={onCancel} disabled={saving}>Keep the saved address</button>}
     </div>
   );
 }
@@ -316,6 +361,8 @@ function PayPanel({ q, onPaid, onDeclined }: { q: Quote; onPaid: () => void; onD
     setStarting(false);
     if (r.status === 200 && typeof r.body?.clientSecret === "string") {
       if (Number.isInteger(r.body.amountChargedNowCents) && r.body.amountChargedNowCents > 0) setChargeCents(r.body.amountChargedNowCents);
+      // Deliverables D3: a deliverable's pay answer carries amounts.chargeCents.
+      else if (Number.isInteger(r.body.amounts?.chargeCents) && r.body.amounts.chargeCents > 0) setChargeCents(r.body.amounts.chargeCents);
       setSecret(r.body.clientSecret);
       return;
     }
@@ -332,10 +379,16 @@ function PayPanel({ q, onPaid, onDeclined }: { q: Quote; onPaid: () => void; onD
   }
 
   // Quotes the backend can't take payment for yet: say so instead of a button that fails.
-  const cantPay = q.kind === "product" ? "Paying for custom products in Outsyde is coming soon. Message the business to arrange payment for now."
-    : !q.jobDate || !q.startTime ? "This quote doesn't have a date and time yet. Ask the business to add them, then pay." : "";
+  // Deliverables D3: a deliverable has no date or time; a Delivery one needs the address before paying.
+  const product = q.kind === "product";
+  const [editAddress, setEditAddress] = useState(false);
+  const cantPay = !product && (!q.jobDate || !q.startTime) ? "This quote doesn't have a date and time yet. Ask the business to add them, then pay." : "";
+  if (product && !secret && (needsAddress(q) || editAddress)) {
+    return <AddressBox q={q} onSaved={async () => { setEditAddress(false); await onDeclined(); }} onCancel={q.deliveryAddress ? () => setEditAddress(false) : undefined} />;
+  }
   return (
     <div className="qp-stack">
+      {product && q.fulfillment === "delivery" && q.deliveryAddress && !secret && <button className="qp-link" onClick={() => setEditAddress(true)}>Change the delivery address</button>}
       {cantPay ? <p className="qp-muted">{cantPay}</p> : stripe === null ? <p className="qp-err">Payments aren&apos;t available right now. Try again later.</p> : !secret ? (
         <button className="qp-btn" onClick={() => void start()} disabled={starting || stripe === undefined}>{starting ? "Getting your payment ready" : `Continue to pay ${money(q.amounts.payNowCents)}`}</button>
       ) : (
