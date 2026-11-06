@@ -76,8 +76,8 @@ body{font-family:var(--sans);background:var(--black);color:var(--cream);overflow
          <a href="/consumer-signup" className="role-card">
             <span className="role-icon consumer" aria-hidden="true">🛍️</span>
             <span className="role-text">
-              <span className="role-title">Consumer</span>
-              <span className="role-desc">Browse, book sessions and shop local talent</span>
+              <span className="role-title">Outsyder</span>
+              <span className="role-desc">Browse, book sessions &amp; shop local talent</span>
             </span>
             <span className="role-arrow" aria-hidden="true">→</span>
           </a>

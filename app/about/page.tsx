@@ -329,7 +329,7 @@ footer{background:#000;border-top:0.5px solid rgba(232,185,48,.14);padding:72px 
               <div className="ft-y" aria-hidden="true">Y</div>
               <span className="ft-name">Go Outsyde</span>
             </div>
-            <p>Culture meets commerce. Linking local businesses with artists and consumers — one place to shop, book, and experience it all.</p>
+            <p>Culture meets commerce. Linking local businesses and artists with Outsyders. One place to shop, book and experience it all.</p>
             <div className="ft-social" aria-label="Social media links">
               <a href="https://instagram.com/go.outsyde" target="_blank" rel="noopener noreferrer">Instagram</a>
               <a href="https://tiktok.com/@go.outsyde" target="_blank" rel="noopener noreferrer">TikTok</a>
