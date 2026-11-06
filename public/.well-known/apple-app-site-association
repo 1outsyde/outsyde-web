@@ -5,12 +5,13 @@
       {
         "appID": "324KR5FQTX.com.outsyde.app",
         "appIDs": ["324KR5FQTX.com.outsyde.app"],
-        "paths": ["/claim", "/claim/*", "/finish", "/finish/*"],
+        "paths": ["/claim", "/claim/*", "/finish", "/finish/*", "/q/*"],
         "components": [
           { "/": "/claim", "comment": "Finish an account with no password (reminder emails, login hand-off)" },
           { "/": "/claim/*" },
           { "/": "/finish", "comment": "Setup checklist: plan, payouts, username" },
-          { "/": "/finish/*" }
+          { "/": "/finish/*" },
+          { "/": "/q/*", "comment": "Quote links: open the quote in the app (needs app 1.2.0 with OutsydeCapture #515)" }
         ]
       }
     ]
