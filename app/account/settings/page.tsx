@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import ChangeEmailCard from "./ChangeEmailCard";
 import Link from "next/link";
 
 type DeletionStatus = "active" | "pending_deletion" | "deleted";
@@ -33,7 +34,8 @@ export default function AccountSettingsPage() {
         // not the profile endpoint which doesn't expose them.
         setAccount({
           username: data.username,
-          email: me.email,
+          // /api/auth/me nests the user ({ authenticated, user: { email } }); me.email was always undefined.
+          email: me.user?.email ?? me.email,
           deletionStatus: me.deletionStatus ?? "active",
           scheduledDeletionAt: me.scheduledDeletionAt ?? null,
         });
@@ -192,6 +194,11 @@ export default function AccountSettingsPage() {
             </div>
           </div>
         )}
+
+        <ChangeEmailCard
+          currentEmail={account?.email ?? null}
+          onChanged={(email) => setAccount((prev) => (prev ? { ...prev, email } : prev))}
+        />
 
         <div className="card">
           <div className="card-title">Delete Account</div>
