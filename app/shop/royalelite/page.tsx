@@ -9,7 +9,7 @@
 // The nav cart badge is READ-ONLY (shows existing Lotus/Dia Lux items only).
 //
 // EMAIL: submissions POST to /api/royal-elite-estimate, which sends the lead via
-// Resend to BOTH info@goutsyde.com AND Bprovisionproperties@yahoo.com in one call.
+// Resend to BOTH info@goutsyde.com AND Info.RoyalEliteMoving@gmail.com (lib/emails.ts ROYAL_ELITE_LEAD_EMAIL) in one call.
 // (Migrated off Web3Forms — no access key needed anymore.)
 
 "use client";
@@ -500,7 +500,7 @@ export default function RoyalEliteStore() {
 
         <div className="re-foot">
           © {new Date().getFullYear()} Royal Elite Moving™ · Sold on OutsYde ·{" "}
-          <a href="mailto:Bprovisionproperties@yahoo.com">Bprovisionproperties@yahoo.com</a> · 757-944-4925
+          <a href="mailto:Info.RoyalEliteMoving@gmail.com">Info.RoyalEliteMoving@gmail.com</a> · 757-944-4925
         </div>
       </div>
     </>

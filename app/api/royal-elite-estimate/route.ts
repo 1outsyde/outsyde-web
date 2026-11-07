@@ -2,7 +2,7 @@
 // Receives a move-request / free-estimate submission from the Royal Elite
 // storefront (app/shop/royalelite/page.tsx) and emails the lead to BOTH:
 //   1) info@goutsyde.com               (you — every lead logged in the Outsyde inbox)
-//   2) Bprovisionproperties@yahoo.com  (Royal Elite — so the vendor can act on it)
+//   2) Info.RoyalEliteMoving@gmail.com (Royal Elite, so the vendor can act on it; lib/emails.ts ROYAL_ELITE_LEAD_EMAIL)
 //
 // Uses lib/emails.ts sendEmail() helper — same fetch-based Resend pattern as
 // notify-signup and Lotus. No SDK import, no new dependency.
