@@ -285,6 +285,9 @@ export async function sendBusinessSignupConfirmation(p: { email: string; busines
 }
 
 // ===== ROYAL ELITE MOVING — ESTIMATE REQUEST =====
+// Royal Elite Moving lead inbox (Legend 2026-11-06: Benny moved from Bprovisionproperties@yahoo.com).
+export const ROYAL_ELITE_LEAD_EMAIL = "Info.RoyalEliteMoving@gmail.com";
+
 export async function sendRoyalEliteEstimate(p: {
   name: string;
   email: string;
@@ -331,7 +334,7 @@ export async function sendRoyalEliteEstimate(p: {
   </div>`;
 
   return sendEmail({
-    to: ["info@goutsyde.com", "Bprovisionproperties@yahoo.com"],
+    to: ["info@goutsyde.com", ROYAL_ELITE_LEAD_EMAIL],
     reply_to: p.email,
     subject: `New Move Request — ${p.name || "Royal Elite Moving"}`,
     html,
