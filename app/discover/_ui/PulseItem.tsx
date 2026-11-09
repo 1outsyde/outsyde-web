@@ -10,6 +10,8 @@ import CommentsPanel from "./CommentsPanel";
 import FollowButton from "./FollowButton";
 import HlsVideo from "./HlsVideo";
 import FitBackdrop from "./FitBackdrop";
+import PulseProgress from "./PulseProgress";
+import { shouldShowProgress } from "../_lib/pulseProgress";
 import { useToggle } from "./useToggle";
 import styles from "./discover.module.css";
 
@@ -49,6 +51,10 @@ export default function PulseItem({ video, active, near, paused, muted, viewer, 
   const save = useToggle({ on: video.isSaved, count: 0 }, (on) => clientApi.save(video.id, on), () => onSignIn(SIGN_IN_SAVE));
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Progress bar (Pulse length step C2): position from the player, jump through seekRef.
+  const [playback, setPlayback] = useState({ current: 0, duration: 0 });
+  const [scrubbing, setScrubbing] = useState(false);
+  const seekRef = useRef<((seconds: number) => void) | null>(null);
 
   // A waiting single tap never outlives the item being active (or the item itself).
   useEffect(() => () => {
@@ -62,6 +68,18 @@ export default function PulseItem({ video, active, near, paused, muted, viewer, 
   const closeComments = useCallback(() => setCommentsOpen(false), []);
   const addedComment = useCallback(() => setCommentsCount((n) => n + 1), []);
   const onError = useCallback(() => setFailed(true), []);
+  const onProgress = useCallback((current: number, duration: number) => {
+    setPlayback((p) => (Math.abs(p.current - current) < 0.05 && p.duration === duration ? p : { current, duration }));
+  }, []);
+  const jump = (seconds: number) => {
+    seekRef.current?.(seconds);
+    setPlayback((p) => ({ ...p, current: seconds }));
+  };
+  const onScrubStart = () => setScrubbing(true);
+  const onScrubEnd = (seconds: number) => {
+    if (seconds >= 0) jump(seconds); // -1: cancelled, no jump
+    setScrubbing(false);
+  };
 
   /** Watch time for Pulse ranking: signed in, at least 1 second, sent once per activation, silently, no retry. */
   const onTime = (watchedMs: number, durationMs: number, loops: number) => {
@@ -102,12 +120,13 @@ export default function PulseItem({ video, active, near, paused, muted, viewer, 
   const onComment = () => (viewerId ? setCommentsOpen(true) : onSignIn(SIGN_IN_COMMENT));
   const avatar = isPlayableUrl(author.profilePhotoUrl) ? author.profilePhotoUrl : null;
   const showPaused = active && paused && !failed;
+  const showProgress = active && near && !failed && shouldShowProgress(playback.duration);
   // Signed in: the button waits for the follow check so it never flips from Follow to Following.
   const showFollow = viewerId ? followed !== undefined : viewer.status === "out";
 
   return (
     <article className={styles.pulseItem} data-post-id={video.id} data-active={active ? "true" : undefined} aria-label={`Video by ${author.displayName}`}>
-      <div className={styles.pulseStage} data-fit={video.fit}>
+      <div className={styles.pulseStage} data-fit={video.fit} data-progress={showProgress ? "true" : undefined} data-scrubbing={scrubbing ? "true" : undefined}>
         {video.fit === "fit" ? <FitBackdrop src={video.blurUrl} /> : null}
         {failed || !near ? (
           video.poster ? (
@@ -116,7 +135,7 @@ export default function PulseItem({ video, active, near, paused, muted, viewer, 
             <div className={styles.mediaPlaceholder} />
           )
         ) : (
-          <HlsVideo src={video.videoUrl} poster={video.poster} active={active} paused={paused} muted={muted} loop fit={video.fit} onTime={onTime} onError={onError} />
+          <HlsVideo src={video.videoUrl} poster={video.poster} active={active} paused={paused || scrubbing} muted={muted} loop fit={video.fit} onTime={onTime} onError={onError} onProgress={onProgress} seekRef={seekRef} />
         )}
         {failed ? <span className={styles.pulseUnavailable}>Video unavailable</span> : null}
 
@@ -178,6 +197,9 @@ export default function PulseItem({ video, active, near, paused, muted, viewer, 
             </button>
           </div>
         </div>
+        {showProgress ? (
+          <PulseProgress current={playback.current} duration={playback.duration} onScrubStart={onScrubStart} onScrubEnd={onScrubEnd} onStep={jump} />
+        ) : null}
       </div>
 
       <CommentsPanel postId={video.id} open={commentsOpen} onClose={closeComments} viewer={viewer} onSignIn={onSignIn} onAdded={addedComment} />
