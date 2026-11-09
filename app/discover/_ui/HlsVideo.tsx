@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useRef, type MutableRefObject, type RefObject } from "react";
 import styles from "./discover.module.css";
 
 type OnTime = (watchedMs: number, durationMs: number, loops: number) => void;
-type Clock = { watched: number; since: number; loops: number; lastPos: number };
+type OnProgress = (currentSeconds: number, durationSeconds: number) => void;
+/** barSeekAt: when the Pulse progress bar last moved the video (performance.now()), 0 if never. */
+type Clock = { watched: number; since: number; loops: number; lastPos: number; barSeekAt: number };
 
 function stopClock(c: Clock) {
   if (c.since > 0) c.watched += performance.now() - c.since;
@@ -35,8 +37,10 @@ function play(video: HTMLVideoElement, muted: boolean) {
  * `onTime` gets the time actually played while active (not the position), the
  * duration and the loop count, each time the video stops being active or goes away.
  * `onError` is called when the stream cannot play (a fatal hls.js error, or a native media error).
+ * Pulse progress bar (step C2), both optional: `onProgress` gets the position and length while active,
+ * and `seekRef` is filled with a function that jumps to a time. A bar jump is not counted as a loop.
  */
-export default function HlsVideo({ src, poster, active, muted, loop, paused = false, fit = "fill", onTime, onError }: {
+export default function HlsVideo({ src, poster, active, muted, loop, paused = false, fit = "fill", onTime, onError, onProgress, seekRef }: {
   src: string;
   poster: string | null;
   active: boolean;
@@ -47,6 +51,8 @@ export default function HlsVideo({ src, poster, active, muted, loop, paused = fa
   fit?: "fill" | "fit";
   onTime?(watchedMs: number, durationMs: number, loops: number): void;
   onError?(): void;
+  onProgress?(currentSeconds: number, durationSeconds: number): void;
+  seekRef?: MutableRefObject<((seconds: number) => void) | null>;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   const activeRef = useRef(active);
@@ -54,12 +60,14 @@ export default function HlsVideo({ src, poster, active, muted, loop, paused = fa
   const pausedRef = useRef(paused);
   const onTimeRef = useRef<OnTime | undefined>(onTime);
   const onErrorRef = useRef<(() => void) | undefined>(onError);
-  const clock = useRef<Clock>({ watched: 0, since: 0, loops: 0, lastPos: 0 });
+  const onProgressRef = useRef<OnProgress | undefined>(onProgress);
+  const clock = useRef<Clock>({ watched: 0, since: 0, loops: 0, lastPos: 0, barSeekAt: 0 });
   const startLoad = useRef<(() => void) | null>(null); // set while an hls.js instance waits to load
 
   useEffect(() => {
     onTimeRef.current = onTime;
     onErrorRef.current = onError;
+    onProgressRef.current = onProgress;
     mutedRef.current = muted;
     pausedRef.current = paused;
   });
@@ -128,8 +136,12 @@ export default function HlsVideo({ src, poster, active, muted, loop, paused = fa
     };
     const onStop = () => stopClock(c);
     const onTimeUpdate = () => {
-      if (video.loop && video.currentTime + 0.5 < c.lastPos) c.loops += 1;
+      // A jump back made by the progress bar (within 2 s) is not a loop.
+      const barSeek = c.barSeekAt > 0 && performance.now() - c.barSeekAt < 2000;
+      if (video.loop && video.currentTime + 0.5 < c.lastPos && !barSeek) c.loops += 1;
       c.lastPos = video.currentTime;
+      const d = video.duration;
+      if (activeRef.current && Number.isFinite(d) && d > 0) onProgressRef.current?.(video.currentTime, d);
     };
     video.addEventListener("play", onPlay);
     video.addEventListener("playing", onPlaying);
@@ -179,6 +191,22 @@ export default function HlsVideo({ src, poster, active, muted, loop, paused = fa
   useEffect(() => {
     if (ref.current) ref.current.muted = muted;
   }, [muted]);
+
+  // Progress bar jumps (only callers that pass seekRef; feed posts and stories never jump).
+  useEffect(() => {
+    if (!seekRef) return;
+    const c = clock.current;
+    seekRef.current = (seconds: number) => {
+      const video = ref.current;
+      if (!video || !Number.isFinite(seconds)) return;
+      c.barSeekAt = performance.now();
+      c.lastPos = seconds;
+      video.currentTime = seconds;
+    };
+    return () => {
+      seekRef.current = null;
+    };
+  }, [seekRef]);
 
   return (
     <video
